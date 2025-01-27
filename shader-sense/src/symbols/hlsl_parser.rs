@@ -10,7 +10,17 @@ use super::{
     },
 };
 
-pub(super) struct HlslIncludeTreeParser {}
+pub fn get_hlsl_parsers() -> Vec<Box<dyn SymbolTreeParser>> {
+    vec![
+        Box::new(HlslFunctionTreeParser { is_field: false }),
+        Box::new(HlslStructTreeParser::new()),
+        Box::new(HlslVariableTreeParser { is_field: false }),
+        Box::new(HlslIncludeTreeParser {}),
+        Box::new(HlslDefineTreeParser {}),
+    ]
+}
+
+struct HlslIncludeTreeParser {}
 
 impl SymbolTreeParser for HlslIncludeTreeParser {
     fn get_query(&self) -> String {
@@ -61,7 +71,7 @@ impl SymbolTreeParser for HlslIncludeTreeParser {
         }
     }
 }
-pub(super) struct HlslDefineTreeParser {}
+struct HlslDefineTreeParser {}
 
 impl SymbolTreeParser for HlslDefineTreeParser {
     fn get_query(&self) -> String {
@@ -113,8 +123,8 @@ impl SymbolTreeParser for HlslDefineTreeParser {
         });
     }
 }
-pub(super) struct HlslFunctionTreeParser {
-    pub is_field: bool,
+struct HlslFunctionTreeParser {
+    is_field: bool,
 }
 
 impl SymbolTreeParser for HlslFunctionTreeParser {
@@ -189,7 +199,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
     }
 }
 
-pub(super) struct HlslStructTreeParser {
+struct HlslStructTreeParser {
     var_parser: HlslVariableTreeParser,
     var_query: tree_sitter::Query,
     func_parser: HlslFunctionTreeParser,
@@ -313,8 +323,8 @@ impl SymbolTreeParser for HlslStructTreeParser {
     }
 }
 
-pub(super) struct HlslVariableTreeParser {
-    pub is_field: bool,
+struct HlslVariableTreeParser {
+    is_field: bool,
 }
 
 impl SymbolTreeParser for HlslVariableTreeParser {

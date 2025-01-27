@@ -7,8 +7,12 @@ use super::{
     },
 };
 
+pub fn get_wgsl_parsers() -> Vec<Box<dyn SymbolTreeParser>> {
+    vec![]
+}
+
 #[allow(dead_code)] // For now, dont pollute Wgsl as its not ready
-pub(super) struct WgslStructTreeParser {}
+struct WgslStructTreeParser {}
 
 impl SymbolTreeParser for WgslStructTreeParser {
     fn get_query(&self) -> String {

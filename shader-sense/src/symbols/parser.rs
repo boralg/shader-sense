@@ -8,15 +8,10 @@ use tree_sitter::{InputEdit, Node, Parser, QueryCursor, QueryMatch, Tree, TreeCu
 use crate::symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolList};
 
 use super::{
-    glsl_parser::{
-        GlslDefineTreeParser, GlslFunctionTreeParser, GlslIncludeTreeParser, GlslStructTreeParser,
-        GlslVariableTreeParser,
-    },
-    hlsl_parser::{
-        HlslDefineTreeParser, HlslFunctionTreeParser, HlslIncludeTreeParser, HlslStructTreeParser,
-        HlslVariableTreeParser,
-    },
+    glsl_parser::get_glsl_parsers,
+    hlsl_parser::get_hlsl_parsers,
     symbols::{ShaderScope, SymbolError},
+    wgsl_parser::get_wgsl_parsers,
 };
 
 pub(super) fn get_name<'a>(shader_content: &'a str, node: Node) -> &'a str {
@@ -126,13 +121,10 @@ impl SymbolParser {
             .expect("Error loading HLSL grammar");
         Self {
             parser,
-            symbol_parsers: vec![
-                create_symbol_parser(Box::new(HlslFunctionTreeParser { is_field: false }), &lang),
-                create_symbol_parser(Box::new(HlslStructTreeParser::new()), &lang),
-                create_symbol_parser(Box::new(HlslVariableTreeParser { is_field: false }), &lang),
-                create_symbol_parser(Box::new(HlslIncludeTreeParser {}), &lang),
-                create_symbol_parser(Box::new(HlslDefineTreeParser {}), &lang),
-            ],
+            symbol_parsers: get_hlsl_parsers()
+                .into_iter()
+                .map(|symbol_parser| create_symbol_parser(symbol_parser, &lang))
+                .collect(),
             scope_query: tree_sitter::Query::new(lang.clone(), r#"(compound_statement) @scope"#)
                 .unwrap(),
         }
@@ -145,13 +137,10 @@ impl SymbolParser {
             .expect("Error loading GLSL grammar");
         Self {
             parser,
-            symbol_parsers: vec![
-                create_symbol_parser(Box::new(GlslFunctionTreeParser {}), &lang),
-                create_symbol_parser(Box::new(GlslStructTreeParser {}), &lang),
-                create_symbol_parser(Box::new(GlslVariableTreeParser {}), &lang),
-                create_symbol_parser(Box::new(GlslIncludeTreeParser {}), &lang),
-                create_symbol_parser(Box::new(GlslDefineTreeParser {}), &lang),
-            ],
+            symbol_parsers: get_glsl_parsers()
+                .into_iter()
+                .map(|symbol_parser| create_symbol_parser(symbol_parser, &lang))
+                .collect(),
             scope_query: tree_sitter::Query::new(lang.clone(), r#"(compound_statement) @scope"#)
                 .unwrap(),
         }
@@ -164,7 +153,10 @@ impl SymbolParser {
             .expect("Error loading WGSL grammar");
         Self {
             parser,
-            symbol_parsers: vec![],
+            symbol_parsers: get_wgsl_parsers()
+                .into_iter()
+                .map(|symbol_parser| create_symbol_parser(symbol_parser, &lang))
+                .collect(),
             scope_query: tree_sitter::Query::new(lang.clone(), r#"(compound_statement) @scope"#)
                 .unwrap(),
         }

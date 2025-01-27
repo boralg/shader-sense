@@ -10,7 +10,17 @@ use super::{
     },
 };
 
-pub(super) struct GlslIncludeTreeParser {}
+pub fn get_glsl_parsers() -> Vec<Box<dyn SymbolTreeParser>> {
+    vec![
+        Box::new(GlslFunctionTreeParser {}),
+        Box::new(GlslStructTreeParser {}),
+        Box::new(GlslVariableTreeParser {}),
+        Box::new(GlslIncludeTreeParser {}),
+        Box::new(GlslDefineTreeParser {}),
+    ]
+}
+
+struct GlslIncludeTreeParser {}
 
 impl SymbolTreeParser for GlslIncludeTreeParser {
     fn get_query(&self) -> String {
@@ -62,7 +72,7 @@ impl SymbolTreeParser for GlslIncludeTreeParser {
     }
 }
 
-pub(super) struct GlslDefineTreeParser {}
+struct GlslDefineTreeParser {}
 
 impl SymbolTreeParser for GlslDefineTreeParser {
     fn get_query(&self) -> String {
@@ -114,7 +124,7 @@ impl SymbolTreeParser for GlslDefineTreeParser {
         });
     }
 }
-pub(super) struct GlslFunctionTreeParser {}
+struct GlslFunctionTreeParser {}
 
 impl SymbolTreeParser for GlslFunctionTreeParser {
     fn get_query(&self) -> String {
@@ -183,7 +193,7 @@ impl SymbolTreeParser for GlslFunctionTreeParser {
     }
 }
 
-pub(super) struct GlslStructTreeParser {}
+struct GlslStructTreeParser {}
 
 impl SymbolTreeParser for GlslStructTreeParser {
     fn get_query(&self) -> String {
@@ -231,7 +241,7 @@ impl SymbolTreeParser for GlslStructTreeParser {
         });
     }
 }
-pub(super) struct GlslVariableTreeParser {}
+struct GlslVariableTreeParser {}
 
 impl SymbolTreeParser for GlslVariableTreeParser {
     fn get_query(&self) -> String {
