@@ -9,7 +9,9 @@ use lsp_types::Url;
 use shader_sense::{
     shader::ShadingLanguage,
     shader_error::ShaderError,
-    symbols::{symbol_provider::SymbolProvider, symbols::ShaderSymbolList, SymbolTree},
+    symbols::{
+        symbol_provider::SymbolProvider, symbol_tree::SymbolTree, symbols::ShaderSymbolList,
+    },
 };
 
 use super::server_config::ServerConfig;

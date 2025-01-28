@@ -3,9 +3,13 @@ mod wgsl_parser;
 use tree_sitter::Parser;
 use wgsl_parser::get_wgsl_parsers;
 
-use super::parser::{create_symbol_parser, SymbolParser};
+use super::{
+    parser::create_symbol_parser,
+    symbol_provider::SymbolProvider,
+    symbols::{parse_default_shader_intrinsics, ShaderSymbolList},
+};
 
-impl SymbolParser {
+impl SymbolProvider {
     pub fn wgsl() -> Self {
         let lang = tree_sitter_wgsl_bevy::language();
         let mut parser = Parser::new();
@@ -21,6 +25,9 @@ impl SymbolParser {
             scope_query: tree_sitter::Query::new(lang.clone(), r#"(compound_statement) @scope"#)
                 .unwrap(),
             filters: vec![],
+            shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
+                "../intrinsics/wgsl-intrinsics.json"
+            ))),
         }
     }
 }

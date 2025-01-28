@@ -498,22 +498,3 @@ pub fn parse_default_shader_intrinsics(shading_language: ShadingLanguage) -> Sha
         ))),
     }
 }
-
-// SCOPES
-
-// How to affect scope to a symbol ?
-// Vec<String> = ["", "fibonnaci"] // Could mean global / fibonnaci, but would require to parse header of scope... No trivial.
-// Scope = {start:, end:,} // Store an optional scope range computed on symbol detection, found by iterating on scopes vec.
-//      /-> Would have a scope [0, 2, 35, 98] instead that are index in scope range.
-//          This mean all symbol in scope 0, 2, 35 & 98 arer compatibles.
-// { // Scope 1
-//  struct Value { // Scope 5
-//      uint oui;
-//  }
-// }
-// scope of Value == [1] (could have an owning scope (such as 5), this way, when dot is pressed on data type with owning scope, read values in this scope (and methods !))
-// scope of oui = [1, 5]
-
-pub(super) trait SymbolFilter {
-    fn filter_symbols(&self, shader_symbols: &mut ShaderSymbolList, file_name: &String);
-}

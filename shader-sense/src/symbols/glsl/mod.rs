@@ -1,12 +1,14 @@
 use glsl_filter::{GlslStageFilter, GlslVersionFilter};
 use tree_sitter::Parser;
 
-use super::parser::{create_symbol_parser, SymbolParser};
+use super::{
+    parser::create_symbol_parser, symbol_provider::SymbolProvider, symbols::ShaderSymbolList,
+};
 
 mod glsl_filter;
 mod glsl_parser;
 
-impl SymbolParser {
+impl SymbolProvider {
     pub fn glsl() -> Self {
         let lang = tree_sitter_glsl::language();
         let mut parser = Parser::new();
@@ -22,6 +24,9 @@ impl SymbolParser {
             scope_query: tree_sitter::Query::new(lang.clone(), r#"(compound_statement) @scope"#)
                 .unwrap(),
             filters: vec![Box::new(GlslVersionFilter {}), Box::new(GlslStageFilter {})],
+            shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
+                "../intrinsics/glsl-intrinsics.json"
+            ))),
         }
     }
 }

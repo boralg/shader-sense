@@ -2,10 +2,10 @@ mod glsl;
 mod hlsl;
 mod parser;
 pub mod symbol_provider;
+pub mod symbol_tree;
 pub mod symbols;
 mod wgsl;
 
-pub use parser::SymbolTree;
 use symbol_provider::SymbolProvider;
 
 use crate::shader::ShadingLanguage;

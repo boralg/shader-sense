@@ -1,10 +1,11 @@
 use crate::shader::ShaderStage;
 
-use crate::symbols::symbols::{ShaderSymbolList, SymbolFilter};
+use crate::symbols::parser::SymbolTreeFilter;
+use crate::symbols::symbols::ShaderSymbolList;
 
 pub struct HlslStageFilter {}
 
-impl SymbolFilter for HlslStageFilter {
+impl SymbolTreeFilter for HlslStageFilter {
     fn filter_symbols(&self, shader_symbols: &mut ShaderSymbolList, file_name: &String) {
         match ShaderStage::from_file_name(file_name) {
             Some(shader_stage) => {
