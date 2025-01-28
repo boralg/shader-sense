@@ -4,9 +4,7 @@ use tree_sitter::Parser;
 use wgsl_parser::get_wgsl_parsers;
 
 use super::{
-    parser::create_symbol_parser,
-    symbol_provider::SymbolProvider,
-    symbols::{parse_default_shader_intrinsics, ShaderSymbolList},
+    parser::create_symbol_parser, symbol_provider::SymbolProvider, symbols::ShaderSymbolList,
 };
 
 impl SymbolProvider {

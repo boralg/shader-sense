@@ -484,17 +484,3 @@ impl ShaderSymbol {
         }
     }
 }
-
-pub fn parse_default_shader_intrinsics(shading_language: ShadingLanguage) -> ShaderSymbolList {
-    match shading_language {
-        ShadingLanguage::Wgsl => ShaderSymbolList::parse_from_json(String::from(include_str!(
-            "intrinsics/wgsl-intrinsics.json"
-        ))),
-        ShadingLanguage::Hlsl => ShaderSymbolList::parse_from_json(String::from(include_str!(
-            "intrinsics/hlsl-intrinsics.json"
-        ))),
-        ShadingLanguage::Glsl => ShaderSymbolList::parse_from_json(String::from(include_str!(
-            "intrinsics/glsl-intrinsics.json"
-        ))),
-    }
-}
