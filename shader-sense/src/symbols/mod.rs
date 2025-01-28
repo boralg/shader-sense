@@ -1,11 +1,12 @@
 mod glsl;
 mod hlsl;
 mod parser;
+pub mod symbol_provider;
 pub mod symbols;
 mod wgsl;
 
 pub use parser::SymbolTree;
-use symbols::SymbolProvider;
+use symbol_provider::SymbolProvider;
 
 use crate::shader::ShadingLanguage;
 
@@ -27,7 +28,10 @@ mod tests {
         validator::validator::ValidationParams,
     };
 
-    use super::symbols::{parse_default_shader_intrinsics, ShaderSymbolList, SymbolProvider};
+    use super::{
+        symbol_provider::SymbolProvider,
+        symbols::{parse_default_shader_intrinsics, ShaderSymbolList},
+    };
 
     pub fn find_file_dependencies(
         include_handler: &mut IncludeHandler,

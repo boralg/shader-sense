@@ -9,7 +9,8 @@ use lsp_types::Url;
 use shader_sense::{
     shader::ShadingLanguage,
     symbols::{
-        symbols::{ShaderSymbolList, SymbolError, SymbolProvider},
+        symbol_provider::SymbolProvider,
+        symbols::{ShaderSymbolList, SymbolError},
         SymbolTree,
     },
 };

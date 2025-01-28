@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use shader_sense::{
-    symbols::symbols::{ShaderSymbolList, SymbolProvider},
+    symbols::{symbol_provider::SymbolProvider, symbols::ShaderSymbolList},
     validator::{glslang::Glslang, naga::Naga, validator::Validator},
 };
 
