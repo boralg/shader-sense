@@ -26,7 +26,7 @@ impl SymbolProvider {
                 .unwrap(),
             filters: vec![],
             shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
-                "../intrinsics/wgsl-intrinsics.json"
+                "wgsl-intrinsics.json"
             ))),
         }
     }

@@ -25,7 +25,7 @@ impl SymbolProvider {
                 .unwrap(),
             filters: vec![Box::new(GlslVersionFilter {}), Box::new(GlslStageFilter {})],
             shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
-                "../intrinsics/glsl-intrinsics.json"
+                "glsl-intrinsics.json"
             ))),
         }
     }
