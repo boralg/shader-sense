@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::{
+use crate::symbols::{
     parser::{get_name, SymbolTreeParser},
     symbols::{
         ShaderParameter, ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,

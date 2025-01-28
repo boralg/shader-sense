@@ -1,11 +1,8 @@
-mod glsl_filter;
-mod glsl_parser;
-mod hlsl_filter;
-mod hlsl_parser;
+mod glsl;
+mod hlsl;
 mod parser;
 pub mod symbols;
-mod wgsl_filter;
-mod wgsl_parser;
+mod wgsl;
 
 pub use parser::SymbolTree;
 use symbols::SymbolProvider;

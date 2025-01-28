@@ -7,12 +7,7 @@ use tree_sitter::{InputEdit, Node, Parser, QueryCursor, QueryMatch, Tree, TreeCu
 
 use crate::symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolList};
 
-use super::{
-    glsl_parser::get_glsl_parsers,
-    hlsl_parser::get_hlsl_parsers,
-    symbols::{ShaderScope, SymbolError},
-    wgsl_parser::get_wgsl_parsers,
-};
+use super::symbols::{ShaderScope, SymbolError, SymbolFilter};
 
 pub(super) fn get_name<'a>(shader_content: &'a str, node: Node) -> &'a str {
     let range = node.range();
@@ -98,12 +93,13 @@ impl SymbolTree {
     }
 }
 pub struct SymbolParser {
-    parser: Parser,
-    symbol_parsers: Vec<(Box<dyn SymbolTreeParser>, tree_sitter::Query)>,
-    scope_query: tree_sitter::Query,
+    pub(super) parser: Parser,
+    pub(super) symbol_parsers: Vec<(Box<dyn SymbolTreeParser>, tree_sitter::Query)>,
+    pub(super) scope_query: tree_sitter::Query,
+    pub(super) filters: Vec<Box<dyn SymbolFilter>>,
 }
 
-fn create_symbol_parser(
+pub(super) fn create_symbol_parser(
     symbol_parser: Box<dyn SymbolTreeParser>,
     language: &tree_sitter::Language,
 ) -> (Box<dyn SymbolTreeParser>, tree_sitter::Query) {
@@ -113,54 +109,6 @@ fn create_symbol_parser(
 }
 
 impl SymbolParser {
-    pub fn hlsl() -> Self {
-        let lang = tree_sitter_hlsl::language();
-        let mut parser = Parser::new();
-        parser
-            .set_language(lang.clone())
-            .expect("Error loading HLSL grammar");
-        Self {
-            parser,
-            symbol_parsers: get_hlsl_parsers()
-                .into_iter()
-                .map(|symbol_parser| create_symbol_parser(symbol_parser, &lang))
-                .collect(),
-            scope_query: tree_sitter::Query::new(lang.clone(), r#"(compound_statement) @scope"#)
-                .unwrap(),
-        }
-    }
-    pub fn glsl() -> Self {
-        let lang = tree_sitter_glsl::language();
-        let mut parser = Parser::new();
-        parser
-            .set_language(lang.clone())
-            .expect("Error loading GLSL grammar");
-        Self {
-            parser,
-            symbol_parsers: get_glsl_parsers()
-                .into_iter()
-                .map(|symbol_parser| create_symbol_parser(symbol_parser, &lang))
-                .collect(),
-            scope_query: tree_sitter::Query::new(lang.clone(), r#"(compound_statement) @scope"#)
-                .unwrap(),
-        }
-    }
-    pub fn wgsl() -> Self {
-        let lang = tree_sitter_wgsl_bevy::language();
-        let mut parser = Parser::new();
-        parser
-            .set_language(lang.clone())
-            .expect("Error loading WGSL grammar");
-        Self {
-            parser,
-            symbol_parsers: get_wgsl_parsers()
-                .into_iter()
-                .map(|symbol_parser| create_symbol_parser(symbol_parser, &lang))
-                .collect(),
-            scope_query: tree_sitter::Query::new(lang.clone(), r#"(compound_statement) @scope"#)
-                .unwrap(),
-        }
-    }
     fn query_scopes(
         &self,
         file_path: &Path,

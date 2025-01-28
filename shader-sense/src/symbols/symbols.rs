@@ -11,10 +11,7 @@ use crate::{
     validator::validator::ValidationParams,
 };
 
-use super::{
-    glsl_filter::{GlslStageFilter, GlslVersionFilter},
-    parser::{SymbolParser, SymbolTree},
-};
+use super::parser::{SymbolParser, SymbolTree};
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderParameter {
@@ -548,7 +545,6 @@ impl Display for SymbolError {
 pub struct SymbolProvider {
     shader_intrinsics: ShaderSymbolList,
     symbol_parser: SymbolParser,
-    filters: Vec<Box<dyn SymbolFilter>>,
 }
 
 impl SymbolProvider {
@@ -556,21 +552,18 @@ impl SymbolProvider {
         Self {
             symbol_parser: SymbolParser::glsl(),
             shader_intrinsics: parse_default_shader_intrinsics(ShadingLanguage::Glsl),
-            filters: vec![Box::new(GlslVersionFilter {}), Box::new(GlslStageFilter {})],
         }
     }
     pub fn hlsl() -> Self {
         Self {
             symbol_parser: SymbolParser::hlsl(),
             shader_intrinsics: parse_default_shader_intrinsics(ShadingLanguage::Hlsl),
-            filters: vec![],
         }
     }
     pub fn wgsl() -> Self {
         Self {
             symbol_parser: SymbolParser::wgsl(),
             shader_intrinsics: parse_default_shader_intrinsics(ShadingLanguage::Wgsl),
-            filters: vec![],
         }
     }
     pub fn from(shading_language: ShadingLanguage) -> Self {
@@ -648,7 +641,7 @@ impl SymbolProvider {
             .unwrap()
             .to_string_lossy()
             .to_string();
-        for filter in &self.filters {
+        for filter in &self.symbol_parser.filters {
             filter.filter_symbols(&mut shader_symbols, &file_name);
         }
         Ok(shader_symbols)

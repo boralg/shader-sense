@@ -1,6 +1,6 @@
 use crate::shader::ShaderStage;
 
-use super::symbols::{ShaderSymbolList, SymbolFilter};
+use crate::symbols::symbols::{ShaderSymbolList, SymbolFilter};
 
 pub struct GlslVersionFilter {}
 
