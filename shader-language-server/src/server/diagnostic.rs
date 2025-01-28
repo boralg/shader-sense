@@ -5,9 +5,11 @@ use std::{
 };
 
 use log::{debug, error, info};
-use lsp_types::{Diagnostic, PublishDiagnosticsParams, Url};
+use lsp_types::{Diagnostic, DiagnosticSeverity, DiagnosticTag, PublishDiagnosticsParams, Url};
 
 use shader_sense::shader_error::{ShaderErrorSeverity, ValidatorError};
+
+use crate::server::common::shader_range_to_lsp_range;
 
 use super::{ServerConnection, ServerFileCacheHandle, ServerLanguageData};
 
@@ -158,6 +160,26 @@ impl ServerLanguageData {
                         diagnostics.insert(uri.clone(), vec![]);
                     }
                 });
+                // Add inactive regions
+                let mut inactive_diagnostics = self
+                    .recolt_inactive(&uri, cached_file)
+                    .unwrap_or(vec![]) // TODO: should not ignore error here.
+                    .into_iter()
+                    .map(|range| Diagnostic {
+                        range: shader_range_to_lsp_range(&range),
+                        severity: Some(DiagnosticSeverity::HINT),
+                        message: "Code disabled by currently used macros".into(),
+                        source: Some("shader-validator".to_string()),
+                        tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+                        ..Default::default()
+                    })
+                    .collect();
+                match diagnostics.get_mut(&uri) {
+                    Some(diagnostics) => diagnostics.append(&mut inactive_diagnostics),
+                    None => {
+                        diagnostics.insert(uri.clone(), inactive_diagnostics);
+                    }
+                }
                 Ok(diagnostics)
             }
             Err(err) => Err(err),

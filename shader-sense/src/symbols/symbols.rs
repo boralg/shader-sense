@@ -669,4 +669,10 @@ impl SymbolProvider {
         self.symbol_parser
             .find_label_chain_at_position(symbol_tree, position)
     }
+    pub fn get_inactive_regions(
+        &self,
+        symbol_tree: &SymbolTree,
+    ) -> Result<Vec<ShaderRange>, SymbolError> {
+        self.symbol_parser.find_inactive_regions(symbol_tree)
+    }
 }

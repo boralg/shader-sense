@@ -284,6 +284,12 @@ impl SymbolParser {
             position,
         )
     }
+    pub fn find_inactive_regions(
+        &self,
+        symbol_tree: &SymbolTree,
+    ) -> Result<Vec<ShaderRange>, SymbolError> {
+        self.find_inactive_regions_in_node(symbol_tree, symbol_tree.tree.root_node())
+    }
     fn find_label_at_position_in_node(
         &self,
         symbol_tree: &SymbolTree,
@@ -420,5 +426,13 @@ impl SymbolParser {
         } else {
             Err(SymbolError::NoSymbol)
         }
+    }
+    fn find_inactive_regions_in_node(
+        &self,
+        _symbol_tree: &SymbolTree,
+        _node: Node,
+    ) -> Result<Vec<ShaderRange>, SymbolError> {
+        // Query differ from lang. Need to be handled per lang
+        Ok(vec![])
     }
 }

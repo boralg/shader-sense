@@ -9,6 +9,7 @@ mod debug;
 mod diagnostic;
 mod goto;
 mod hover;
+mod inactive;
 mod signature;
 
 mod server_config;
@@ -26,15 +27,14 @@ use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, GotoDefinition, HoverRequest, Request,
     SignatureHelpRequest, WorkspaceConfiguration,
 };
-use lsp_types::ServerCapabilities;
 use lsp_types::{
     CompletionOptionsCompletionItem, CompletionParams, CompletionResponse, ConfigurationParams,
     DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentDiagnosticReportResult,
     FullDocumentDiagnosticReport, GotoDefinitionParams, HoverParams, HoverProviderCapability,
-    RelatedFullDocumentDiagnosticReport, SignatureHelpOptions, SignatureHelpParams,
-    TextDocumentSyncKind, Url, WorkDoneProgressOptions,
+    RelatedFullDocumentDiagnosticReport, ServerCapabilities, SignatureHelpOptions,
+    SignatureHelpParams, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
 };
 use shader_sense::shader::ShadingLanguage;
 
