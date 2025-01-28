@@ -24,14 +24,11 @@ mod tests {
     use regex::Regex;
 
     use crate::{
-        include::IncludeHandler, shader::ShadingLanguage, symbols::symbols::ShaderPosition,
+        include::IncludeHandler, symbols::symbols::ShaderPosition,
         validator::validator::ValidationParams,
     };
 
-    use super::{
-        symbol_provider::SymbolProvider,
-        symbols::{parse_default_shader_intrinsics, ShaderSymbolList},
-    };
+    use super::{symbol_provider::SymbolProvider, symbols::ShaderSymbolList};
 
     pub fn find_file_dependencies(
         include_handler: &mut IncludeHandler,
@@ -107,17 +104,23 @@ mod tests {
     #[test]
     fn intrinsics_glsl_ok() {
         // Ensure parsing of intrinsics is OK
-        let _ = parse_default_shader_intrinsics(ShadingLanguage::Glsl);
+        let _ = ShaderSymbolList::parse_from_json(String::from(include_str!(
+            "glsl/glsl-intrinsics.json"
+        )));
     }
     #[test]
     fn intrinsics_hlsl_ok() {
         // Ensure parsing of intrinsics is OK
-        let _ = parse_default_shader_intrinsics(ShadingLanguage::Hlsl);
+        let _ = ShaderSymbolList::parse_from_json(String::from(include_str!(
+            "hlsl/hlsl-intrinsics.json"
+        )));
     }
     #[test]
     fn intrinsics_wgsl_ok() {
         // Ensure parsing of intrinsics is OK
-        let _ = parse_default_shader_intrinsics(ShadingLanguage::Wgsl);
+        let _ = ShaderSymbolList::parse_from_json(String::from(include_str!(
+            "wgsl/wgsl-intrinsics.json"
+        )));
     }
     #[test]
     fn symbols_glsl_ok() {
