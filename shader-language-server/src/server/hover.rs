@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, Position, Url};
 
-use shader_sense::symbols::symbols::{ShaderPosition, SymbolError};
+use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderPosition};
 
 use super::{common::shader_range_to_lsp_range, ServerFileCacheHandle, ServerLanguageData};
 
@@ -12,7 +12,7 @@ impl ServerLanguageData {
         uri: &Url,
         cached_file: ServerFileCacheHandle,
         position: Position,
-    ) -> Result<Option<Hover>, SymbolError> {
+    ) -> Result<Option<Hover>, ShaderError> {
         let file_path = uri.to_file_path().unwrap();
         let shader_position = ShaderPosition {
             file_path: file_path.clone(),
@@ -73,7 +73,7 @@ impl ServerLanguageData {
                 None => Ok(None),
             },
             Err(err) => {
-                if let SymbolError::NoSymbol = err {
+                if let ShaderError::NoSymbol = err {
                     Ok(None)
                 } else {
                     Err(err)

@@ -8,11 +8,8 @@ use log::debug;
 use lsp_types::Url;
 use shader_sense::{
     shader::ShadingLanguage,
-    symbols::{
-        symbol_provider::SymbolProvider,
-        symbols::{ShaderSymbolList, SymbolError},
-        SymbolTree,
-    },
+    shader_error::ShaderError,
+    symbols::{symbol_provider::SymbolProvider, symbols::ShaderSymbolList, SymbolTree},
 };
 
 use super::server_config::ServerConfig;
@@ -40,7 +37,7 @@ impl ServerFileCache {
         config: &ServerConfig,
         range: Option<lsp_types::Range>,
         partial_content: Option<&String>,
-    ) -> Result<(), SymbolError> {
+    ) -> Result<(), ShaderError> {
         let now_start = std::time::Instant::now();
         let old_content = self.symbol_tree.content.clone();
         let now_update_ast = std::time::Instant::now();
@@ -107,7 +104,7 @@ impl ServerLanguageFileCache {
         text: &String,
         symbol_provider: &mut SymbolProvider,
         config: &ServerConfig,
-    ) -> Result<ServerFileCacheHandle, SymbolError> {
+    ) -> Result<ServerFileCacheHandle, ShaderError> {
         assert!(*uri == clean_url(&uri));
         let file_path = uri.to_file_path().unwrap();
 
@@ -154,7 +151,7 @@ impl ServerLanguageFileCache {
         lang: ShadingLanguage,
         symbol_provider: &mut SymbolProvider,
         config: &ServerConfig,
-    ) -> Result<ServerFileCacheHandle, SymbolError> {
+    ) -> Result<ServerFileCacheHandle, ShaderError> {
         assert!(*uri == clean_url(&uri));
         let file_path = uri.to_file_path().unwrap();
 
@@ -227,7 +224,7 @@ impl ServerLanguageFileCache {
             None => None,
         }
     }
-    pub fn remove_dependency(&mut self, uri: &Url) -> Result<(), SymbolError> {
+    pub fn remove_dependency(&mut self, uri: &Url) -> Result<(), ShaderError> {
         fn list_all_dependencies_count(
             file_cache: &HashMap<PathBuf, ServerFileCacheHandle>,
         ) -> HashMap<PathBuf, usize> {
@@ -287,7 +284,7 @@ impl ServerLanguageFileCache {
                                 }
                             }
                             None => {
-                                return Err(SymbolError::InternalErr(format!(
+                                return Err(ShaderError::InternalErr(format!(
                                     "Could not find dependency file {}",
                                     dependency_path.display()
                                 )))
@@ -297,13 +294,13 @@ impl ServerLanguageFileCache {
                 }
                 Ok(())
             }
-            None => Err(SymbolError::InternalErr(format!(
+            None => Err(ShaderError::InternalErr(format!(
                 "Trying to remove dependency file {} that is not watched",
                 uri.path()
             ))),
         }
     }
-    pub fn remove_file(&mut self, uri: &Url) -> Result<bool, SymbolError> {
+    pub fn remove_file(&mut self, uri: &Url) -> Result<bool, ShaderError> {
         match self.files.remove(uri) {
             Some(cached_file) => {
                 let mut cached_file = RefCell::borrow_mut(&cached_file);
@@ -322,7 +319,7 @@ impl ServerLanguageFileCache {
                 // Check if it was destroyed or we still have it in deps.
                 Ok(self.dependencies.get(&uri).is_none())
             }
-            None => Err(SymbolError::InternalErr(format!(
+            None => Err(ShaderError::InternalErr(format!(
                 "Trying to remove main file {} that is not watched",
                 uri.path()
             ))),

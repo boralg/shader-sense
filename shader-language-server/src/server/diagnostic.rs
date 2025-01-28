@@ -7,7 +7,7 @@ use std::{
 use log::{debug, error, info};
 use lsp_types::{Diagnostic, DiagnosticSeverity, DiagnosticTag, PublishDiagnosticsParams, Url};
 
-use shader_sense::shader_error::{ShaderErrorSeverity, ValidatorError};
+use shader_sense::shader_error::{ShaderDiagnosticSeverity, ShaderError};
 
 use crate::server::common::shader_range_to_lsp_range;
 
@@ -67,7 +67,7 @@ impl ServerLanguageData {
         &mut self,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
-    ) -> Result<HashMap<Url, Vec<Diagnostic>>, ValidatorError> {
+    ) -> Result<HashMap<Url, Vec<Diagnostic>>, ShaderError> {
         let file_path = uri.to_file_path().unwrap();
         let validation_params = self.config.into_validation_params();
         let shading_language = RefCell::borrow(&cached_file).shading_language;
@@ -115,7 +115,7 @@ impl ServerLanguageData {
                     };
                     if diagnostic
                         .severity
-                        .is_required(ShaderErrorSeverity::from(self.config.severity.clone()))
+                        .is_required(ShaderDiagnosticSeverity::from(self.config.severity.clone()))
                     {
                         let diagnostic = Diagnostic {
                             range: lsp_types::Range::new(
@@ -123,14 +123,18 @@ impl ServerLanguageData {
                                 lsp_types::Position::new(diagnostic.line - 1, diagnostic.pos),
                             ),
                             severity: Some(match diagnostic.severity {
-                                ShaderErrorSeverity::Hint => lsp_types::DiagnosticSeverity::HINT,
-                                ShaderErrorSeverity::Information => {
+                                ShaderDiagnosticSeverity::Hint => {
+                                    lsp_types::DiagnosticSeverity::HINT
+                                }
+                                ShaderDiagnosticSeverity::Information => {
                                     lsp_types::DiagnosticSeverity::INFORMATION
                                 }
-                                ShaderErrorSeverity::Warning => {
+                                ShaderDiagnosticSeverity::Warning => {
                                     lsp_types::DiagnosticSeverity::WARNING
                                 }
-                                ShaderErrorSeverity::Error => lsp_types::DiagnosticSeverity::ERROR,
+                                ShaderDiagnosticSeverity::Error => {
+                                    lsp_types::DiagnosticSeverity::ERROR
+                                }
                             }),
                             message: diagnostic.error,
                             source: Some("shader-validator".to_string()),

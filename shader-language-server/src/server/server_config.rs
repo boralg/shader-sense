@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use shader_sense::{
     shader::{GlslSpirvVersion, GlslTargetClient, HlslShaderModel, HlslVersion},
-    shader_error::ShaderErrorSeverity,
+    shader_error::ShaderDiagnosticSeverity,
     validator::validator::ValidationParams,
 };
 
@@ -55,7 +55,7 @@ impl Default for ServerConfig {
             defines: HashMap::new(),
             validate: true,
             symbols: true,
-            severity: ShaderErrorSeverity::Hint.to_string(),
+            severity: ShaderDiagnosticSeverity::Hint.to_string(),
             hlsl: ServerHlslConfig::default(),
             glsl: ServerGlslConfig::default(),
         }

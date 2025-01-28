@@ -5,9 +5,12 @@ use std::{
 
 use tree_sitter::{InputEdit, Node, Parser, QueryCursor, QueryMatch, Tree, TreeCursor};
 
-use crate::symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolList};
+use crate::{
+    shader_error::ShaderError,
+    symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolList},
+};
 
-use super::symbols::{ShaderScope, SymbolError, SymbolFilter};
+use super::symbols::{ShaderScope, SymbolFilter};
 
 pub(super) fn get_name<'a>(shader_content: &'a str, node: Node) -> &'a str {
     let range = node.range();
@@ -134,14 +137,14 @@ impl SymbolParser {
         &mut self,
         file_path: &Path,
         shader_content: &str,
-    ) -> Result<SymbolTree, SymbolError> {
+    ) -> Result<SymbolTree, ShaderError> {
         match self.parser.parse(shader_content, None) {
             Some(tree) => Ok(SymbolTree {
                 file_path: file_path.into(),
                 content: shader_content.into(),
                 tree,
             }),
-            None => Err(SymbolError::ParseError(format!(
+            None => Err(ShaderError::ParseSymbolError(format!(
                 "Failed to parse AST for file {}",
                 file_path.display()
             ))),
@@ -153,7 +156,7 @@ impl SymbolParser {
         new_shader_content: &str,
         range: tree_sitter::Range,
         new_text: &String,
-    ) -> Result<(), SymbolError> {
+    ) -> Result<(), ShaderError> {
         let line_count = new_text.lines().count();
         symbol_tree.tree.edit(&InputEdit {
             start_byte: range.start_byte,
@@ -180,7 +183,7 @@ impl SymbolParser {
                 symbol_tree.content = new_shader_content.into();
                 Ok(())
             }
-            None => Err(SymbolError::ParseError(format!(
+            None => Err(ShaderError::ParseSymbolError(format!(
                 "Failed to update AST for file {}.",
                 symbol_tree.file_path.display()
             ))),
@@ -189,7 +192,7 @@ impl SymbolParser {
     pub fn query_local_symbols(
         &self,
         symbol_tree: &SymbolTree,
-    ) -> Result<ShaderSymbolList, SymbolError> {
+    ) -> Result<ShaderSymbolList, ShaderError> {
         let scopes = self.query_scopes(
             &symbol_tree.file_path,
             &symbol_tree.content,
@@ -218,14 +221,14 @@ impl SymbolParser {
         &self,
         symbol_tree: &SymbolTree,
         position: ShaderPosition,
-    ) -> Result<(String, ShaderRange), SymbolError> {
+    ) -> Result<(String, ShaderRange), ShaderError> {
         self.find_label_at_position_in_node(symbol_tree, symbol_tree.tree.root_node(), position)
     }
     pub fn find_label_chain_at_position(
         &mut self,
         symbol_tree: &SymbolTree,
         position: ShaderPosition,
-    ) -> Result<Vec<(String, ShaderRange)>, SymbolError> {
+    ) -> Result<Vec<(String, ShaderRange)>, ShaderError> {
         self.find_label_chain_at_position_in_node(
             symbol_tree,
             symbol_tree.tree.root_node(),
@@ -235,7 +238,7 @@ impl SymbolParser {
     pub fn find_inactive_regions(
         &self,
         symbol_tree: &SymbolTree,
-    ) -> Result<Vec<ShaderRange>, SymbolError> {
+    ) -> Result<Vec<ShaderRange>, ShaderError> {
         self.find_inactive_regions_in_node(symbol_tree, symbol_tree.tree.root_node())
     }
     fn find_label_at_position_in_node(
@@ -243,7 +246,7 @@ impl SymbolParser {
         symbol_tree: &SymbolTree,
         node: Node,
         position: ShaderPosition,
-    ) -> Result<(String, ShaderRange), SymbolError> {
+    ) -> Result<(String, ShaderRange), ShaderError> {
         fn range_contain(including_range: tree_sitter::Range, position: ShaderPosition) -> bool {
             let including_range =
                 ShaderRange::from_range(including_range, position.file_path.clone());
@@ -279,7 +282,7 @@ impl SymbolParser {
                         ) {
                             Ok(label) => return Ok(label),
                             Err(err) => {
-                                if let SymbolError::NoSymbol = err {
+                                if let ShaderError::NoSymbol = err {
                                     // Skip.
                                 } else {
                                     return Err(err);
@@ -289,9 +292,9 @@ impl SymbolParser {
                     }
                 }
             }
-            Err(SymbolError::NoSymbol)
+            Err(ShaderError::NoSymbol)
         } else {
-            Err(SymbolError::NoSymbol)
+            Err(ShaderError::NoSymbol)
         }
     }
     fn find_label_chain_at_position_in_node(
@@ -299,7 +302,7 @@ impl SymbolParser {
         symbol_tree: &SymbolTree,
         node: Node,
         position: ShaderPosition,
-    ) -> Result<Vec<(String, ShaderRange)>, SymbolError> {
+    ) -> Result<Vec<(String, ShaderRange)>, ShaderError> {
         fn range_contain(including_range: tree_sitter::Range, position: ShaderPosition) -> bool {
             let including_range =
                 ShaderRange::from_range(including_range, position.file_path.clone());
@@ -327,7 +330,7 @@ impl SymbolParser {
                                 ),
                             ));
                         } else {
-                            return Err(SymbolError::InternalErr(format!(
+                            return Err(ShaderError::InternalErr(format!(
                                 "Unhandled case in find_label_chain_at_position_in_node: {}",
                                 field.kind()
                             )));
@@ -360,7 +363,7 @@ impl SymbolParser {
                         ) {
                             Ok(chain_list) => return Ok(chain_list),
                             Err(err) => {
-                                if let SymbolError::NoSymbol = err {
+                                if let ShaderError::NoSymbol = err {
                                     // Skip.
                                 } else {
                                     return Err(err);
@@ -370,16 +373,16 @@ impl SymbolParser {
                     }
                 }
             }
-            Err(SymbolError::NoSymbol)
+            Err(ShaderError::NoSymbol)
         } else {
-            Err(SymbolError::NoSymbol)
+            Err(ShaderError::NoSymbol)
         }
     }
     fn find_inactive_regions_in_node(
         &self,
         _symbol_tree: &SymbolTree,
         _node: Node,
-    ) -> Result<Vec<ShaderRange>, SymbolError> {
+    ) -> Result<Vec<ShaderRange>, ShaderError> {
         // Query differ from lang. Need to be handled per lang
         Ok(vec![])
     }

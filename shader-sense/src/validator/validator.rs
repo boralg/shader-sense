@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::Path};
 use crate::{
     include::Dependencies,
     shader::{GlslSpirvVersion, GlslTargetClient, HlslShaderModel, HlslVersion},
-    shader_error::{ShaderDiagnosticList, ValidatorError},
+    shader_error::{ShaderDiagnosticList, ShaderError},
 };
 
 #[derive(Debug, Default)]
@@ -24,7 +24,7 @@ pub trait Validator {
         file_path: &Path,
         params: ValidationParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
-    ) -> Result<(ShaderDiagnosticList, Dependencies), ValidatorError>;
+    ) -> Result<(ShaderDiagnosticList, Dependencies), ShaderError>;
 
     fn get_file_name(&self, path: &Path) -> String {
         String::from(path.file_name().unwrap().to_string_lossy())

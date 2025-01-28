@@ -6,7 +6,7 @@ use std::path::Path;
 
 use crate::{
     include::Dependencies,
-    shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderErrorSeverity, ValidatorError},
+    shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
 };
 
 use super::validator::{ValidationParams, Validator};
@@ -27,7 +27,7 @@ impl Naga {
         if let Some(loc) = loc {
             ShaderDiagnostic {
                 file_path: None,
-                severity: ShaderErrorSeverity::Error,
+                severity: ShaderDiagnosticSeverity::Error,
                 error,
                 line: loc.line_number,
                 pos: loc.line_position,
@@ -35,7 +35,7 @@ impl Naga {
         } else {
             ShaderDiagnostic {
                 file_path: None,
-                severity: ShaderErrorSeverity::Error,
+                severity: ShaderDiagnosticSeverity::Error,
                 error,
                 line: 0,
                 pos: 0,
@@ -50,7 +50,7 @@ impl Validator for Naga {
         _file_path: &Path,
         _params: ValidationParams,
         _include_callback: &mut dyn FnMut(&Path) -> Option<String>,
-    ) -> Result<(ShaderDiagnosticList, Dependencies), ValidatorError> {
+    ) -> Result<(ShaderDiagnosticList, Dependencies), ShaderError> {
         let module = match wgsl::parse_str(&shader_content)
             .map_err(|err| Self::from_parse_err(err, &shader_content))
         {
@@ -66,14 +66,14 @@ impl Validator for Naga {
                 let loc = span.location(&shader_content);
                 list.push(ShaderDiagnostic {
                     file_path: None,
-                    severity: ShaderErrorSeverity::Error,
+                    severity: ShaderDiagnosticSeverity::Error,
                     error: error.emit_to_string(""),
                     line: loc.line_number,
                     pos: loc.line_position,
                 });
             }
             if list.is_empty() {
-                Err(ValidatorError::internal(
+                Err(ShaderError::InternalErr(
                     error.emit_to_string(&shader_content),
                 ))
             } else {

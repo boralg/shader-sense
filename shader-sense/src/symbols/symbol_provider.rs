@@ -1,12 +1,14 @@
 use std::path::Path;
 
-use crate::{shader::ShadingLanguage, validator::validator::ValidationParams};
+use crate::{
+    shader::ShadingLanguage, shader_error::ShaderError, validator::validator::ValidationParams,
+};
 
 use super::{
     parser::SymbolParser,
     symbols::{
         parse_default_shader_intrinsics, ShaderPosition, ShaderRange, ShaderSymbol,
-        ShaderSymbolData, ShaderSymbolList, SymbolError,
+        ShaderSymbolData, ShaderSymbolList,
     },
     SymbolTree,
 };
@@ -51,7 +53,7 @@ impl SymbolProvider {
         &mut self,
         file_path: &Path,
         shader_content: &str,
-    ) -> Result<SymbolTree, SymbolError> {
+    ) -> Result<SymbolTree, ShaderError> {
         self.symbol_parser.create_ast(&file_path, &shader_content)
     }
     pub fn update_ast(
@@ -61,7 +63,7 @@ impl SymbolProvider {
         new_shader_content: &str,
         old_range: &ShaderRange,
         new_text: &String,
-    ) -> Result<(), SymbolError> {
+    ) -> Result<(), ShaderError> {
         self.symbol_parser.update_ast(
             symbol_tree,
             new_shader_content,
@@ -86,7 +88,7 @@ impl SymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         params: &ValidationParams,
-    ) -> Result<ShaderSymbolList, SymbolError> {
+    ) -> Result<ShaderSymbolList, ShaderError> {
         let mut shader_symbols = self.symbol_parser.query_local_symbols(&symbol_tree)?;
         // Add custom macros to symbol list.
         for define in &params.defines {
@@ -121,7 +123,7 @@ impl SymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         position: ShaderPosition,
-    ) -> Result<(String, ShaderRange), SymbolError> {
+    ) -> Result<(String, ShaderRange), ShaderError> {
         self.symbol_parser
             .find_label_at_position(symbol_tree, position)
     }
@@ -129,14 +131,14 @@ impl SymbolProvider {
         &mut self,
         symbol_tree: &SymbolTree,
         position: ShaderPosition,
-    ) -> Result<Vec<(String, ShaderRange)>, SymbolError> {
+    ) -> Result<Vec<(String, ShaderRange)>, ShaderError> {
         self.symbol_parser
             .find_label_chain_at_position(symbol_tree, position)
     }
     pub fn get_inactive_regions(
         &self,
         symbol_tree: &SymbolTree,
-    ) -> Result<Vec<ShaderRange>, SymbolError> {
+    ) -> Result<Vec<ShaderRange>, ShaderError> {
         self.symbol_parser.find_inactive_regions(symbol_tree)
     }
 }

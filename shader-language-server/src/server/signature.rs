@@ -11,7 +11,7 @@ use lsp_types::{
 use regex::Regex;
 
 use shader_sense::{
-    shader_error::ValidatorError,
+    shader_error::ShaderError,
     symbols::symbols::{ShaderPosition, ShaderSymbol, ShaderSymbolData},
 };
 
@@ -23,7 +23,7 @@ impl ServerLanguageData {
         uri: &Url,
         cached_file: ServerFileCacheHandle,
         position: Position,
-    ) -> Result<Option<SignatureHelp>, ValidatorError> {
+    ) -> Result<Option<SignatureHelp>, ShaderError> {
         // TODO: rely on symbol provider for stronger result.
         // Should simply get symbol & read parameters. Need to get parameter index though...
         let all_symbol_list = self.get_all_symbols(Rc::clone(&cached_file));

@@ -2,45 +2,45 @@ use core::fmt;
 use std::path::PathBuf;
 
 #[derive(Debug)]
-pub enum ShaderErrorSeverity {
+pub enum ShaderDiagnosticSeverity {
     Error,
     Warning,
     Information,
     Hint,
 }
-impl fmt::Display for ShaderErrorSeverity {
+impl fmt::Display for ShaderDiagnosticSeverity {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ShaderErrorSeverity::Error => write!(f, "error"),
-            ShaderErrorSeverity::Warning => write!(f, "warning"),
-            ShaderErrorSeverity::Information => write!(f, "info"),
-            ShaderErrorSeverity::Hint => write!(f, "hint"),
+            ShaderDiagnosticSeverity::Error => write!(f, "error"),
+            ShaderDiagnosticSeverity::Warning => write!(f, "warning"),
+            ShaderDiagnosticSeverity::Information => write!(f, "info"),
+            ShaderDiagnosticSeverity::Hint => write!(f, "hint"),
         }
     }
 }
 
-impl From<String> for ShaderErrorSeverity {
+impl From<String> for ShaderDiagnosticSeverity {
     fn from(value: String) -> Self {
         match value.as_str() {
-            "error" => ShaderErrorSeverity::Error,
-            "warning" => ShaderErrorSeverity::Warning,
-            "info" => ShaderErrorSeverity::Information,
-            "hint" => ShaderErrorSeverity::Hint,
-            _ => ShaderErrorSeverity::Error,
+            "error" => ShaderDiagnosticSeverity::Error,
+            "warning" => ShaderDiagnosticSeverity::Warning,
+            "info" => ShaderDiagnosticSeverity::Information,
+            "hint" => ShaderDiagnosticSeverity::Hint,
+            _ => ShaderDiagnosticSeverity::Error,
         }
     }
 }
 
-impl ShaderErrorSeverity {
-    pub fn is_required(&self, required_severity: ShaderErrorSeverity) -> bool {
+impl ShaderDiagnosticSeverity {
+    pub fn is_required(&self, required_severity: ShaderDiagnosticSeverity) -> bool {
         self.get_enum_index() <= required_severity.get_enum_index()
     }
     fn get_enum_index(&self) -> u32 {
         match self {
-            ShaderErrorSeverity::Error => 0,
-            ShaderErrorSeverity::Warning => 1,
-            ShaderErrorSeverity::Information => 2,
-            ShaderErrorSeverity::Hint => 3,
+            ShaderDiagnosticSeverity::Error => 0,
+            ShaderDiagnosticSeverity::Warning => 1,
+            ShaderDiagnosticSeverity::Information => 2,
+            ShaderDiagnosticSeverity::Hint => 3,
         }
     }
 }
@@ -48,7 +48,7 @@ impl ShaderErrorSeverity {
 #[derive(Debug)]
 pub struct ShaderDiagnostic {
     pub file_path: Option<PathBuf>,
-    pub severity: ShaderErrorSeverity,
+    pub severity: ShaderDiagnosticSeverity,
     pub error: String,
     pub line: u32,
     pub pos: u32,
@@ -59,37 +59,45 @@ pub struct ShaderDiagnosticList {
 }
 
 #[derive(Debug)]
-pub enum ValidatorError {
+pub enum ShaderError {
+    ValidationError(String),
+    NoSymbol,
+    ParseSymbolError(String),
+    SymbolQueryError(String),
     IoErr(std::io::Error),
     InternalErr(String),
 }
 
-impl From<regex::Error> for ValidatorError {
+impl From<regex::Error> for ShaderError {
     fn from(error: regex::Error) -> Self {
         match error {
             regex::Error::CompiledTooBig(err) => {
-                ValidatorError::internal(format!("Regex compile too big: {}", err))
+                ShaderError::InternalErr(format!("Regex compile too big: {}", err))
             }
             regex::Error::Syntax(err) => {
-                ValidatorError::internal(format!("Regex syntax invalid: {}", err))
+                ShaderError::InternalErr(format!("Regex syntax invalid: {}", err))
             }
-            err => ValidatorError::internal(format!("Regex error: {:#?}", err)),
+            err => ShaderError::InternalErr(format!("Regex error: {:#?}", err)),
         }
     }
 }
 
-impl fmt::Display for ValidatorError {
+impl fmt::Display for ShaderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ValidatorError::IoErr(err) => write!(f, "IoError: {}", err),
-            ValidatorError::InternalErr(err) => write!(f, "Error: {}", err),
+            ShaderError::IoErr(err) => write!(f, "IoError: {}", err),
+            ShaderError::InternalErr(err) => write!(f, "Error: {}", err),
+            ShaderError::NoSymbol => write!(f, "NoSymbol"),
+            ShaderError::ParseSymbolError(err) => write!(f, "ParseSymbolError: {}", err),
+            ShaderError::ValidationError(err) => write!(f, "ValidationError: {}", err),
+            ShaderError::SymbolQueryError(err) => write!(f, "SymbolQueryError: {}", err),
         }
     }
 }
 
-impl From<std::io::Error> for ValidatorError {
+impl From<std::io::Error> for ShaderError {
     fn from(err: std::io::Error) -> Self {
-        ValidatorError::IoErr(err)
+        ShaderError::IoErr(err)
     }
 }
 impl From<ShaderDiagnostic> for ShaderDiagnosticList {
@@ -110,23 +118,5 @@ impl ShaderDiagnosticList {
     }
     pub fn is_empty(&self) -> bool {
         self.diagnostics.is_empty()
-    }
-}
-impl ValidatorError {
-    pub fn internal(error: String) -> Self {
-        ValidatorError::InternalErr(error)
-    }
-}
-pub enum ShaderError {
-    Validator(ValidatorError),
-    DiagnosticList(ShaderDiagnosticList),
-}
-
-impl From<ShaderError> for ValidatorError {
-    fn from(value: ShaderError) -> Self {
-        match value {
-            ShaderError::Validator(validator) => validator,
-            ShaderError::DiagnosticList(diag) => ValidatorError::internal(format!("Trying to convert ValidatorError to ShaderError, but we received diagnostic: {:#?}", diag)),
-        }
     }
 }

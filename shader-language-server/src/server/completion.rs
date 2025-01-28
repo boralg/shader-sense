@@ -7,9 +7,8 @@ use lsp_types::{
 
 use shader_sense::{
     shader::ShadingLanguage,
-    symbols::symbols::{
-        ShaderPosition, ShaderSymbol, ShaderSymbolData, ShaderSymbolType, SymbolError,
-    },
+    shader_error::ShaderError,
+    symbols::symbols::{ShaderPosition, ShaderSymbol, ShaderSymbolData, ShaderSymbolType},
 };
 
 use super::{ServerFileCacheHandle, ServerLanguageData};
@@ -34,7 +33,7 @@ impl ServerLanguageData {
         cached_file: ServerFileCacheHandle,
         position: Position,
         trigger_character: Option<String>,
-    ) -> Result<Vec<CompletionItem>, SymbolError> {
+    ) -> Result<Vec<CompletionItem>, ShaderError> {
         let file_path = uri.to_file_path().unwrap();
         let symbol_list = self.get_all_symbols(Rc::clone(&cached_file));
         let cached_file = cached_file.borrow();
@@ -90,7 +89,7 @@ impl ServerLanguageData {
                                 match members_and_methods.iter().find(|e| e.label == next_item.0) {
                                     Some(next_symbol) => next_symbol.clone(),
                                     None => {
-                                        return Err(SymbolError::InternalErr(format!(
+                                        return Err(ShaderError::InternalErr(format!(
                                             "Failed to find symbol {} for struct {}",
                                             next_item.0, current_symbol.label
                                         )))
@@ -130,7 +129,7 @@ impl ServerLanguageData {
                             .collect());
                     }
                     Err(err) => {
-                        if let SymbolError::NoSymbol = err {
+                        if let ShaderError::NoSymbol = err {
                             Ok(vec![])
                         } else {
                             Err(err)

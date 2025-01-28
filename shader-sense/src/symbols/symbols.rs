@@ -6,12 +6,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    shader::{ShaderStage, ShadingLanguage},
-    validator::validator::ValidationParams,
-};
-
-use super::parser::{SymbolParser, SymbolTree};
+use crate::shader::{ShaderStage, ShadingLanguage};
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderParameter {
@@ -521,21 +516,4 @@ pub fn parse_default_shader_intrinsics(shading_language: ShadingLanguage) -> Sha
 
 pub(super) trait SymbolFilter {
     fn filter_symbols(&self, shader_symbols: &mut ShaderSymbolList, file_name: &String);
-}
-
-#[derive(Debug, Clone)]
-pub enum SymbolError {
-    NoSymbol,
-    ParseError(String),
-    InternalErr(String),
-}
-
-impl Display for SymbolError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SymbolError::NoSymbol => write!(f, "NoSymbol"),
-            SymbolError::ParseError(error) => write!(f, "{}", error),
-            SymbolError::InternalErr(error) => write!(f, "{}", error),
-        }
-    }
 }

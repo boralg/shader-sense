@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use lsp_types::Url;
-use shader_sense::symbols::symbols::{ShaderRange, SymbolError};
+use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderRange};
 
 use super::{server_file_cache::ServerFileCacheHandle, server_language_data::ServerLanguageData};
 
@@ -10,7 +10,7 @@ impl ServerLanguageData {
         &mut self,
         _uri: &Url,
         cached_file: &ServerFileCacheHandle,
-    ) -> Result<Vec<ShaderRange>, SymbolError> {
+    ) -> Result<Vec<ShaderRange>, ShaderError> {
         // https://github.com/microsoft/language-server-protocol/issues/1938
         let cached_file = RefCell::borrow(cached_file);
         match self
