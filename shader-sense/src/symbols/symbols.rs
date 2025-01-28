@@ -1,12 +1,11 @@
 use std::{
     cmp::Ordering,
-    fmt::Display,
     path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
 
-use crate::shader::{ShaderStage, ShadingLanguage};
+use crate::shader::ShaderStage;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderParameter {

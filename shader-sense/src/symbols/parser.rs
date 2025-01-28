@@ -1,16 +1,10 @@
-use std::{
-    path::{Path, PathBuf},
-    vec,
-};
+use std::path::{Path, PathBuf};
 
-use tree_sitter::{InputEdit, Node, Parser, QueryCursor, QueryMatch, Tree, TreeCursor};
+use tree_sitter::{Node, QueryMatch};
 
-use crate::{
-    shader_error::ShaderError,
-    symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolList},
-};
+use crate::symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolList};
 
-use super::{symbol_tree::SymbolTree, symbols::ShaderScope};
+use super::symbols::ShaderScope;
 
 pub(super) fn get_name<'a>(shader_content: &'a str, node: Node) -> &'a str {
     let range = node.range();
