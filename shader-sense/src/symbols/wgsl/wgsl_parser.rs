@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::symbols::{
-    parser::{get_name, SymbolTreeParser},
+    symbol_parser::{get_name, SymbolTreeParser},
     symbols::{
         ShaderParameter, ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
     },

@@ -1,16 +1,20 @@
 use crate::shader::ShaderStage;
 
-use crate::symbols::parser::SymbolTreeFilter;
+use crate::symbols::symbol_parser::SymbolTreeFilter;
 use crate::symbols::symbols::ShaderSymbolList;
 
-pub struct GlslVersionFilter {}
+pub fn get_glsl_filters() -> Vec<Box<dyn SymbolTreeFilter>> {
+    vec![Box::new(GlslStageFilter {}), Box::new(GlslVersionFilter {})]
+}
+
+struct GlslVersionFilter {}
 
 impl SymbolTreeFilter for GlslVersionFilter {
     fn filter_symbols(&self, _shader_symbols: &mut ShaderSymbolList, _file_name: &String) {
         // TODO: filter version
     }
 }
-pub struct GlslStageFilter {}
+struct GlslStageFilter {}
 
 impl SymbolTreeFilter for GlslStageFilter {
     fn filter_symbols(&self, shader_symbols: &mut ShaderSymbolList, file_name: &String) {

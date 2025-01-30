@@ -1,9 +1,13 @@
 use crate::shader::ShaderStage;
 
-use crate::symbols::parser::SymbolTreeFilter;
+use crate::symbols::symbol_parser::SymbolTreeFilter;
 use crate::symbols::symbols::ShaderSymbolList;
 
-pub struct HlslStageFilter {}
+pub fn get_hlsl_filters() -> Vec<Box<dyn SymbolTreeFilter>> {
+    vec![Box::new(HlslStageFilter {})]
+}
+
+struct HlslStageFilter {}
 
 impl SymbolTreeFilter for HlslStageFilter {
     fn filter_symbols(&self, shader_symbols: &mut ShaderSymbolList, file_name: &String) {

@@ -86,7 +86,7 @@ impl ServerLanguageData {
                         match self.watched_files.watch_dependency(
                             &deps_uri,
                             shading_language,
-                            &mut self.symbol_provider,
+                            self.symbol_provider.as_mut(),
                             &self.config,
                         ) {
                             Ok(deps_file) => deps_file,

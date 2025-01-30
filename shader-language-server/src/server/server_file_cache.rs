@@ -35,34 +35,21 @@ impl ServerFileCache {
     pub fn update(
         &mut self,
         uri: &Url,
-        symbol_provider: &mut SymbolProvider,
+        symbol_provider: &mut dyn SymbolProvider,
         config: &ServerConfig,
         range: Option<lsp_types::Range>,
         partial_content: Option<&String>,
     ) -> Result<(), ShaderError> {
         let now_start = std::time::Instant::now();
-        let old_content = self.symbol_tree.content.clone();
         let now_update_ast = std::time::Instant::now();
         // Update abstract syntax tree
         let file_path = uri.to_file_path().unwrap();
-        let validation_params = config.into_validation_params();
         if let (Some(range), Some(partial_content)) = (range, partial_content) {
             let shader_range = lsp_range_to_shader_range(&range, &file_path);
-            let mut new_content = old_content.clone();
-            new_content.replace_range(
-                shader_range.start.to_byte_offset(&old_content)
-                    ..shader_range.end.to_byte_offset(&old_content),
-                &partial_content,
-            );
-            symbol_provider.update_ast(
-                &mut self.symbol_tree,
-                &old_content,
-                &new_content,
-                &shader_range,
-                &partial_content,
-            )?;
+            self.symbol_tree
+                .update_partial(symbol_provider, &shader_range, &partial_content)?;
         } else if let Some(whole_content) = partial_content {
-            self.symbol_tree = symbol_provider.create_ast(&file_path, &whole_content)?;
+            self.symbol_tree.update(symbol_provider, &whole_content)?;
         } else {
             // No update on content to perform.
         }
@@ -75,7 +62,7 @@ impl ServerFileCache {
         let now_get_symbol = std::time::Instant::now();
         // Cache symbols
         self.symbol_cache = if config.symbols {
-            symbol_provider.get_all_symbols(&self.symbol_tree, &validation_params)?
+            symbol_provider.query_file_symbols(&self.symbol_tree)
         } else {
             ShaderSymbolList::default()
         };
@@ -104,7 +91,7 @@ impl ServerLanguageFileCache {
         uri: &Url,
         lang: ShadingLanguage,
         text: &String,
-        symbol_provider: &mut SymbolProvider,
+        symbol_provider: &mut dyn SymbolProvider,
         config: &ServerConfig,
     ) -> Result<ServerFileCacheHandle, ShaderError> {
         assert!(*uri == clean_url(&uri));
@@ -120,10 +107,8 @@ impl ServerLanguageFileCache {
             }
             None => {
                 assert!(self.files.get(&uri).is_none());
-                let symbol_tree = symbol_provider.create_ast(&file_path, &text)?;
-                let validation_params = config.into_validation_params();
-                let symbol_list =
-                    symbol_provider.get_all_symbols(&symbol_tree, &validation_params)?;
+                let symbol_tree = SymbolTree::new(symbol_provider, &file_path, &text)?;
+                let symbol_list = symbol_provider.query_file_symbols(&symbol_tree);
                 let cached_file = Rc::new(RefCell::new(ServerFileCache {
                     shading_language: lang,
                     symbol_tree: symbol_tree,
@@ -151,7 +136,7 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         lang: ShadingLanguage,
-        symbol_provider: &mut SymbolProvider,
+        symbol_provider: &mut dyn SymbolProvider,
         config: &ServerConfig,
     ) -> Result<ServerFileCacheHandle, ShaderError> {
         assert!(*uri == clean_url(&uri));
@@ -183,10 +168,8 @@ impl ServerLanguageFileCache {
                 }
                 None => {
                     let text = read_string_lossy(&file_path).unwrap();
-                    let symbol_tree = symbol_provider.create_ast(&file_path, &text)?;
-                    let validation_params = config.into_validation_params();
-                    let symbol_list =
-                        symbol_provider.get_all_symbols(&symbol_tree, &validation_params)?;
+                    let symbol_tree = SymbolTree::new(symbol_provider, &file_path, &text)?;
+                    let symbol_list = symbol_provider.query_file_symbols(&symbol_tree);
                     let cached_file = Rc::new(RefCell::new(ServerFileCache {
                         shading_language: lang,
                         symbol_tree: symbol_tree,

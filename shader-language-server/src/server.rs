@@ -372,7 +372,7 @@ impl ServerLanguage {
                                 &uri,
                                 shading_language.clone(),
                                 &params.text_document.text,
-                                &mut language_data.symbol_provider,
+                                language_data.symbol_provider.as_mut(),
                                 &language_data.config,
                             ) {
                                 Ok(cached_file) => {
@@ -423,7 +423,7 @@ impl ServerLanguage {
                         );
                         match RefCell::borrow_mut(&cached_file).update(
                             &uri,
-                            &mut language_data.symbol_provider,
+                            language_data.symbol_provider.as_mut(),
                             &language_data.config,
                             None,
                             None,
@@ -476,7 +476,7 @@ impl ServerLanguage {
                         for content in &params.content_changes {
                             match RefCell::borrow_mut(&cached_file).update(
                                 &uri,
-                                &mut language_data.symbol_provider,
+                                language_data.symbol_provider.as_mut(),
                                 &language_data.config,
                                 content.range,
                                 Some(&content.text),
@@ -567,7 +567,7 @@ impl ServerLanguage {
                         // Update symbols & republish diags.
                         match RefCell::borrow_mut(&cached_file).update(
                             &url,
-                            &mut language_data.symbol_provider,
+                            language_data.symbol_provider.as_mut(),
                             &language_data.config,
                             None,
                             None,

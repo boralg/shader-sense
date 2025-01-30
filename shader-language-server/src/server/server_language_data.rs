@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 
 use shader_sense::{
-    symbols::{symbol_provider::SymbolProvider, symbols::ShaderSymbolList},
+    symbols::{
+        symbol_provider::SymbolProvider, symbols::ShaderSymbolList, GlslSymbolProvider,
+        HlslSymbolProvider, WgslSymbolProvider,
+    },
     validator::{glslang::Glslang, naga::Naga, validator::Validator},
 };
 
@@ -16,7 +19,7 @@ use super::{
 pub struct ServerLanguageData {
     pub watched_files: ServerLanguageFileCache,
     pub validator: Box<dyn Validator>,
-    pub symbol_provider: SymbolProvider,
+    pub symbol_provider: Box<dyn SymbolProvider>,
     pub config: ServerConfig,
 }
 
@@ -25,7 +28,7 @@ impl ServerLanguageData {
         Self {
             watched_files: ServerLanguageFileCache::new(),
             validator: Box::new(Glslang::glsl()),
-            symbol_provider: SymbolProvider::glsl(),
+            symbol_provider: Box::new(GlslSymbolProvider::new()),
             config: ServerConfig::default(),
         }
     }
@@ -36,7 +39,7 @@ impl ServerLanguageData {
             validator: Box::new(Glslang::hlsl()),
             #[cfg(not(target_os = "wasi"))]
             validator: Box::new(Dxc::new().unwrap()),
-            symbol_provider: SymbolProvider::hlsl(),
+            symbol_provider: Box::new(HlslSymbolProvider::new()),
             config: ServerConfig::default(),
         }
     }
@@ -44,7 +47,7 @@ impl ServerLanguageData {
         Self {
             watched_files: ServerLanguageFileCache::new(),
             validator: Box::new(Naga::new()),
-            symbol_provider: SymbolProvider::wgsl(),
+            symbol_provider: Box::new(WgslSymbolProvider::new()),
             config: ServerConfig::default(),
         }
     }
@@ -59,6 +62,8 @@ impl ServerLanguageData {
             let deps_cached_file = RefCell::borrow(&deps_cached_file);
             symbol_cache.append(deps_cached_file.symbol_cache.clone());
         }
+        // Add macros
+        self.config.append_custom_defines(&mut symbol_cache);
         symbol_cache
     }
 }

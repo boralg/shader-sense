@@ -3,7 +3,7 @@ use std::path::Path;
 use crate::{include::IncludeHandler, shader::ShadingLanguage, symbols::symbols::ShaderMember};
 
 use crate::symbols::{
-    parser::{get_name, SymbolTreeParser},
+    symbol_parser::{get_name, SymbolTreeParser},
     symbols::{
         ShaderMethod, ShaderParameter, ShaderPosition, ShaderRange, ShaderScope, ShaderSignature,
         ShaderSymbol, ShaderSymbolData, ShaderSymbolList,

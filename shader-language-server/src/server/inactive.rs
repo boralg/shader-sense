@@ -15,7 +15,7 @@ impl ServerLanguageData {
         let cached_file = RefCell::borrow(cached_file);
         match self
             .symbol_provider
-            .get_inactive_regions(&cached_file.symbol_tree)
+            .query_inactive_regions(&cached_file.symbol_tree)
         {
             Ok(ranges) => Ok(ranges),
             Err(error) => Err(error),

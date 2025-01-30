@@ -2,7 +2,7 @@ use std::path::Path;
 
 use shader_sense::{
     shader::ShadingLanguage,
-    symbols::create_symbol_provider,
+    symbols::{create_symbol_provider, symbol_tree::SymbolTree},
     validator::{create_validator, validator::ValidationParams},
 };
 
@@ -28,12 +28,10 @@ fn query_all_symbol(shading_language: ShadingLanguage, shader_path: &Path) {
     // SymbolProvider intended to gather file symbol at runtime by inspecting the AST.
     let mut symbol_provider = create_symbol_provider(shading_language);
     let shader_content = std::fs::read_to_string(shader_path).unwrap();
-    match symbol_provider.create_ast(shader_path, &shader_content) {
+    match SymbolTree::new(symbol_provider.as_mut(), shader_path, &shader_content) {
         Ok(symbol_tree) => {
-            match symbol_provider.get_all_symbols(&symbol_tree, &ValidationParams::default()) {
-                Ok(symbol_list) => println!("Found symbols: {:#?}", symbol_list),
-                Err(err) => println!("Failed to get all symbols: {:#?}", err),
-            }
+            let symbol_list = symbol_provider.query_file_symbols(&symbol_tree);
+            println!("Found symbols: {:#?}", symbol_list);
         }
         Err(err) => println!("Failed to create ast: {:#?}", err),
     }

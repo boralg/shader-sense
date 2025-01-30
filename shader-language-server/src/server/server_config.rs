@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use shader_sense::{
     shader::{GlslSpirvVersion, GlslTargetClient, HlslShaderModel, HlslVersion},
     shader_error::ShaderDiagnosticSeverity,
+    symbols::symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolList},
     validator::validator::ValidationParams,
 };
 
@@ -44,6 +45,24 @@ impl ServerConfig {
             hlsl_enable16bit_types: self.hlsl.enable16bitTypes,
             glsl_client: self.glsl.targetClient,
             glsl_spirv: self.glsl.spirvVersion,
+        }
+    }
+    pub fn append_custom_defines(&self, symbol_list: &mut ShaderSymbolList) {
+        for define in &self.defines {
+            symbol_list.constants.push(ShaderSymbol {
+                label: define.0.clone(),
+                description: format!("Preprocessor macro (value: {})", define.1),
+                version: "".into(),
+                stages: Vec::new(),
+                link: None,
+                data: ShaderSymbolData::Constants {
+                    ty: "".into(),
+                    qualifier: "".into(),
+                    value: define.1.clone(),
+                },
+                range: None,
+                scope_stack: None,
+            });
         }
     }
 }

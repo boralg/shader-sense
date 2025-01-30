@@ -1,15 +1,25 @@
-use glsl_filter::{GlslStageFilter, GlslVersionFilter};
+mod glsl_filter;
+mod glsl_inactive;
+mod glsl_parser;
+mod glsl_word;
+mod glsl_word_chain;
+
+use glsl_filter::get_glsl_filters;
+use glsl_parser::get_glsl_parsers;
 use tree_sitter::Parser;
 
 use super::{
-    parser::create_symbol_parser, symbol_provider::SymbolProvider, symbols::ShaderSymbolList,
+    symbol_parser::SymbolParser, symbol_provider::SymbolProvider, symbols::ShaderSymbolList,
 };
 
-mod glsl_filter;
-mod glsl_parser;
+pub struct GlslSymbolProvider {
+    parser: Parser,
+    symbol_parser: SymbolParser,
+    shader_intrinsics: ShaderSymbolList,
+}
 
-impl SymbolProvider {
-    pub fn glsl() -> Self {
+impl GlslSymbolProvider {
+    pub fn new() -> Self {
         let lang = tree_sitter_glsl::language();
         let mut parser = Parser::new();
         parser
@@ -17,16 +27,56 @@ impl SymbolProvider {
             .expect("Error loading GLSL grammar");
         Self {
             parser,
-            symbol_parsers: glsl_parser::get_glsl_parsers()
-                .into_iter()
-                .map(|symbol_parser| create_symbol_parser(symbol_parser, &lang))
-                .collect(),
-            scope_query: tree_sitter::Query::new(lang.clone(), r#"(compound_statement) @scope"#)
-                .unwrap(),
-            filters: vec![Box::new(GlslVersionFilter {}), Box::new(GlslStageFilter {})],
+            symbol_parser: SymbolParser::new(
+                lang.clone(),
+                r#"(compound_statement) @scope"#,
+                get_glsl_parsers(),
+                get_glsl_filters(),
+            ),
             shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
                 "glsl-intrinsics.json"
             ))),
         }
+    }
+}
+
+impl SymbolProvider for GlslSymbolProvider {
+    fn get_parser(&mut self) -> &mut Parser {
+        &mut self.parser
+    }
+
+    fn get_intrinsics_symbol(&self) -> &ShaderSymbolList {
+        &self.shader_intrinsics
+    }
+
+    fn query_file_symbols(&self, symbol_tree: &super::symbol_tree::SymbolTree) -> ShaderSymbolList {
+        self.symbol_parser.query_file_symbols(symbol_tree)
+    }
+
+    fn get_word_range_at_position(
+        &self,
+        symbol_tree: &super::symbol_tree::SymbolTree,
+        position: super::symbols::ShaderPosition,
+    ) -> Result<(String, super::symbols::ShaderRange), crate::shader_error::ShaderError> {
+        self.find_label_at_position_in_node(symbol_tree, symbol_tree.tree.root_node(), position)
+    }
+
+    fn get_word_chain_range_at_position(
+        &mut self,
+        symbol_tree: &super::symbol_tree::SymbolTree,
+        position: super::symbols::ShaderPosition,
+    ) -> Result<Vec<(String, super::symbols::ShaderRange)>, crate::shader_error::ShaderError> {
+        self.find_label_chain_at_position_in_node(
+            symbol_tree,
+            symbol_tree.tree.root_node(),
+            position,
+        )
+    }
+
+    fn query_inactive_regions(
+        &self,
+        symbol_tree: &super::symbol_tree::SymbolTree,
+    ) -> Result<Vec<super::symbols::ShaderRange>, crate::shader_error::ShaderError> {
+        self.query_inactive_regions_in_node(symbol_tree, symbol_tree.tree.root_node())
     }
 }

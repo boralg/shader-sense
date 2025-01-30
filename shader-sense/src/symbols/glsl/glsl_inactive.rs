@@ -3,9 +3,9 @@ use crate::{
     symbols::{symbol_tree::SymbolTree, symbols::ShaderRange},
 };
 
-use super::HlslSymbolProvider;
+use super::GlslSymbolProvider;
 
-impl HlslSymbolProvider {
+impl GlslSymbolProvider {
     pub fn query_inactive_regions_in_node(
         &self,
         _symbol_tree: &SymbolTree,

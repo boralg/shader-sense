@@ -107,6 +107,9 @@ impl ShaderRange {
     pub fn new(start: ShaderPosition, end: ShaderPosition) -> Self {
         Self { start, end }
     }
+    pub fn whole(_content: &str) -> Self {
+        todo!()
+    }
     pub fn contain_bounds(&self, position: &ShaderRange) -> bool {
         self.contain(&position.start) && self.contain(&position.end)
     }
