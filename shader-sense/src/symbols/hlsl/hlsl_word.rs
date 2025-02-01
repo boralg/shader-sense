@@ -19,8 +19,7 @@ impl HlslSymbolProvider {
         position: ShaderPosition,
     ) -> Result<(String, ShaderRange), ShaderError> {
         fn range_contain(including_range: tree_sitter::Range, position: ShaderPosition) -> bool {
-            let including_range =
-                ShaderRange::from_range(including_range, position.file_path.clone());
+            let including_range = ShaderRange::from_range(including_range, &position.file_path);
             including_range.contain(&position)
         }
         if range_contain(node.range(), position.clone()) {
@@ -33,7 +32,7 @@ impl HlslSymbolProvider {
                 "identifier" | "type_identifier" | "primitive_type" => {
                     return Ok((
                         get_name(&symbol_tree.content, node).into(),
-                        ShaderRange::from_range(node.range(), symbol_tree.file_path.clone()),
+                        ShaderRange::from_range(node.range(), &symbol_tree.file_path),
                     ))
                 }
                 // TODO: should use string_content instead
@@ -41,7 +40,7 @@ impl HlslSymbolProvider {
                     let path = get_name(&symbol_tree.content, node);
                     return Ok((
                         path[1..path.len() - 1].into(),
-                        ShaderRange::from_range(node.range(), symbol_tree.file_path.clone()),
+                        ShaderRange::from_range(node.range(), &symbol_tree.file_path),
                     ));
                 }
                 _ => {

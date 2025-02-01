@@ -40,5 +40,6 @@ pub trait SymbolProvider {
     fn query_inactive_regions(
         &self,
         symbol_tree: &SymbolTree,
+        symbol_cache: Option<&ShaderSymbolList>,
     ) -> Result<Vec<ShaderRange>, ShaderError>;
 }

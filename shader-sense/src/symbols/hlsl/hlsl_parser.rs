@@ -97,7 +97,7 @@ impl SymbolTreeParser for HlslDefineTreeParser {
         } else {
             None
         };
-        symbols.functions.push(ShaderSymbol {
+        symbols.constants.push(ShaderSymbol {
             label: get_name(shader_content, identifier_node).into(),
             description: match value {
                 Some(value) => format!(

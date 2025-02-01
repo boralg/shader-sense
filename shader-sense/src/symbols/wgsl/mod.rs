@@ -73,6 +73,7 @@ impl SymbolProvider for WgslSymbolProvider {
     fn query_inactive_regions(
         &self,
         _symbol_tree: &SymbolTree,
+        _symbol_cache: Option<&ShaderSymbolList>,
     ) -> Result<Vec<ShaderRange>, ShaderError> {
         Ok(vec![])
     }

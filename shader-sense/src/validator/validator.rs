@@ -6,7 +6,7 @@ use crate::{
     shader_error::{ShaderDiagnosticList, ShaderError},
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ValidationParams {
     pub includes: Vec<String>,
     pub defines: HashMap<String, String>,

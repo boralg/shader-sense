@@ -19,8 +19,7 @@ impl HlslSymbolProvider {
         position: ShaderPosition,
     ) -> Result<Vec<(String, ShaderRange)>, ShaderError> {
         fn range_contain(including_range: tree_sitter::Range, position: ShaderPosition) -> bool {
-            let including_range =
-                ShaderRange::from_range(including_range, position.file_path.clone());
+            let including_range = ShaderRange::from_range(including_range, &position.file_path);
             including_range.contain(&position)
         }
         if range_contain(node.range(), position.clone()) {
@@ -28,7 +27,7 @@ impl HlslSymbolProvider {
                 "identifier" => {
                     return Ok(vec![(
                         get_name(&symbol_tree.content, node).into(),
-                        ShaderRange::from_range(node.range(), symbol_tree.file_path.clone()),
+                        ShaderRange::from_range(node.range(), &symbol_tree.file_path),
                     )])
                 }
                 "field_identifier" => {
@@ -39,10 +38,7 @@ impl HlslSymbolProvider {
                         if field.kind() == "field_identifier" {
                             chain.push((
                                 get_name(&symbol_tree.content, field).into(),
-                                ShaderRange::from_range(
-                                    field.range(),
-                                    symbol_tree.file_path.clone(),
-                                ),
+                                ShaderRange::from_range(field.range(), &symbol_tree.file_path),
                             ));
                         } else {
                             return Err(ShaderError::InternalErr(format!(
@@ -60,7 +56,7 @@ impl HlslSymbolProvider {
                                     get_name(&symbol_tree.content, identifier).into(),
                                     ShaderRange::from_range(
                                         identifier.range(),
-                                        symbol_tree.file_path.clone(),
+                                        &symbol_tree.file_path,
                                     ),
                                 ));
                                 break;

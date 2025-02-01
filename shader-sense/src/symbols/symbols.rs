@@ -74,10 +74,10 @@ impl ShaderPosition {
             pos,
         }
     }
-    pub fn from_pos(content: &str, pos: usize, file_path: &Path) -> ShaderPosition {
-        let line = content[..pos].lines().count() - 1;
-        let pos = content[pos..].as_ptr() as usize
-            - content[..pos].lines().last().unwrap().as_ptr() as usize;
+    pub fn from_byte_offset(content: &str, byte_offset: usize, file_path: &Path) -> ShaderPosition {
+        let line = content[..byte_offset].lines().count() - 1;
+        let pos = content[byte_offset..].as_ptr() as usize
+            - content[..byte_offset].lines().last().unwrap().as_ptr() as usize;
         ShaderPosition {
             line: line as u32,
             pos: pos as u32,
@@ -293,6 +293,47 @@ impl ShaderSymbolList {
             list: self,
             ty: Some(ShaderSymbolType::Types), // First one
         }
+    }
+    pub fn filter<P: Fn(&ShaderSymbol) -> bool>(&self, predicate: P) -> ShaderSymbolList {
+        ShaderSymbolList {
+            types: self
+                .types
+                .iter()
+                .filter(|e| predicate(*e))
+                .cloned()
+                .collect(),
+            constants: self
+                .constants
+                .iter()
+                .filter(|e| predicate(*e))
+                .cloned()
+                .collect(),
+            variables: self
+                .variables
+                .iter()
+                .filter(|e| predicate(*e))
+                .cloned()
+                .collect(),
+            functions: self
+                .functions
+                .iter()
+                .filter(|e| predicate(*e))
+                .cloned()
+                .collect(),
+            keywords: self
+                .keywords
+                .iter()
+                .filter(|e| predicate(*e))
+                .cloned()
+                .collect(),
+        }
+    }
+    pub fn retain<P: Fn(&ShaderSymbol) -> bool>(&mut self, predicate: P) {
+        self.types.retain(&predicate);
+        self.constants.retain(&predicate);
+        self.functions.retain(&predicate);
+        self.variables.retain(&predicate);
+        self.keywords.retain(&predicate);
     }
     pub fn filter_scoped_symbol(&self, cursor_position: ShaderPosition) -> ShaderSymbolList {
         // Ensure symbols are already defined at pos

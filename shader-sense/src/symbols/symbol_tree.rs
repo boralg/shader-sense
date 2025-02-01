@@ -104,6 +104,9 @@ impl SymbolTree {
     }
     // Dump AST from tree
     pub fn dump_ast(&self) -> String {
+        Self::dump_ast_node(self.tree.root_node())
+    }
+    pub fn dump_ast_node(node: tree_sitter::Node) -> String {
         fn format_debug_cursor(cursor: &mut TreeCursor, depth: usize) -> String {
             let mut debug_tree = String::new();
             loop {
@@ -123,6 +126,6 @@ impl SymbolTree {
             }
             debug_tree
         }
-        format_debug_cursor(&mut self.tree.root_node().walk(), 0)
+        format_debug_cursor(&mut node.walk(), 0)
     }
 }

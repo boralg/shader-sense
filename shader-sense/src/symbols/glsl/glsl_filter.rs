@@ -12,6 +12,7 @@ struct GlslVersionFilter {}
 impl SymbolTreeFilter for GlslVersionFilter {
     fn filter_symbols(&self, _shader_symbols: &mut ShaderSymbolList, _file_name: &String) {
         // TODO: filter version
+        // Need to have correct & verified intrinsics data
     }
 }
 struct GlslStageFilter {}
@@ -20,43 +21,9 @@ impl SymbolTreeFilter for GlslStageFilter {
     fn filter_symbols(&self, shader_symbols: &mut ShaderSymbolList, file_name: &String) {
         match ShaderStage::from_file_name(file_name) {
             Some(shader_stage) => {
-                *shader_symbols = ShaderSymbolList {
-                    types: shader_symbols
-                        .types
-                        .drain(..)
-                        .filter(|value| {
-                            value.stages.contains(&shader_stage) || value.stages.is_empty()
-                        })
-                        .collect(),
-                    constants: shader_symbols
-                        .constants
-                        .drain(..)
-                        .filter(|value| {
-                            value.stages.contains(&shader_stage) || value.stages.is_empty()
-                        })
-                        .collect(),
-                    variables: shader_symbols
-                        .variables
-                        .drain(..)
-                        .filter(|value| {
-                            value.stages.contains(&shader_stage) || value.stages.is_empty()
-                        })
-                        .collect(),
-                    functions: shader_symbols
-                        .functions
-                        .drain(..)
-                        .filter(|value| {
-                            value.stages.contains(&shader_stage) || value.stages.is_empty()
-                        })
-                        .collect(),
-                    keywords: shader_symbols
-                        .keywords
-                        .drain(..)
-                        .filter(|value| {
-                            value.stages.contains(&shader_stage) || value.stages.is_empty()
-                        })
-                        .collect(),
-                }
+                shader_symbols.retain(|symbol| {
+                    symbol.stages.contains(&shader_stage) || symbol.stages.is_empty()
+                });
             }
             None => {
                 // No filtering

@@ -81,7 +81,8 @@ impl SymbolProvider for HlslSymbolProvider {
     fn query_inactive_regions(
         &self,
         symbol_tree: &SymbolTree,
+        symbol_cache: Option<&ShaderSymbolList>,
     ) -> Result<Vec<ShaderRange>, ShaderError> {
-        self.query_inactive_regions_in_node(symbol_tree, symbol_tree.tree.root_node())
+        self.query_inactive_regions_in_node(symbol_tree, symbol_tree.tree.root_node(), symbol_cache)
     }
 }

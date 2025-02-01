@@ -8,8 +8,13 @@ use glsl_filter::get_glsl_filters;
 use glsl_parser::get_glsl_parsers;
 use tree_sitter::Parser;
 
+use crate::shader_error::ShaderError;
+
 use super::{
-    symbol_parser::SymbolParser, symbol_provider::SymbolProvider, symbols::ShaderSymbolList,
+    symbol_parser::SymbolParser,
+    symbol_provider::SymbolProvider,
+    symbol_tree::SymbolTree,
+    symbols::{ShaderRange, ShaderSymbolList},
 };
 
 pub struct GlslSymbolProvider {
@@ -75,8 +80,9 @@ impl SymbolProvider for GlslSymbolProvider {
 
     fn query_inactive_regions(
         &self,
-        symbol_tree: &super::symbol_tree::SymbolTree,
-    ) -> Result<Vec<super::symbols::ShaderRange>, crate::shader_error::ShaderError> {
-        self.query_inactive_regions_in_node(symbol_tree, symbol_tree.tree.root_node())
+        symbol_tree: &SymbolTree,
+        symbol_cache: Option<&ShaderSymbolList>,
+    ) -> Result<Vec<ShaderRange>, ShaderError> {
+        self.query_inactive_regions_in_node(symbol_tree, symbol_tree.tree.root_node(), symbol_cache)
     }
 }

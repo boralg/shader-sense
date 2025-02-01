@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use tree_sitter::{Node, Query, QueryCursor, QueryMatch};
 
@@ -12,18 +12,28 @@ pub(super) fn get_name<'a>(shader_content: &'a str, node: Node) -> &'a str {
 }
 
 impl ShaderRange {
-    pub(super) fn from_range(value: tree_sitter::Range, file_path: PathBuf) -> Self {
+    pub(super) fn from_range(value: tree_sitter::Range, file_path: &Path) -> Self {
         ShaderRange {
             start: ShaderPosition {
-                file_path: file_path.clone(),
+                file_path: file_path.into(),
                 line: value.start_point.row as u32,
                 pos: value.start_point.column as u32,
             },
             end: ShaderPosition {
-                file_path: file_path.clone(),
+                file_path: file_path.into(),
                 line: value.end_point.row as u32,
                 pos: value.end_point.column as u32,
             },
+        }
+    }
+}
+
+impl ShaderPosition {
+    pub(super) fn from_tree_sitter_point(point: tree_sitter::Point, file_path: &Path) -> Self {
+        ShaderPosition {
+            file_path: file_path.into(),
+            line: point.row as u32,
+            pos: point.column as u32,
         }
     }
 }
@@ -98,7 +108,7 @@ impl SymbolParser {
         ) {
             scopes.push(ShaderScope::from_range(
                 matche.captures[0].node.range(),
-                symbol_tree.file_path.clone(),
+                &symbol_tree.file_path,
             ));
         }
         scopes

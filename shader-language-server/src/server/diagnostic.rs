@@ -2,6 +2,7 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     path::{Path, PathBuf},
+    rc::Rc,
 };
 
 use log::{debug, error, info};
@@ -76,7 +77,7 @@ impl ServerLanguageData {
         match self.validator.validate_shader(
             content,
             file_path.as_path(),
-            validation_params,
+            validation_params.clone(),
             &mut |deps_path: &Path| -> Option<String> {
                 let deps_uri = Url::from_file_path(deps_path).unwrap();
                 let deps_file = match self.watched_files.get_dependency(&deps_uri) {
@@ -165,9 +166,14 @@ impl ServerLanguageData {
                     }
                 });
                 // Add inactive regions
+
                 let mut inactive_diagnostics = self
-                    .recolt_inactive(&uri, cached_file)
-                    .unwrap_or(vec![]) // TODO: should not ignore error here.
+                    .recolt_inactive(
+                        &uri,
+                        cached_file,
+                        Some(&self.get_all_symbols(Rc::clone(cached_file))),
+                    ) // TODO: bad double query here...
+                    .unwrap() // TODO: should not crash here.
                     .into_iter()
                     .map(|range| Diagnostic {
                         range: shader_range_to_lsp_range(&range),
