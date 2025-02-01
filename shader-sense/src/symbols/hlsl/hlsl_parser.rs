@@ -152,7 +152,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
                     file_path,
                     shader_content,
                     scopes,
-                    &mut symbols
+                    &mut symbols,
                 );
                 symbols
                     .get_shader_symbol_list()
@@ -189,7 +189,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
                     &mut symbols,
                 );
                 symbols
-                .get_shader_symbol_list()
+                    .get_shader_symbol_list()
                     .variables
                     .iter()
                     .map(|f| ShaderMember {
@@ -247,7 +247,7 @@ impl SymbolTreeParser for HlslVariableTreeParser {
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
-        symbol_builder: &mut ShaderSymbolListBuilder
+        symbol_builder: &mut ShaderSymbolListBuilder,
     ) {
         let label_node = matches.captures[1].node;
         let range = ShaderRange::from_range(label_node.range(), file_path.into());

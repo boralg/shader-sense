@@ -47,24 +47,6 @@ impl ServerConfig {
             glsl_spirv: self.glsl.spirvVersion,
         }
     }
-    pub fn append_custom_defines(&self, symbol_list: &mut ShaderSymbolList) {
-        for define in &self.defines {
-            symbol_list.constants.push(ShaderSymbol {
-                label: define.0.clone(),
-                description: format!("Preprocessor macro (value: {})", define.1),
-                version: "".into(),
-                stages: Vec::new(),
-                link: None,
-                data: ShaderSymbolData::Constants {
-                    ty: "".into(),
-                    qualifier: "".into(),
-                    value: define.1.clone(),
-                },
-                range: None,
-                scope_stack: None,
-            });
-        }
-    }
 }
 
 impl Default for ServerConfig {

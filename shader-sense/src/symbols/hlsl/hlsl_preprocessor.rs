@@ -49,9 +49,11 @@ impl SymbolTreePreprocessorParser for HlslIncludeTreePreprocessorParser {
         // Only add symbol if path can be resolved.
         match include_handler.search_path_in_includes(Path::new(relative_path)) {
             Some(absolute_path) => {
-                preprocessor
-                    .includes
-                    .push(ShaderPreprocessorInclude::new(absolute_path, range));
+                preprocessor.includes.push(ShaderPreprocessorInclude::new(
+                    relative_path.into(),
+                    absolute_path,
+                    range,
+                ));
             }
             None => {}
         }

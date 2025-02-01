@@ -46,13 +46,13 @@ impl ShaderPosition {
 
 pub struct ShaderSymbolListBuilder<'a> {
     shader_symbol_list: ShaderSymbolList,
-    filter_callback: Box<&'a dyn Fn(&ShaderSymbol) -> bool>
+    filter_callback: Box<&'a dyn Fn(&ShaderSymbol) -> bool>,
 }
 impl<'a> ShaderSymbolListBuilder<'a> {
     pub fn new(filter_callback: &'a dyn Fn(&ShaderSymbol) -> bool) -> Self {
         Self {
             shader_symbol_list: ShaderSymbolList::default(),
-            filter_callback: Box::new(filter_callback)
+            filter_callback: Box::new(filter_callback),
         }
     }
     pub fn add_constant(&mut self, shader_symbol: ShaderSymbol) {
@@ -189,7 +189,10 @@ impl SymbolParser {
         }
         scopes
     }
-    pub fn query_file_preprocessor(&self, symbol_tree: &SymbolTree) -> Result<ShaderPreprocessor, ShaderError> {
+    pub fn query_file_preprocessor(
+        &self,
+        symbol_tree: &SymbolTree,
+    ) -> Result<ShaderPreprocessor, ShaderError> {
         let mut preprocessor = ShaderPreprocessor::default();
         for parser in &self.preprocessor_parsers {
             let mut query_cursor = QueryCursor::new();
@@ -207,10 +210,16 @@ impl SymbolParser {
             }
         }
         // Query regions.
-        preprocessor.regions = (self.region_finder)(symbol_tree, symbol_tree.tree.root_node(), &preprocessor)?;
+        preprocessor.regions =
+            (self.region_finder)(symbol_tree, symbol_tree.tree.root_node(), &preprocessor)?;
         // Filter out defines in inactive regions.
-        preprocessor.defines.retain(|define| {
-            preprocessor.regions.iter().find(|region| !region.is_active && region.range.contain_bounds(&define.range)).is_none()
+        preprocessor.defines.retain(|define| match &define.range {
+            Some(range) => preprocessor
+                .regions
+                .iter()
+                .find(|region| !region.is_active && region.range.contain_bounds(&range))
+                .is_none(),
+            None => true,
         });
         Ok(preprocessor)
     }
@@ -224,7 +233,7 @@ impl SymbolParser {
             // This will not include external preprocessor symbols
             // (such as file included through another file, and having parent file preproc)
             None => self.query_file_preprocessor(symbol_tree)?,
-        }; 
+        };
         // TODO: Should use something else than name...
         let file_name = symbol_tree
             .file_path

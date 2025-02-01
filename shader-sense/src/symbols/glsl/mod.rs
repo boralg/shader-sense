@@ -56,7 +56,10 @@ impl SymbolProvider for GlslSymbolProvider {
         &self.shader_intrinsics
     }
 
-    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> Result<ShaderPreprocessor, ShaderError> {
+    fn query_preprocessor(
+        &self,
+        symbol_tree: &SymbolTree,
+    ) -> Result<ShaderPreprocessor, ShaderError> {
         self.symbol_parser.query_file_preprocessor(symbol_tree)
     }
 
@@ -64,7 +67,7 @@ impl SymbolProvider for GlslSymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         preprocessor: Option<&ShaderPreprocessor>,
-    ) -> Result<ShaderSymbolList, ShaderError>{
+    ) -> Result<ShaderSymbolList, ShaderError> {
         self.symbol_parser
             .query_file_symbols(symbol_tree, preprocessor)
     }

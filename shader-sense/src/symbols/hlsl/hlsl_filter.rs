@@ -15,7 +15,7 @@ impl SymbolTreeFilter for HlslStageFilter {
             Some(shader_stage) => {
                 shader_symbol.stages.contains(&shader_stage) || shader_symbol.stages.is_empty()
             }
-            None => true // Not filtered
+            None => true, // Not filtered
         }
     }
 }

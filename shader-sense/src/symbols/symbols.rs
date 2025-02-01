@@ -153,14 +153,15 @@ impl ShaderRegion {
 
 #[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessorInclude {
-    pub path: PathBuf,
+    pub relative_path: String,
+    pub absolute_path: PathBuf,
     pub range: ShaderRange,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessorDefine {
     pub name: String,
-    pub range: ShaderRange,
+    pub range: Option<ShaderRange>,
     pub value: Option<String>,
 }
 
@@ -172,12 +173,91 @@ pub struct ShaderPreprocessor {
 }
 impl ShaderPreprocessorDefine {
     pub fn new(name: String, range: ShaderRange, value: Option<String>) -> Self {
-        Self { name, range, value }
+        Self {
+            name,
+            range: Some(range),
+            value,
+        }
     }
 }
 impl ShaderPreprocessorInclude {
-    pub fn new(path: PathBuf, range: ShaderRange) -> Self {
-        Self { path, range }
+    pub fn new(relative_path: String, absolute_path: PathBuf, range: ShaderRange) -> Self {
+        Self {
+            relative_path,
+            absolute_path,
+            range,
+        }
+    }
+}
+
+impl ShaderPreprocessor {
+    pub fn preprocess_symbols(&self, shader_symbols: &mut ShaderSymbolList) {
+        // Filter inactive regions symbols
+        shader_symbols.filter(|symbol| {
+            let is_in_inactive_region = match &symbol.range {
+                Some(range) => {
+                    for region in &self.regions {
+                        if !region.is_active && region.range.contain_bounds(&range) {
+                            return false; // Symbol is in inactive region. Remove it.
+                        }
+                    }
+                    true
+                }
+                None => true, // keep
+            };
+            is_in_inactive_region
+        });
+        // Add defines
+        let mut define_symbols: Vec<ShaderSymbol> = self
+            .defines
+            .iter()
+            .map(|define| {
+                ShaderSymbol {
+                    label: define.name.clone(),
+                    description: match &define.value {
+                        Some(value) => {
+                            format!("Preprocessor macro. Expanding to \n```\n{}\n```", value)
+                        }
+                        None => format!("Preprocessor macro."),
+                    },
+                    version: "".into(),
+                    stages: vec![],
+                    link: None,
+                    data: ShaderSymbolData::Constants {
+                        ty: "#define".into(),
+                        qualifier: "".into(),
+                        value: match &define.value {
+                            Some(value) => value.clone(),
+                            None => "".into(),
+                        },
+                    },
+                    range: define.range.clone(),
+                    scope_stack: None, // No scope for define
+                }
+            })
+            .collect();
+        // Add includes as symbol
+        let mut include_symbols: Vec<ShaderSymbol> = self
+            .includes
+            .iter()
+            .map(|include| {
+                ShaderSymbol {
+                    label: include.relative_path.clone(),
+                    description: format!("Including file {}", include.absolute_path.display()),
+                    version: "".into(),
+                    stages: vec![],
+                    link: None,
+                    data: ShaderSymbolData::Link {
+                        target: ShaderPosition::new(include.absolute_path.clone(), 0, 0),
+                    },
+                    range: Some(include.range.clone()),
+                    scope_stack: None, // No scope for include
+                }
+            })
+            .collect();
+        shader_symbols.constants.append(&mut define_symbols);
+        // TODO: these should not be in constants...
+        shader_symbols.constants.append(&mut include_symbols);
     }
 }
 

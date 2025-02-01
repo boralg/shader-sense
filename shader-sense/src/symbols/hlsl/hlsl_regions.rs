@@ -18,10 +18,13 @@ fn get_define<'a>(
 ) -> Option<&'a ShaderPreprocessorDefine> {
     preprocessor.defines.iter().find(|define| {
         let same_name = define.name == name;
-        let same_file = define.range.start.file_path == position.file_path;
+        let has_range = define.range.is_some(); // None, mean global define.
+        let same_file =
+            has_range && define.range.as_ref().unwrap().start.file_path == position.file_path;
         // Here, there is also case where macro defined in another file.
         // We cannot check this, but it should be correctly set in preprocessor.
-        let defined_before = (same_file && define.range.start < *position) || !same_file;
+        let defined_before =
+            (same_file && define.range.as_ref().unwrap().start < *position) || !same_file;
         same_name && defined_before
     })
 }
@@ -80,7 +83,7 @@ fn resolve_condition(
             }
         }
         value => {
-            assert!(false, "case unhandled for {}", value);
+            assert!(false, "condition unhandled for {}", value);
             false
         }
     }
@@ -171,7 +174,8 @@ pub fn query_regions_in_node(
                             &symbol_tree.file_path,
                         );
                         (
-                            !found_active_region && resolve_condition(cursor.clone(), symbol_tree, preprocessor),
+                            !found_active_region
+                                && resolve_condition(cursor.clone(), symbol_tree, preprocessor),
                             position,
                         )
                     }
