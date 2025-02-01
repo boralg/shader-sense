@@ -1,12 +1,13 @@
 use std::path::Path;
 
+use crate::symbols::symbol_parser::ShaderSymbolListBuilder;
 use crate::symbols::symbols::ShaderMember;
 
 use crate::symbols::{
     symbol_parser::{get_name, SymbolTreeParser},
     symbols::{
         ShaderMethod, ShaderParameter, ShaderRange, ShaderScope, ShaderSignature, ShaderSymbol,
-        ShaderSymbolData, ShaderSymbolList,
+        ShaderSymbolData,
     },
 };
 
@@ -51,7 +52,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
-        symbols: &mut ShaderSymbolList,
+        symbols: &mut ShaderSymbolListBuilder,
     ) {
         let label_node = matches.captures[1].node;
         let range = ShaderRange::from_range(label_node.range(), file_path.into());
@@ -68,7 +69,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
             s.push(range.clone());
             s
         });*/
-        symbols.functions.push(ShaderSymbol {
+        symbols.add_function(ShaderSymbol {
             label: get_name(shader_content, matches.captures[1].node).into(),
             description: "".into(),
             version: "".into(),
@@ -130,7 +131,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
-        symbols: &mut ShaderSymbolList,
+        symbols: &mut ShaderSymbolListBuilder,
     ) {
         let label_node = matches.captures[0].node;
         let range = ShaderRange::from_range(label_node.range(), file_path.into());
@@ -145,15 +146,16 @@ impl SymbolTreeParser for HlslStructTreeParser {
                 shader_content.as_bytes(),
             )
             .map(|matches| {
-                let mut symbols = ShaderSymbolList::default();
+                let mut symbols = ShaderSymbolListBuilder::new(&|_| true);
                 self.func_parser.process_match(
                     matches,
                     file_path,
                     shader_content,
                     scopes,
-                    &mut symbols,
+                    &mut symbols
                 );
                 symbols
+                    .get_shader_symbol_list()
                     .functions
                     .iter()
                     .map(|f| ShaderMethod {
@@ -178,7 +180,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
                 shader_content.as_bytes(),
             )
             .map(|matches| {
-                let mut symbols = ShaderSymbolList::default();
+                let mut symbols = ShaderSymbolListBuilder::new(&|_| true);
                 self.var_parser.process_match(
                     matches,
                     file_path,
@@ -187,6 +189,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
                     &mut symbols,
                 );
                 symbols
+                .get_shader_symbol_list()
                     .variables
                     .iter()
                     .map(|f| ShaderMember {
@@ -202,7 +205,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
             })
             .collect::<Vec<Vec<ShaderMember>>>()
             .concat();
-        symbols.types.push(ShaderSymbol {
+        symbols.add_type(ShaderSymbol {
             label: get_name(shader_content, matches.captures[0].node).into(),
             description: "".into(),
             version: "".into(),
@@ -244,7 +247,7 @@ impl SymbolTreeParser for HlslVariableTreeParser {
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
-        symbols: &mut ShaderSymbolList,
+        symbol_builder: &mut ShaderSymbolListBuilder
     ) {
         let label_node = matches.captures[1].node;
         let range = ShaderRange::from_range(label_node.range(), file_path.into());
@@ -253,7 +256,7 @@ impl SymbolTreeParser for HlslVariableTreeParser {
         let _type_qualifier = get_name(shader_content, matches.captures[0].node);
         // TODO: handle values & qualifiers..
         //let _value = get_name(shader_content, matche.captures[2].node);
-        symbols.variables.push(ShaderSymbol {
+        symbol_builder.add_variable(ShaderSymbol {
             label: get_name(shader_content, matches.captures[1].node).into(),
             description: "".into(),
             version: "".into(),

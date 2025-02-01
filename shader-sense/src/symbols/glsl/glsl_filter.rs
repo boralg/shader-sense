@@ -1,7 +1,7 @@
 use crate::shader::ShaderStage;
 
 use crate::symbols::symbol_parser::SymbolTreeFilter;
-use crate::symbols::symbols::ShaderSymbolList;
+use crate::symbols::symbols::ShaderSymbol;
 
 pub fn get_glsl_filters() -> Vec<Box<dyn SymbolTreeFilter>> {
     vec![Box::new(GlslStageFilter {}), Box::new(GlslVersionFilter {})]
@@ -10,24 +10,21 @@ pub fn get_glsl_filters() -> Vec<Box<dyn SymbolTreeFilter>> {
 struct GlslVersionFilter {}
 
 impl SymbolTreeFilter for GlslVersionFilter {
-    fn filter_symbols(&self, _shader_symbols: &mut ShaderSymbolList, _file_name: &String) {
+    fn filter_symbol(&self, _shader_symbol: &ShaderSymbol, _file_name: &String) -> bool {
         // TODO: filter version
         // Need to have correct & verified intrinsics data
+        true
     }
 }
 struct GlslStageFilter {}
 
 impl SymbolTreeFilter for GlslStageFilter {
-    fn filter_symbols(&self, shader_symbols: &mut ShaderSymbolList, file_name: &String) {
+    fn filter_symbol(&self, shader_symbol: &ShaderSymbol, file_name: &String) -> bool {
         match ShaderStage::from_file_name(file_name) {
             Some(shader_stage) => {
-                shader_symbols.retain(|symbol| {
-                    symbol.stages.contains(&shader_stage) || symbol.stages.is_empty()
-                });
+                shader_symbol.stages.contains(&shader_stage) || shader_symbol.stages.is_empty()
             }
-            None => {
-                // No filtering
-            }
+            None => true // Not filtered
         }
     }
 }

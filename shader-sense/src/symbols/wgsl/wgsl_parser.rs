@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::symbols::{
-    symbol_parser::{get_name, SymbolTreeParser},
+    symbol_parser::{get_name, ShaderSymbolListBuilder, SymbolTreeParser},
     symbols::{
         ShaderParameter, ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
     },
@@ -33,12 +33,12 @@ impl SymbolTreeParser for WgslStructTreeParser {
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
-        symbols: &mut ShaderSymbolList,
+        symbols: &mut ShaderSymbolListBuilder,
     ) {
         let label_node = matches.captures[0].node;
         let range = ShaderRange::from_range(label_node.range(), file_path.into());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
-        symbols.types.push(ShaderSymbol {
+        symbols.add_type(ShaderSymbol {
             label: get_name(shader_content, matches.captures[0].node).into(),
             description: "".into(),
             version: "".into(),

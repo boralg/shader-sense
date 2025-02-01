@@ -9,7 +9,7 @@ use crate::{
 
 use super::{
     symbol_tree::SymbolTree,
-    symbols::{ShaderPreprocessor, ShaderRegion, ShaderScope},
+    symbols::{ShaderPreprocessor, ShaderRegion, ShaderScope, ShaderSymbol},
 };
 
 pub(super) fn get_name<'a>(shader_content: &'a str, node: Node) -> &'a str {
@@ -44,6 +44,42 @@ impl ShaderPosition {
     }
 }
 
+pub struct ShaderSymbolListBuilder<'a> {
+    shader_symbol_list: ShaderSymbolList,
+    filter_callback: Box<&'a dyn Fn(&ShaderSymbol) -> bool>
+}
+impl<'a> ShaderSymbolListBuilder<'a> {
+    pub fn new(filter_callback: &'a dyn Fn(&ShaderSymbol) -> bool) -> Self {
+        Self {
+            shader_symbol_list: ShaderSymbolList::default(),
+            filter_callback: Box::new(filter_callback)
+        }
+    }
+    pub fn add_constant(&mut self, shader_symbol: ShaderSymbol) {
+        if (self.filter_callback)(&shader_symbol) {
+            self.shader_symbol_list.constants.push(shader_symbol);
+        }
+    }
+    pub fn add_variable(&mut self, shader_symbol: ShaderSymbol) {
+        if (self.filter_callback)(&shader_symbol) {
+            self.shader_symbol_list.variables.push(shader_symbol);
+        }
+    }
+    pub fn add_type(&mut self, shader_symbol: ShaderSymbol) {
+        if (self.filter_callback)(&shader_symbol) {
+            self.shader_symbol_list.types.push(shader_symbol);
+        }
+    }
+    pub fn add_function(&mut self, shader_symbol: ShaderSymbol) {
+        if (self.filter_callback)(&shader_symbol) {
+            self.shader_symbol_list.functions.push(shader_symbol);
+        }
+    }
+    pub fn get_shader_symbol_list(&mut self) -> ShaderSymbolList {
+        std::mem::take(&mut self.shader_symbol_list)
+    }
+}
+
 pub trait SymbolTreeParser {
     // The query to match tree node
     fn get_query(&self) -> String;
@@ -54,7 +90,7 @@ pub trait SymbolTreeParser {
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
-        symbols: &mut ShaderSymbolList,
+        symbols: &mut ShaderSymbolListBuilder,
     );
     fn compute_scope_stack(
         &self,
@@ -74,7 +110,8 @@ pub trait SymbolTreeParser {
     }
 }
 pub trait SymbolTreeFilter {
-    fn filter_symbols(&self, shader_symbols: &mut ShaderSymbolList, file_name: &String);
+    // Filter symbol, keep them on true, remove them on false
+    fn filter_symbol(&self, shader_symbol: &ShaderSymbol, file_name: &String) -> bool;
 }
 
 pub trait SymbolTreePreprocessorParser {
@@ -187,9 +224,35 @@ impl SymbolParser {
             // This will not include external preprocessor symbols
             // (such as file included through another file, and having parent file preproc)
             None => self.query_file_preprocessor(symbol_tree)?,
+        }; 
+        // TODO: Should use something else than name...
+        let file_name = symbol_tree
+            .file_path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        let filter_symbol = |symbol: &ShaderSymbol| -> bool {
+            // Filter inactive regions.
+            let is_in_inactive_region = match &symbol.range {
+                Some(range) => {
+                    for region in &file_preprocessor.regions {
+                        if !region.is_active && region.range.contain_bounds(&range) {
+                            return false; // Symbol is in inactive region. Remove it.
+                        }
+                    }
+                    true
+                }
+                None => true, // keep
+            };
+            let mut is_filtered = !is_in_inactive_region;
+            for filter in &self.symbol_filters {
+                is_filtered = is_filtered | filter.filter_symbol(symbol, &file_name);
+            }
+            is_filtered
         };
+        let mut symbol_list_builder = ShaderSymbolListBuilder::new(&filter_symbol);
         let scopes = self.query_file_scopes(symbol_tree);
-        let mut symbols = ShaderSymbolList::default();
         for parser in &self.symbol_parsers {
             let mut query_cursor = QueryCursor::new();
             for matches in query_cursor.matches(
@@ -202,22 +265,12 @@ impl SymbolParser {
                     &symbol_tree.file_path,
                     &symbol_tree.content,
                     &scopes,
-                    &mut symbols,
+                    &mut symbol_list_builder,
                 );
             }
         }
-        // TODO: Should be run directly on symbol add.
-        // TODO: Should use something else than name...
-        let file_name = symbol_tree
-            .file_path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
-        for filter in &self.symbol_filters {
-            filter.filter_symbols(&mut symbols, &file_name);
-        }
-        // TODO: filter with file_preprocessor
+        let symbols = symbol_list_builder.get_shader_symbol_list();
+        drop(symbol_list_builder);
         Ok(symbols)
     }
 }
