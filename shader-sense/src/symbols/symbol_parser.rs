@@ -152,10 +152,9 @@ impl SymbolParser {
         }
         scopes
     }
-    pub fn query_file_preprocessor(&self, symbol_tree: &SymbolTree) -> ShaderPreprocessor {
+    pub fn query_file_preprocessor(&self, symbol_tree: &SymbolTree) -> Result<ShaderPreprocessor, ShaderError> {
         let mut preprocessor = ShaderPreprocessor::default();
         for parser in &self.preprocessor_parsers {
-            // TODO: cache
             let mut query_cursor = QueryCursor::new();
             for matches in query_cursor.matches(
                 &parser.1,
@@ -170,22 +169,24 @@ impl SymbolParser {
                 );
             }
         }
-        match (self.region_finder)(symbol_tree, symbol_tree.tree.root_node(), &preprocessor) {
-            Ok(regions) => preprocessor.regions = regions,
-            Err(_) => unimplemented!(),
-        }
-        preprocessor
+        // Query regions.
+        preprocessor.regions = (self.region_finder)(symbol_tree, symbol_tree.tree.root_node(), &preprocessor)?;
+        // Filter out defines in inactive regions.
+        preprocessor.defines.retain(|define| {
+            preprocessor.regions.iter().find(|region| !region.is_active && region.range.contain_bounds(&define.range)).is_none()
+        });
+        Ok(preprocessor)
     }
     pub fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
         preprocessor: Option<&ShaderPreprocessor>,
-    ) -> ShaderSymbolList {
+    ) -> Result<ShaderSymbolList, ShaderError> {
         let file_preprocessor = match preprocessor {
             Some(preprocessor) => preprocessor.clone(),
             // This will not include external preprocessor symbols
             // (such as file included through another file, and having parent file preproc)
-            None => self.query_file_preprocessor(symbol_tree),
+            None => self.query_file_preprocessor(symbol_tree)?,
         };
         let scopes = self.query_file_scopes(symbol_tree);
         let mut symbols = ShaderSymbolList::default();
@@ -217,6 +218,6 @@ impl SymbolParser {
             filter.filter_symbols(&mut symbols, &file_name);
         }
         // TODO: filter with file_preprocessor
-        symbols
+        Ok(symbols)
     }
 }

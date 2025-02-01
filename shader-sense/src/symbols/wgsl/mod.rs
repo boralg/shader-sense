@@ -53,7 +53,7 @@ impl SymbolProvider for WgslSymbolProvider {
         &self.shader_intrinsics
     }
 
-    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> super::symbols::ShaderPreprocessor {
+    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> Result<ShaderPreprocessor, ShaderError> {
         self.symbol_parser.query_file_preprocessor(symbol_tree)
     }
 
@@ -61,7 +61,7 @@ impl SymbolProvider for WgslSymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         preprocessor: Option<&ShaderPreprocessor>,
-    ) -> ShaderSymbolList {
+    ) -> Result<ShaderSymbolList, ShaderError> {
         self.symbol_parser
             .query_file_symbols(symbol_tree, preprocessor)
     }

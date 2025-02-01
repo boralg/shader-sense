@@ -31,7 +31,7 @@ mod tests {
     use regex::Regex;
 
     use crate::{
-        include::IncludeHandler, shader::ShadingLanguage, symbols::symbols::ShaderPosition,
+        include::IncludeHandler, shader::ShadingLanguage, shader_error::ShaderError, symbols::symbols::ShaderPosition
     };
 
     use super::{
@@ -77,17 +77,17 @@ mod tests {
         symbol_provider: &mut dyn SymbolProvider,
         file_path: &Path,
         shader_content: &String,
-    ) -> ShaderSymbolList {
+    ) -> Result<ShaderSymbolList, ShaderError> {
         let mut include_handler = IncludeHandler::new(&file_path, vec![]);
         let deps = find_dependencies(&mut include_handler, &shader_content);
         let mut symbols = symbol_provider.get_intrinsics_symbol().clone();
         let symbol_tree = SymbolTree::new(symbol_provider, file_path, shader_content).unwrap();
-        symbols.append(symbol_provider.query_file_symbols(&symbol_tree, None));
+        symbols.append(symbol_provider.query_file_symbols(&symbol_tree, None)?);
         for dep in deps {
             let symbol_tree = SymbolTree::new(symbol_provider, &dep.1, &dep.0).unwrap();
-            symbols.append(symbol_provider.query_file_symbols(&symbol_tree, None));
+            symbols.append(symbol_provider.query_file_symbols(&symbol_tree, None)?);
         }
-        symbols
+        Ok(symbols)
     }
 
     #[test]
@@ -119,7 +119,7 @@ mod tests {
         let mut symbol_provider = create_symbol_provider(ShadingLanguage::Glsl);
         let symbol_tree =
             SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
-        let symbols = symbol_provider.query_file_symbols(&symbol_tree, None);
+        let symbols = symbol_provider.query_file_symbols(&symbol_tree, None).unwrap();
         assert!(!symbols.functions.is_empty());
     }
     #[test]
@@ -130,7 +130,7 @@ mod tests {
         let mut symbol_provider = create_symbol_provider(ShadingLanguage::Hlsl);
         let symbol_tree =
             SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
-        let symbols = symbol_provider.query_file_symbols(&symbol_tree, None);
+        let symbols = symbol_provider.query_file_symbols(&symbol_tree, None).unwrap();
         assert!(!symbols.functions.is_empty());
     }
     #[test]
@@ -141,7 +141,7 @@ mod tests {
         let mut symbol_provider = create_symbol_provider(ShadingLanguage::Wgsl);
         let symbol_tree =
             SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
-        let symbols = symbol_provider.query_file_symbols(&symbol_tree, None);
+        let symbols = symbol_provider.query_file_symbols(&symbol_tree, None).unwrap();
         assert!(symbols.functions.is_empty());
     }
     #[test]
@@ -150,6 +150,7 @@ mod tests {
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         let mut symbol_provider = create_symbol_provider(ShadingLanguage::Glsl);
         let symbols = get_all_symbols(symbol_provider.as_mut(), file_path, &shader_content)
+            .unwrap()
             .filter_scoped_symbol(ShaderPosition {
                 file_path: PathBuf::from(file_path),
                 line: 16,

@@ -30,8 +30,8 @@ fn query_all_symbol(shading_language: ShadingLanguage, shader_path: &Path) {
     let shader_content = std::fs::read_to_string(shader_path).unwrap();
     match SymbolTree::new(symbol_provider.as_mut(), shader_path, &shader_content) {
         Ok(symbol_tree) => {
-            let preprocessor = symbol_provider.query_preprocessor(&symbol_tree);
-            let symbol_list = symbol_provider.query_file_symbols(&symbol_tree, Some(&preprocessor));
+            let preprocessor = symbol_provider.query_preprocessor(&symbol_tree).unwrap();
+            let symbol_list = symbol_provider.query_file_symbols(&symbol_tree, Some(&preprocessor)).unwrap();
             println!("Found symbols: {:#?}", symbol_list);
         }
         Err(err) => println!("Failed to create ast: {:#?}", err),

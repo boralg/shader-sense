@@ -58,14 +58,14 @@ impl SymbolProvider for HlslSymbolProvider {
     fn get_parser(&mut self) -> &mut Parser {
         &mut self.parser
     }
-    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> ShaderPreprocessor {
+    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> Result<ShaderPreprocessor, ShaderError> {
         self.symbol_parser.query_file_preprocessor(symbol_tree)
     }
     fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
         preprocessor: Option<&ShaderPreprocessor>,
-    ) -> ShaderSymbolList {
+    ) -> Result<ShaderSymbolList, ShaderError> {
         self.symbol_parser
             .query_file_symbols(symbol_tree, preprocessor)
     }

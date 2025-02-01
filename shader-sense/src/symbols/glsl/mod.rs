@@ -8,6 +8,8 @@ use glsl_filter::get_glsl_filters;
 use glsl_parser::get_glsl_parsers;
 use tree_sitter::Parser;
 
+use crate::shader_error::ShaderError;
+
 use super::{
     symbol_parser::SymbolParser,
     symbol_provider::SymbolProvider,
@@ -54,7 +56,7 @@ impl SymbolProvider for GlslSymbolProvider {
         &self.shader_intrinsics
     }
 
-    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> super::symbols::ShaderPreprocessor {
+    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> Result<ShaderPreprocessor, ShaderError> {
         self.symbol_parser.query_file_preprocessor(symbol_tree)
     }
 
@@ -62,7 +64,7 @@ impl SymbolProvider for GlslSymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         preprocessor: Option<&ShaderPreprocessor>,
-    ) -> ShaderSymbolList {
+    ) -> Result<ShaderSymbolList, ShaderError>{
         self.symbol_parser
             .query_file_symbols(symbol_tree, preprocessor)
     }

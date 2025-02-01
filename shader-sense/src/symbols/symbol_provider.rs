@@ -14,13 +14,13 @@ pub trait SymbolProvider {
     // Get intrinsic symbols from language
     fn get_intrinsics_symbol(&self) -> &ShaderSymbolList;
     // Query preprocess information for file.
-    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> ShaderPreprocessor;
+    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> Result<ShaderPreprocessor, ShaderError>;
     // Query file symbol from file tree.
     fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
         preprocessor: Option<&ShaderPreprocessor>,
-    ) -> ShaderSymbolList;
+    ) -> Result<ShaderSymbolList, ShaderError>;
     // Create symbol tree from file.
     fn create_tree(
         &mut self,
