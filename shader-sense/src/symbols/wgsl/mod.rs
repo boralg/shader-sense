@@ -1,5 +1,6 @@
 mod wgsl_filter;
 mod wgsl_parser;
+mod wgsl_regions;
 use tree_sitter::Parser;
 use wgsl_filter::get_wgsl_filters;
 use wgsl_parser::get_wgsl_parsers;
@@ -10,7 +11,7 @@ use super::{
     symbol_parser::SymbolParser,
     symbol_provider::SymbolProvider,
     symbol_tree::SymbolTree,
-    symbols::{ShaderPosition, ShaderRange, ShaderSymbolList},
+    symbols::{ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderSymbolList},
 };
 
 pub struct WgslSymbolProvider {
@@ -33,6 +34,8 @@ impl WgslSymbolProvider {
                 "",
                 get_wgsl_parsers(),
                 get_wgsl_filters(),
+                vec![],
+                wgsl_regions::query_regions_in_node,
             ),
             shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
                 "wgsl-intrinsics.json"
@@ -50,8 +53,17 @@ impl SymbolProvider for WgslSymbolProvider {
         &self.shader_intrinsics
     }
 
-    fn query_file_symbols(&self, symbol_tree: &SymbolTree) -> ShaderSymbolList {
-        self.symbol_parser.query_file_symbols(symbol_tree)
+    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> super::symbols::ShaderPreprocessor {
+        self.symbol_parser.query_file_preprocessor(symbol_tree)
+    }
+
+    fn query_file_symbols(
+        &self,
+        symbol_tree: &SymbolTree,
+        preprocessor: Option<&ShaderPreprocessor>,
+    ) -> ShaderSymbolList {
+        self.symbol_parser
+            .query_file_symbols(symbol_tree, preprocessor)
     }
 
     fn get_word_range_at_position(
@@ -67,14 +79,6 @@ impl SymbolProvider for WgslSymbolProvider {
         _symbol_tree: &SymbolTree,
         _position: ShaderPosition,
     ) -> Result<Vec<(String, ShaderRange)>, ShaderError> {
-        Ok(vec![])
-    }
-
-    fn query_inactive_regions(
-        &self,
-        _symbol_tree: &SymbolTree,
-        _symbol_cache: Option<&ShaderSymbolList>,
-    ) -> Result<Vec<ShaderRange>, ShaderError> {
         Ok(vec![])
     }
 }

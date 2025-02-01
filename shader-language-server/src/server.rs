@@ -9,7 +9,6 @@ mod debug;
 mod diagnostic;
 mod goto;
 mod hover;
-mod inactive;
 mod signature;
 
 mod server_config;

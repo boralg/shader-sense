@@ -10,7 +10,9 @@ use shader_sense::{
     shader::ShadingLanguage,
     shader_error::ShaderError,
     symbols::{
-        symbol_provider::SymbolProvider, symbol_tree::SymbolTree, symbols::ShaderSymbolList,
+        symbol_provider::SymbolProvider,
+        symbol_tree::SymbolTree,
+        symbols::{ShaderPreprocessor, ShaderSymbolList},
     },
 };
 
@@ -22,6 +24,7 @@ pub type ServerFileCacheHandle = Rc<RefCell<ServerFileCache>>;
 pub struct ServerFileCache {
     pub shading_language: ShadingLanguage,
     pub symbol_tree: SymbolTree, // Store content on change as its not on disk.
+    pub preprocessor_cache: ShaderPreprocessor, // Store preprocessor to avoid computing them at every change.
     pub symbol_cache: ShaderSymbolList, // Store symbol to avoid computing them at every change.
     pub dependencies: HashMap<PathBuf, ServerFileCacheHandle>, // Store all dependencies of this file.
 }
@@ -61,8 +64,9 @@ impl ServerFileCache {
 
         let now_get_symbol = std::time::Instant::now();
         // Cache symbols
+        self.preprocessor_cache = symbol_provider.query_preprocessor(&self.symbol_tree);
         self.symbol_cache = if config.symbols {
-            symbol_provider.query_file_symbols(&self.symbol_tree)
+            symbol_provider.query_file_symbols(&self.symbol_tree, Some(&self.preprocessor_cache))
         } else {
             ShaderSymbolList::default()
         };
@@ -108,10 +112,13 @@ impl ServerLanguageFileCache {
             None => {
                 assert!(self.files.get(&uri).is_none());
                 let symbol_tree = SymbolTree::new(symbol_provider, &file_path, &text)?;
-                let symbol_list = symbol_provider.query_file_symbols(&symbol_tree);
+                let preprocessor_cache = symbol_provider.query_preprocessor(&symbol_tree);
+                let symbol_list =
+                    symbol_provider.query_file_symbols(&symbol_tree, Some(&preprocessor_cache));
                 let cached_file = Rc::new(RefCell::new(ServerFileCache {
                     shading_language: lang,
                     symbol_tree: symbol_tree,
+                    preprocessor_cache,
                     symbol_cache: if config.symbols {
                         symbol_list
                     } else {
@@ -169,9 +176,12 @@ impl ServerLanguageFileCache {
                 None => {
                     let text = read_string_lossy(&file_path).unwrap();
                     let symbol_tree = SymbolTree::new(symbol_provider, &file_path, &text)?;
-                    let symbol_list = symbol_provider.query_file_symbols(&symbol_tree);
+                    let preprocessor_cache = symbol_provider.query_preprocessor(&symbol_tree);
+                    let symbol_list =
+                        symbol_provider.query_file_symbols(&symbol_tree, Some(&preprocessor_cache));
                     let cached_file = Rc::new(RefCell::new(ServerFileCache {
                         shading_language: lang,
+                        preprocessor_cache,
                         symbol_tree: symbol_tree,
                         symbol_cache: if config.symbols {
                             symbol_list

@@ -2,9 +2,15 @@ use std::path::Path;
 
 use tree_sitter::{Node, Query, QueryCursor, QueryMatch};
 
-use crate::symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolList};
+use crate::{
+    shader_error::ShaderError,
+    symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolList},
+};
 
-use super::{symbol_tree::SymbolTree, symbols::ShaderScope};
+use super::{
+    symbol_tree::SymbolTree,
+    symbols::{ShaderPreprocessor, ShaderRegion, ShaderScope},
+};
 
 pub(super) fn get_name<'a>(shader_content: &'a str, node: Node) -> &'a str {
     let range = node.range();
@@ -71,10 +77,32 @@ pub trait SymbolTreeFilter {
     fn filter_symbols(&self, shader_symbols: &mut ShaderSymbolList, file_name: &String);
 }
 
+pub trait SymbolTreePreprocessorParser {
+    // The query to match tree node
+    fn get_query(&self) -> String;
+    // Process the match & convert it to preprocessor
+    fn process_match(
+        &self,
+        matches: QueryMatch,
+        file_path: &Path,
+        shader_content: &str,
+        preprocessor: &mut ShaderPreprocessor,
+    );
+}
+
+pub type SymbolRegionCallback = fn(
+    &SymbolTree,
+    tree_sitter::Node,
+    &ShaderPreprocessor,
+) -> Result<Vec<ShaderRegion>, ShaderError>;
+
 pub struct SymbolParser {
     symbol_parsers: Vec<(Box<dyn SymbolTreeParser>, tree_sitter::Query)>,
     symbol_filters: Vec<Box<dyn SymbolTreeFilter>>,
     scope_query: Query,
+
+    preprocessor_parsers: Vec<(Box<dyn SymbolTreePreprocessorParser>, tree_sitter::Query)>,
+    region_finder: SymbolRegionCallback,
 }
 
 impl SymbolParser {
@@ -83,6 +111,8 @@ impl SymbolParser {
         scope_query: &str,
         parsers: Vec<Box<dyn SymbolTreeParser>>,
         filters: Vec<Box<dyn SymbolTreeFilter>>,
+        preprocessor_parsers: Vec<Box<dyn SymbolTreePreprocessorParser>>,
+        region_finder: SymbolRegionCallback,
     ) -> Self {
         Self {
             symbol_parsers: parsers
@@ -95,6 +125,15 @@ impl SymbolParser {
                 .collect(),
             symbol_filters: filters,
             scope_query: tree_sitter::Query::new(language.clone(), scope_query).unwrap(),
+            preprocessor_parsers: preprocessor_parsers
+                .into_iter()
+                .map(|e| {
+                    // Cache query
+                    let query = Query::new(language, e.get_query().as_str()).unwrap();
+                    (e, query)
+                })
+                .collect(),
+            region_finder: region_finder,
         }
     }
     fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope> {
@@ -113,7 +152,41 @@ impl SymbolParser {
         }
         scopes
     }
-    pub fn query_file_symbols(&self, symbol_tree: &SymbolTree) -> ShaderSymbolList {
+    pub fn query_file_preprocessor(&self, symbol_tree: &SymbolTree) -> ShaderPreprocessor {
+        let mut preprocessor = ShaderPreprocessor::default();
+        for parser in &self.preprocessor_parsers {
+            // TODO: cache
+            let mut query_cursor = QueryCursor::new();
+            for matches in query_cursor.matches(
+                &parser.1,
+                symbol_tree.tree.root_node(),
+                symbol_tree.content.as_bytes(),
+            ) {
+                parser.0.process_match(
+                    matches,
+                    &symbol_tree.file_path,
+                    &symbol_tree.content,
+                    &mut preprocessor,
+                );
+            }
+        }
+        match (self.region_finder)(symbol_tree, symbol_tree.tree.root_node(), &preprocessor) {
+            Ok(regions) => preprocessor.regions = regions,
+            Err(_) => unimplemented!(),
+        }
+        preprocessor
+    }
+    pub fn query_file_symbols(
+        &self,
+        symbol_tree: &SymbolTree,
+        preprocessor: Option<&ShaderPreprocessor>,
+    ) -> ShaderSymbolList {
+        let file_preprocessor = match preprocessor {
+            Some(preprocessor) => preprocessor.clone(),
+            // This will not include external preprocessor symbols
+            // (such as file included through another file, and having parent file preproc)
+            None => self.query_file_preprocessor(symbol_tree),
+        };
         let scopes = self.query_file_scopes(symbol_tree);
         let mut symbols = ShaderSymbolList::default();
         for parser in &self.symbol_parsers {
@@ -143,6 +216,7 @@ impl SymbolParser {
         for filter in &self.symbol_filters {
             filter.filter_symbols(&mut symbols, &file_name);
         }
+        // TODO: filter with file_preprocessor
         symbols
     }
 }

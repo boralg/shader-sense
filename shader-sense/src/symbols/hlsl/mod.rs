@@ -1,11 +1,13 @@
 mod hlsl_filter;
-mod hlsl_inactive;
 mod hlsl_parser;
+mod hlsl_preprocessor;
+mod hlsl_regions;
 mod hlsl_word;
 mod hlsl_word_chain;
 
 use hlsl_filter::get_hlsl_filters;
 use hlsl_parser::get_hlsl_parsers;
+use hlsl_preprocessor::get_hlsl_preprocessor_parser;
 use tree_sitter::Parser;
 
 use crate::shader_error::ShaderError;
@@ -14,7 +16,7 @@ use super::{
     symbol_parser::SymbolParser,
     symbol_provider::SymbolProvider,
     symbol_tree::SymbolTree,
-    symbols::{ShaderPosition, ShaderRange, ShaderSymbolList},
+    symbols::{ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderSymbolList},
 };
 
 pub struct HlslSymbolProvider {
@@ -38,6 +40,8 @@ impl HlslSymbolProvider {
                 scope_query,
                 get_hlsl_parsers(),
                 get_hlsl_filters(),
+                get_hlsl_preprocessor_parser(),
+                hlsl_regions::query_regions_in_node,
             ),
             shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
                 "hlsl-intrinsics.json"
@@ -54,8 +58,16 @@ impl SymbolProvider for HlslSymbolProvider {
     fn get_parser(&mut self) -> &mut Parser {
         &mut self.parser
     }
-    fn query_file_symbols(&self, symbol_tree: &SymbolTree) -> ShaderSymbolList {
-        self.symbol_parser.query_file_symbols(symbol_tree)
+    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> ShaderPreprocessor {
+        self.symbol_parser.query_file_preprocessor(symbol_tree)
+    }
+    fn query_file_symbols(
+        &self,
+        symbol_tree: &SymbolTree,
+        preprocessor: Option<&ShaderPreprocessor>,
+    ) -> ShaderSymbolList {
+        self.symbol_parser
+            .query_file_symbols(symbol_tree, preprocessor)
     }
     // Get word at a given position.
     fn get_word_range_at_position(
@@ -76,13 +88,5 @@ impl SymbolProvider for HlslSymbolProvider {
             symbol_tree.tree.root_node(),
             position,
         )
-    }
-    // Get all inactive regions ranges
-    fn query_inactive_regions(
-        &self,
-        symbol_tree: &SymbolTree,
-        symbol_cache: Option<&ShaderSymbolList>,
-    ) -> Result<Vec<ShaderRange>, ShaderError> {
-        self.query_inactive_regions_in_node(symbol_tree, symbol_tree.tree.root_node(), symbol_cache)
     }
 }

@@ -1,6 +1,6 @@
 mod glsl_filter;
-mod glsl_inactive;
 mod glsl_parser;
+mod glsl_regions;
 mod glsl_word;
 mod glsl_word_chain;
 
@@ -8,13 +8,11 @@ use glsl_filter::get_glsl_filters;
 use glsl_parser::get_glsl_parsers;
 use tree_sitter::Parser;
 
-use crate::shader_error::ShaderError;
-
 use super::{
     symbol_parser::SymbolParser,
     symbol_provider::SymbolProvider,
     symbol_tree::SymbolTree,
-    symbols::{ShaderRange, ShaderSymbolList},
+    symbols::{ShaderPreprocessor, ShaderSymbolList},
 };
 
 pub struct GlslSymbolProvider {
@@ -37,6 +35,8 @@ impl GlslSymbolProvider {
                 r#"(compound_statement) @scope"#,
                 get_glsl_parsers(),
                 get_glsl_filters(),
+                vec![],
+                glsl_regions::query_regions_in_node,
             ),
             shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
                 "glsl-intrinsics.json"
@@ -54,8 +54,17 @@ impl SymbolProvider for GlslSymbolProvider {
         &self.shader_intrinsics
     }
 
-    fn query_file_symbols(&self, symbol_tree: &super::symbol_tree::SymbolTree) -> ShaderSymbolList {
-        self.symbol_parser.query_file_symbols(symbol_tree)
+    fn query_preprocessor(&self, symbol_tree: &SymbolTree) -> super::symbols::ShaderPreprocessor {
+        self.symbol_parser.query_file_preprocessor(symbol_tree)
+    }
+
+    fn query_file_symbols(
+        &self,
+        symbol_tree: &SymbolTree,
+        preprocessor: Option<&ShaderPreprocessor>,
+    ) -> ShaderSymbolList {
+        self.symbol_parser
+            .query_file_symbols(symbol_tree, preprocessor)
     }
 
     fn get_word_range_at_position(
@@ -76,13 +85,5 @@ impl SymbolProvider for GlslSymbolProvider {
             symbol_tree.tree.root_node(),
             position,
         )
-    }
-
-    fn query_inactive_regions(
-        &self,
-        symbol_tree: &SymbolTree,
-        symbol_cache: Option<&ShaderSymbolList>,
-    ) -> Result<Vec<ShaderRange>, ShaderError> {
-        self.query_inactive_regions_in_node(symbol_tree, symbol_tree.tree.root_node(), symbol_cache)
     }
 }

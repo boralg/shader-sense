@@ -138,6 +138,49 @@ impl ShaderRange {
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct ShaderRegion {
+    pub range: ShaderRange,
+    // Could add some ShaderRegionType::Condition / ShaderRegionType::User...
+    pub is_active: bool, // Is this region passing preprocess
+}
+
+impl ShaderRegion {
+    pub fn new(range: ShaderRange, is_active: bool) -> Self {
+        Self { range, is_active }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ShaderPreprocessorInclude {
+    pub path: PathBuf,
+    pub range: ShaderRange,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ShaderPreprocessorDefine {
+    pub name: String,
+    pub range: ShaderRange,
+    pub value: Option<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ShaderPreprocessor {
+    pub includes: Vec<ShaderPreprocessorInclude>,
+    pub defines: Vec<ShaderPreprocessorDefine>,
+    pub regions: Vec<ShaderRegion>,
+}
+impl ShaderPreprocessorDefine {
+    pub fn new(name: String, range: ShaderRange, value: Option<String>) -> Self {
+        Self { name, range, value }
+    }
+}
+impl ShaderPreprocessorInclude {
+    pub fn new(path: PathBuf, range: ShaderRange) -> Self {
+        Self { path, range }
+    }
+}
+
 pub type ShaderMember = ShaderParameter;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

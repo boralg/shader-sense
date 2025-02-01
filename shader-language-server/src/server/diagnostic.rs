@@ -2,7 +2,6 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     path::{Path, PathBuf},
-    rc::Rc,
 };
 
 use log::{debug, error, info};
@@ -165,25 +164,23 @@ impl ServerLanguageData {
                         diagnostics.insert(uri.clone(), vec![]);
                     }
                 });
-                // Add inactive regions
-
-                let mut inactive_diagnostics = self
-                    .recolt_inactive(
-                        &uri,
-                        cached_file,
-                        Some(&self.get_all_symbols(Rc::clone(cached_file))),
-                    ) // TODO: bad double query here...
-                    .unwrap() // TODO: should not crash here.
-                    .into_iter()
-                    .map(|range| Diagnostic {
-                        range: shader_range_to_lsp_range(&range),
-                        severity: Some(DiagnosticSeverity::HINT),
-                        message: "Code disabled by currently used macros".into(),
-                        source: Some("shader-validator".to_string()),
-                        tags: Some(vec![DiagnosticTag::UNNECESSARY]),
-                        ..Default::default()
+                // Add inactive regions to diag
+                let mut inactive_diagnostics = RefCell::borrow(cached_file)
+                    .preprocessor_cache
+                    .regions
+                    .iter()
+                    .filter_map(|region| {
+                        (!region.is_active).then_some(Diagnostic {
+                            range: shader_range_to_lsp_range(&region.range),
+                            severity: Some(DiagnosticSeverity::HINT),
+                            message: "Code disabled by currently used macros".into(),
+                            source: Some("shader-validator".to_string()),
+                            tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+                            ..Default::default()
+                        })
                     })
                     .collect();
+
                 match diagnostics.get_mut(&uri) {
                     Some(diagnostics) => diagnostics.append(&mut inactive_diagnostics),
                     None => {

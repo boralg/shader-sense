@@ -82,10 +82,10 @@ mod tests {
         let deps = find_dependencies(&mut include_handler, &shader_content);
         let mut symbols = symbol_provider.get_intrinsics_symbol().clone();
         let symbol_tree = SymbolTree::new(symbol_provider, file_path, shader_content).unwrap();
-        symbols.append(symbol_provider.query_file_symbols(&symbol_tree));
+        symbols.append(symbol_provider.query_file_symbols(&symbol_tree, None));
         for dep in deps {
             let symbol_tree = SymbolTree::new(symbol_provider, &dep.1, &dep.0).unwrap();
-            symbols.append(symbol_provider.query_file_symbols(&symbol_tree));
+            symbols.append(symbol_provider.query_file_symbols(&symbol_tree, None));
         }
         symbols
     }
@@ -119,7 +119,7 @@ mod tests {
         let mut symbol_provider = create_symbol_provider(ShadingLanguage::Glsl);
         let symbol_tree =
             SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
-        let symbols = symbol_provider.query_file_symbols(&symbol_tree);
+        let symbols = symbol_provider.query_file_symbols(&symbol_tree, None);
         assert!(!symbols.functions.is_empty());
     }
     #[test]
@@ -130,7 +130,7 @@ mod tests {
         let mut symbol_provider = create_symbol_provider(ShadingLanguage::Hlsl);
         let symbol_tree =
             SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
-        let symbols = symbol_provider.query_file_symbols(&symbol_tree);
+        let symbols = symbol_provider.query_file_symbols(&symbol_tree, None);
         assert!(!symbols.functions.is_empty());
     }
     #[test]
@@ -141,7 +141,7 @@ mod tests {
         let mut symbol_provider = create_symbol_provider(ShadingLanguage::Wgsl);
         let symbol_tree =
             SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
-        let symbols = symbol_provider.query_file_symbols(&symbol_tree);
+        let symbols = symbol_provider.query_file_symbols(&symbol_tree, None);
         assert!(symbols.functions.is_empty());
     }
     #[test]
