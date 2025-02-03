@@ -2,9 +2,7 @@ use std::path::Path;
 
 use crate::symbols::{
     symbol_parser::{get_name, ShaderSymbolListBuilder, SymbolTreeParser},
-    symbols::{
-        ShaderParameter, ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
-    },
+    symbols::{ShaderParameter, ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolData},
 };
 
 pub fn get_wgsl_parsers() -> Vec<Box<dyn SymbolTreeParser>> {
