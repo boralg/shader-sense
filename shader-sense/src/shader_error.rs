@@ -1,6 +1,8 @@
 use core::fmt;
 use std::path::PathBuf;
 
+use crate::symbols::symbols::ShaderRange;
+
 #[derive(Debug)]
 pub enum ShaderDiagnosticSeverity {
     Error,
@@ -63,7 +65,7 @@ pub enum ShaderError {
     ValidationError(String),
     NoSymbol,
     ParseSymbolError(String),
-    SymbolQueryError(String),
+    SymbolQueryError(String, ShaderRange),
     IoErr(std::io::Error),
     InternalErr(String),
 }
@@ -90,7 +92,9 @@ impl fmt::Display for ShaderError {
             ShaderError::NoSymbol => write!(f, "NoSymbol"),
             ShaderError::ParseSymbolError(err) => write!(f, "ParseSymbolError: {}", err),
             ShaderError::ValidationError(err) => write!(f, "ValidationError: {}", err),
-            ShaderError::SymbolQueryError(err) => write!(f, "SymbolQueryError: {}", err),
+            ShaderError::SymbolQueryError(err, range) => {
+                write!(f, "SymbolQueryError: {} at {:?}", err, range)
+            }
         }
     }
 }

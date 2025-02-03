@@ -385,9 +385,10 @@ impl ServerLanguage {
                                         Some(params.text_document.version),
                                     );
                                 }
-                                Err(_) => self.connection.send_notification_error(format!(
-                                    "Failed to watch file {}",
-                                    uri.to_string()
+                                Err(error) => self.connection.send_notification_error(format!(
+                                    "Failed to watch file {}: {}",
+                                    uri.to_string(),
+                                    error.to_string()
                                 )),
                             }
                         }
