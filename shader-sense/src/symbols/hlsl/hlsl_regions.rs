@@ -1,3 +1,5 @@
+use std::num::ParseIntError;
+
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
@@ -50,7 +52,7 @@ macro_rules! assert_node_kind {
     };
 }
 
-fn get_define<'a>(
+fn get_define_value<'a>(
     preprocessor: &'a ShaderPreprocessor,
     name: &str,
     position: &ShaderPosition,
@@ -67,62 +69,82 @@ fn get_define<'a>(
         same_name && defined_before
     })
 }
+fn parse_number(number: &str) -> Result<i32, ParseIntError> {
+    if number.starts_with("0x") && number.len() > 2 {
+        let prefixed_number = number
+            .strip_prefix("0x")
+            .unwrap_or(number.strip_prefix("0X").unwrap_or(number));
+        i32::from_str_radix(prefixed_number, 16)
+    } else if number.starts_with("0") && number.len() > 1 {
+        let prefixed_number = number.strip_prefix("0").unwrap_or(number);
+        i32::from_str_radix(prefixed_number, 8)
+    } else {
+        number.parse::<i32>()
+    }
+}
+fn get_define_as_i32_depth<'a>(
+    preprocessor: &'a ShaderPreprocessor,
+    name: &str,
+    position: &ShaderPosition,
+    depth: u32,
+) -> Result<i32, ShaderError> {
+    if depth == 0 {
+        return Err(ShaderError::SymbolQueryError(
+            format!("Failed to parse number_literal {}", name),
+            ShaderRange::new(position.clone(), position.clone()),
+        ));
+    } else {
+        match get_define_value(preprocessor, name, position) {
+            Some(define) => match &define.value {
+                Some(value) => match parse_number(value) {
+                    Ok(parsed_value) => Ok(parsed_value),
+                    Err(_) => get_define_as_i32_depth(
+                        &preprocessor,
+                        value,
+                        &ShaderPosition::default(),
+                        depth - 1,
+                    ),
+                },
+                None => Ok(0), // Return false instead of error
+            },
+            None => Ok(0), // Return false instead of error
+        }
+    }
+}
 fn get_define_as_i32<'a>(
     preprocessor: &'a ShaderPreprocessor,
     name: &str,
     position: &ShaderPosition,
 ) -> Result<i32, ShaderError> {
-    match get_define(preprocessor, name, position) {
+    match get_define_value(preprocessor, name, position) {
         Some(define) => match &define.value {
             Some(value) => match value.parse::<i32>() {
                 Ok(parsed_value) => Ok(parsed_value),
-                Err(_) => Err(ShaderError::InternalErr(format!(
-                    "Failed to convert define to i32: {}={}",
-                    define.name, value
-                ))),
+                Err(_) => {
+                    get_define_as_i32_depth(&preprocessor, value, &ShaderPosition::default(), 10)
+                }
             },
-            None => Err(ShaderError::InternalErr(format!(
-                "Failed to get value for define: {}",
-                define.name
-            ))),
+            None => Ok(0), // Return false instead of error
         },
-        None => Err(ShaderError::InternalErr(format!(
-            "Failed to get define: {}",
-            name
-        ))),
-    }
-}
-fn get_define_as_bool<'a>(
-    preprocessor: &'a ShaderPreprocessor,
-    name: &str,
-    position: &ShaderPosition,
-) -> Result<bool, ShaderError> {
-    match get_define(preprocessor, name, position) {
-        Some(define) => match &define.value {
-            Some(value) => match value.parse::<i32>() {
-                Ok(parsed_value) => Ok(parsed_value != 0),
-                Err(_) => Err(ShaderError::InternalErr(format!(
-                    "Failed to convert define to bool: {}={}",
-                    define.name, value
-                ))),
-            },
-            None => Ok(false), // no value.
-        },
-        None => Ok(false), // not defined.
+        None => Ok(0), // Return false instead of error
     }
 }
 fn is_define_defined(
     preprocessor: &ShaderPreprocessor,
     name: &str,
     position: &ShaderPosition,
-) -> bool {
-    get_define(preprocessor, name, position).is_some()
+) -> i32 {
+    if get_define_value(preprocessor, name, position).is_some() {
+        1
+    } else {
+        0
+    }
 }
 fn resolve_condition(
     cursor: tree_sitter::TreeCursor,
     symbol_tree: &SymbolTree,
     preprocessor: &ShaderPreprocessor,
-) -> Result<bool, ShaderError> {
+) -> Result<i32, ShaderError> {
     let mut cursor = cursor;
     match cursor.node().kind() {
         "preproc_defined" => {
@@ -139,18 +161,21 @@ fn resolve_condition(
             Ok(is_define_defined(preprocessor, condition_macro, &position))
         }
         "number_literal" => {
-            let number = get_name(&symbol_tree.content, cursor.node());
-            match number.parse::<i32>() {
-                Ok(value) => Ok(value != 0),
+            // As simple as it is, but need to be warry of hexa or octal values.
+            let number_str = get_name(&symbol_tree.content, cursor.node());
+            let parsed_number = parse_number(number_str);
+            match parsed_number {
+                Ok(value) => Ok(value),
                 Err(_) => Err(ShaderError::SymbolQueryError(
-                    format!("Failed to parse number_literal {}", number),
+                    format!("Failed to parse number_literal {}", number_str),
                     ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
                 )),
             }
         }
         "identifier" => {
+            // An identifier is simply a macro.
             let condition_macro = get_name(&symbol_tree.content, cursor.node());
-            let value = get_define_as_bool(
+            let value = get_define_as_i32(
                 preprocessor,
                 condition_macro,
                 &ShaderPosition::from_tree_sitter_point(
@@ -161,10 +186,11 @@ fn resolve_condition(
             Ok(value)
         }
         "binary_expression" => {
+            // A binary expression might compare two expression or identifier. Recurse them.
             assert_tree_sitter!(cursor.goto_first_child());
             assert_field_name!(cursor, "left");
             let left_condition = match cursor.node().kind() {
-                "identifier" => get_define_as_bool(
+                "identifier" => get_define_as_i32(
                     preprocessor,
                     &get_name(&symbol_tree.content, cursor.node()),
                     &ShaderPosition::from_tree_sitter_point(
@@ -180,7 +206,7 @@ fn resolve_condition(
             assert_tree_sitter!(cursor.goto_next_sibling());
             assert_field_name!(cursor, "right");
             let right_condition = match cursor.node().kind() {
-                "identifier" => get_define_as_bool(
+                "identifier" => get_define_as_i32(
                     preprocessor,
                     &get_name(&symbol_tree.content, cursor.node()),
                     &ShaderPosition::from_tree_sitter_point(
@@ -191,8 +217,24 @@ fn resolve_condition(
                 _ => resolve_condition(cursor.clone(), symbol_tree, preprocessor)?,
             };
             match operator {
-                "&&" => Ok(left_condition && right_condition),
-                "||" => Ok(left_condition || right_condition),
+                "&&" => Ok(((left_condition != 0) && (right_condition != 0)) as i32),
+                "||" => Ok(((left_condition != 0) || (right_condition != 0)) as i32),
+                "|" => Ok(((left_condition != 0) | (right_condition != 0)) as i32),
+                "&" => Ok(((left_condition != 0) & (right_condition != 0)) as i32),
+                "^" => Ok(left_condition ^ right_condition),
+                "==" => Ok((left_condition == right_condition) as i32),
+                "!=" => Ok((left_condition != right_condition) as i32),
+                "<" => Ok((left_condition < right_condition) as i32),
+                ">" => Ok((left_condition > right_condition) as i32),
+                "<=" => Ok((left_condition <= right_condition) as i32),
+                ">=" => Ok((left_condition >= right_condition) as i32),
+                ">>" => Ok(left_condition >> right_condition),
+                "<<" => Ok(left_condition << right_condition),
+                "+" => Ok(left_condition + right_condition),
+                "-" => Ok(left_condition - right_condition),
+                "*" => Ok(left_condition * right_condition),
+                "/" => Ok(left_condition / right_condition),
+                "%" => Ok(left_condition % right_condition),
                 value => Err(ShaderError::SymbolQueryError(
                     format!("Binary operator unhandled for {}", value),
                     ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
@@ -215,10 +257,10 @@ fn resolve_condition(
                 &symbol_tree.file_path,
             );
             match operator {
-                "!" => Ok(!get_define_as_bool(preprocessor, &argument, &position)?),
-                "+" => Ok((get_define_as_i32(preprocessor, &argument, &position)?) != 0),
-                "-" => Ok((get_define_as_i32(preprocessor, &argument, &position)?) != 0),
-                "~" => Ok((!get_define_as_i32(preprocessor, &argument, &position)?) != 0),
+                "!" => Ok(!get_define_as_i32(preprocessor, &argument, &position)?),
+                "+" => Ok(get_define_as_i32(preprocessor, &argument, &position)?),
+                "-" => Ok(-get_define_as_i32(preprocessor, &argument, &position)?),
+                "~" => Ok(!get_define_as_i32(preprocessor, &argument, &position)?),
                 value => Err(ShaderError::SymbolQueryError(
                     format!("Unary operator unhandled for {}", value),
                     ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
@@ -311,7 +353,7 @@ pub fn query_regions_in_node(
                     )
                 }
                 "#else" => (
-                    !found_active_region,
+                    if found_active_region { 0 } else { 1 },
                     ShaderPosition::from_tree_sitter_point(
                         cursor.node().range().end_point,
                         &symbol_tree.file_path,
@@ -326,8 +368,11 @@ pub fn query_regions_in_node(
                         &symbol_tree.file_path,
                     );
                     (
-                        !found_active_region
-                            && resolve_condition(cursor.clone(), symbol_tree, preprocessor)?,
+                        if found_active_region {
+                            0
+                        } else {
+                            resolve_condition(cursor.clone(), symbol_tree, preprocessor)?
+                        },
                         position,
                     )
                 }
@@ -353,13 +398,13 @@ pub fn query_regions_in_node(
                             );
                             regions.push(ShaderRegion::new(
                                 ShaderRange::new(region_start, region_end),
-                                is_active_region,
+                                is_active_region != 0,
                             ));
                             let mut next_region = find_regions(
                                 symbol_tree,
                                 preprocessor,
                                 cursor,
-                                is_active_region || found_active_region,
+                                (is_active_region != 0) || found_active_region,
                             )?;
                             regions.append(&mut next_region);
                             return Ok(regions);
@@ -378,7 +423,7 @@ pub fn query_regions_in_node(
                 ShaderPosition::from_tree_sitter_point(end_point, &symbol_tree.file_path);
             regions.push(ShaderRegion::new(
                 ShaderRange::new(region_start, region_end),
-                is_active_region,
+                is_active_region != 0,
             ));
             Ok(regions)
         }
