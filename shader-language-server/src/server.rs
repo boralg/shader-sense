@@ -561,6 +561,7 @@ impl ServerLanguage {
                 for (_language, language_data) in &mut server.language_data {
                     language_data.config = config.clone();
                     // Republish all diagnostics
+                    let mut file_to_republish = Vec::new();
                     for (url, cached_file) in &language_data.watched_files.files {
                         // Clear diags
                         language_data.clear_diagnostic(&server.connection, &url);
@@ -572,11 +573,20 @@ impl ServerLanguage {
                             None,
                             None,
                         ) {
-                            Ok(_) => {}
+                            Ok(_) => file_to_republish.push((url.clone(), Rc::clone(&cached_file))),
                             Err(err) => server
                                 .connection
                                 .send_notification_error(format!("{}", err)),
                         };
+                    }
+                    // Republish all diagnostics with new settings.
+                    for (url, cached_file) in &file_to_republish {
+                        language_data.publish_diagnostic(
+                            &server.connection,
+                            url,
+                            cached_file,
+                            None,
+                        );
                     }
                 }
             },

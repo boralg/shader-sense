@@ -53,6 +53,7 @@ impl ServerLanguageData {
 
     pub fn clear_diagnostic(&self, connection: &ServerConnection, uri: &Url) {
         // TODO: check it exist ?
+        info!("Clearing diagnostic for file {}", uri);
         let publish_diagnostics_params = PublishDiagnosticsParams {
             uri: uri.clone(),
             diagnostics: Vec::new(),
