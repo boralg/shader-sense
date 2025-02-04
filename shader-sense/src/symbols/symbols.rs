@@ -1,5 +1,6 @@
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     path::{Path, PathBuf},
 };
 
@@ -136,6 +137,11 @@ impl ShaderRange {
             false
         }
     }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ShaderSymbolParams {
+    pub defines: HashMap<String, String>,
 }
 
 #[derive(Debug, Default, Clone)]

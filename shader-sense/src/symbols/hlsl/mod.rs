@@ -16,7 +16,9 @@ use super::{
     symbol_parser::SymbolParser,
     symbol_provider::SymbolProvider,
     symbol_tree::SymbolTree,
-    symbols::{ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderSymbolList},
+    symbols::{
+        ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderSymbolList, ShaderSymbolParams,
+    },
 };
 
 pub struct HlslSymbolProvider {
@@ -61,8 +63,10 @@ impl SymbolProvider for HlslSymbolProvider {
     fn query_preprocessor(
         &self,
         symbol_tree: &SymbolTree,
+        symbol_params: &ShaderSymbolParams,
     ) -> Result<ShaderPreprocessor, ShaderError> {
-        self.symbol_parser.query_file_preprocessor(symbol_tree)
+        self.symbol_parser
+            .query_file_preprocessor(symbol_tree, symbol_params)
     }
     fn query_file_symbols(
         &self,

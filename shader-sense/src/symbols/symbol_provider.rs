@@ -6,7 +6,9 @@ use crate::shader_error::ShaderError;
 
 use super::{
     symbol_tree::SymbolTree,
-    symbols::{ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderSymbolList},
+    symbols::{
+        ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderSymbolList, ShaderSymbolParams,
+    },
 };
 pub trait SymbolProvider {
     // Get underlying treesitter parser
@@ -17,6 +19,7 @@ pub trait SymbolProvider {
     fn query_preprocessor(
         &self,
         symbol_tree: &SymbolTree,
+        symbol_params: &ShaderSymbolParams,
     ) -> Result<ShaderPreprocessor, ShaderError>;
     // Query file symbol from file tree.
     fn query_file_symbols(

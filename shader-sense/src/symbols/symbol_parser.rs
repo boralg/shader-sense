@@ -9,7 +9,10 @@ use crate::{
 
 use super::{
     symbol_tree::SymbolTree,
-    symbols::{ShaderPreprocessor, ShaderRegion, ShaderScope, ShaderSymbol},
+    symbols::{
+        ShaderPreprocessor, ShaderPreprocessorDefine, ShaderRegion, ShaderScope, ShaderSymbol,
+        ShaderSymbolParams,
+    },
 };
 
 pub(super) fn get_name<'a>(shader_content: &'a str, node: Node) -> &'a str {
@@ -192,6 +195,7 @@ impl SymbolParser {
     pub fn query_file_preprocessor(
         &self,
         symbol_tree: &SymbolTree,
+        symbol_params: &ShaderSymbolParams,
     ) -> Result<ShaderPreprocessor, ShaderError> {
         let mut preprocessor = ShaderPreprocessor::default();
         for parser in &self.preprocessor_parsers {
@@ -209,6 +213,18 @@ impl SymbolParser {
                 );
             }
         }
+        // Add settings define
+        preprocessor.defines.append(
+            &mut symbol_params
+                .defines
+                .iter()
+                .map(|(define, value)| ShaderPreprocessorDefine {
+                    name: define.clone(),
+                    range: None,
+                    value: Some(value.clone()),
+                })
+                .collect(),
+        );
         // Query regions.
         preprocessor.regions =
             (self.region_finder)(symbol_tree, symbol_tree.tree.root_node(), &preprocessor)?;
@@ -232,9 +248,10 @@ impl SymbolParser {
             Some(preprocessor) => preprocessor.clone(),
             // This will not include external preprocessor symbols
             // (such as file included through another file, and having parent file preproc)
-            None => self.query_file_preprocessor(symbol_tree)?,
+            None => self.query_file_preprocessor(symbol_tree, &ShaderSymbolParams::default())?,
         };
         // TODO: Should use something else than name...
+        // Required for shader stage filtering...
         let file_name = symbol_tree
             .file_path
             .file_name()

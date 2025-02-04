@@ -2,7 +2,7 @@ use std::path::Path;
 
 use shader_sense::{
     shader::ShadingLanguage,
-    symbols::{create_symbol_provider, symbol_tree::SymbolTree},
+    symbols::{create_symbol_provider, symbol_tree::SymbolTree, symbols::ShaderSymbolParams},
     validator::{create_validator, validator::ValidationParams},
 };
 
@@ -30,7 +30,9 @@ fn query_all_symbol(shading_language: ShadingLanguage, shader_path: &Path) {
     let shader_content = std::fs::read_to_string(shader_path).unwrap();
     match SymbolTree::new(symbol_provider.as_mut(), shader_path, &shader_content) {
         Ok(symbol_tree) => {
-            let preprocessor = symbol_provider.query_preprocessor(&symbol_tree).unwrap();
+            let preprocessor = symbol_provider
+                .query_preprocessor(&symbol_tree, &ShaderSymbolParams::default())
+                .unwrap();
             let symbol_list = symbol_provider
                 .query_file_symbols(&symbol_tree, Some(&preprocessor))
                 .unwrap();
