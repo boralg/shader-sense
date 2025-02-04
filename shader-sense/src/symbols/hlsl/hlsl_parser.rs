@@ -32,10 +32,16 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
             declarator: (function_declarator
                 declarator: ({}identifier) @function.label
                 parameters: (parameter_list 
-                    ((parameter_declaration
-                        type: (_) @function.param.type
-                        declarator: (_) @function.param.decl
-                    )(",")?)*
+                    ([
+                        ((parameter_declaration
+                            type: (_) @function.param.type
+                            declarator: (_) @function.param.decl
+                        )(",")?)
+                        ((optional_parameter_declaration
+                            type: (_) @function.param.type
+                            declarator: (_) @function.param.decl
+                        )(",")?)
+                    ])*
                 )
             )
             body: (compound_statement) @function.scope
@@ -57,18 +63,36 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
         let label_node = matches.captures[1].node;
         let range = ShaderRange::from_range(label_node.range(), file_path.into());
         let scope_stack = self.compute_scope_stack(scopes, &range);
-        // Query internal scopes variables
-        /*let scope_node = matche.captures[matche.captures.len() - 1].node;
-        let content_scope_stack = {
+        // Query internal scope
+        let scope_node = matches.captures[matches.captures.len() - 1].node;
+        let parameter_scope_stack = {
             let mut s = scope_stack.clone();
-            s.push(range.clone());
+            s.push(ShaderRange::from_range(scope_node.range(), file_path));
             s
         };
-        query_variables(file_path, &shader_content[scope_node.range().start_byte.. scope_node.range().end_byte], scope_node, {
-            let mut s = scope_stack.clone();
-            s.push(range.clone());
-            s
-        });*/
+        // Get parameters & add them as function scope variable.
+        let parameters = matches.captures[2..matches.captures.len() - 1]
+            .chunks(2)
+            .map(|w| {
+                let ty: String = get_name(shader_content, w[0].node).into();
+                let label: String = get_name(shader_content, w[1].node).into();
+                symbols.add_variable(ShaderSymbol {
+                    label: label.clone(),
+                    description: "".into(),
+                    version: "".into(),
+                    stages: vec![],
+                    link: None,
+                    data: ShaderSymbolData::Variables { ty: ty.clone() },
+                    range: Some(ShaderRange::from_range(w[1].node.range(), file_path)),
+                    scope_stack: Some(parameter_scope_stack.clone()),
+                });
+                ShaderParameter {
+                    ty: ty,
+                    label: label,
+                    description: "".into(),
+                }
+            })
+            .collect::<Vec<ShaderParameter>>();
         symbols.add_function(ShaderSymbol {
             label: get_name(shader_content, matches.captures[1].node).into(),
             description: "".into(),
@@ -79,14 +103,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
                 signatures: vec![ShaderSignature {
                     returnType: get_name(shader_content, matches.captures[0].node).into(),
                     description: "".into(),
-                    parameters: matches.captures[2..matches.captures.len() - 1]
-                        .chunks(2)
-                        .map(|w| ShaderParameter {
-                            ty: get_name(shader_content, w[0].node).into(),
-                            label: get_name(shader_content, w[1].node).into(),
-                            description: "".into(),
-                        })
-                        .collect::<Vec<ShaderParameter>>(),
+                    parameters: parameters,
                 }],
             },
             range: Some(range),
