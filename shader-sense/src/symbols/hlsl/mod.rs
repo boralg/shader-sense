@@ -97,3 +97,87 @@ impl SymbolProvider for HlslSymbolProvider {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use crate::{
+        shader::ShadingLanguage,
+        symbols::{
+            create_symbol_provider,
+            symbol_tree::SymbolTree,
+            symbols::{ShaderPosition, ShaderRange, ShaderRegion, ShaderSymbolParams},
+        },
+    };
+
+    #[test]
+    fn test_hlsl_regions() {
+        let file_path = Path::new("./test/hlsl/regions.hlsl");
+        let shader_content = std::fs::read_to_string(file_path).unwrap();
+        let mut symbol_provider = create_symbol_provider(ShadingLanguage::Hlsl);
+        let symbol_tree =
+            SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
+        let preprocessor = symbol_provider
+            .query_preprocessor(&symbol_tree, &ShaderSymbolParams::default())
+            .unwrap();
+        //let symbols = symbol_provider.query_file_symbols(&symbol_tree, Some(&preprocessor));
+        let set_region =
+            |start_line: u32, start_pos: u32, end_line: u32, end_pos: u32, active: bool| {
+                ShaderRegion {
+                    range: ShaderRange::new(
+                        ShaderPosition::new(file_path.into(), start_line, start_pos),
+                        ShaderPosition::new(file_path.into(), end_line, end_pos),
+                    ),
+                    is_active: active,
+                }
+            };
+        let expected_regions = vec![
+            // elif
+            set_region(4, 21, 6, 0, true),
+            set_region(6, 32, 8, 0, false),
+            set_region(8, 5, 9, 16, false),
+            // ifdef true
+            set_region(12, 24, 14, 0, true),
+            set_region(14, 5, 15, 16, false),
+            // ifndef
+            set_region(18, 25, 20, 0, false),
+            set_region(20, 5, 21, 16, true),
+            // ifdef false
+            set_region(24, 28, 26, 0, false),
+            // if 0
+            set_region(28, 5, 30, 0, false),
+            // if parenthesized
+            set_region(33, 50, 35, 0, false),
+            // if binary
+            set_region(38, 43, 40, 0, false),
+            // if unary
+            set_region(43, 22, 45, 0, false),
+        ];
+        assert!(preprocessor.regions.len() == expected_regions.len());
+        for region_index in 0..preprocessor.regions.len() {
+            println!(
+                "region {}: {:#?}",
+                region_index, preprocessor.regions[region_index]
+            );
+            assert!(
+                preprocessor.regions[region_index].range.start
+                    == expected_regions[region_index].range.start,
+                "Failed start assert for region {}",
+                region_index
+            );
+            assert!(
+                preprocessor.regions[region_index].range.end
+                    == expected_regions[region_index].range.end,
+                "Failed end assert for region {}",
+                region_index
+            );
+            assert!(
+                preprocessor.regions[region_index].is_active
+                    == expected_regions[region_index].is_active,
+                "Failed active assert for region {}",
+                region_index
+            );
+        }
+    }
+}
