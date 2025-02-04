@@ -13,8 +13,14 @@ use crate::{
     },
 };
 
+// Some nice query resources
+// https://davisvaughan.github.io/r-tree-sitter/reference/query-matches-and-captures.html
+// https://parsiya.net/blog/knee-deep-tree-sitter-queries/
+// Check https://github.com/tree-sitter/tree-sitter-cpp/blob/master/src/grammar.json & grammar.json to inspect how node are layout
 // All symbols details can be found here
 // https://github.com/tree-sitter/tree-sitter-cpp/blob/master/src/grammar.json
+// Here the goal is mostly to compute #if regions & mark them as active or not
+// This try resolving condition using macros through tree sitter.
 
 macro_rules! assert_tree_sitter {
     ($condition:expr) => {
@@ -43,7 +49,7 @@ macro_rules! assert_node_kind {
     ($cursor:expr, $value:expr) => {
         if $cursor.node().kind() != $value {
             return Err(ShaderError::InternalErr(format!(
-                "Unexpected query field name {} at : ({}:{})",
+                "Unexpected query node kind {} at : ({}:{})",
                 $value,
                 file!(),
                 line!()
@@ -94,6 +100,8 @@ fn get_define_as_i32_depth<'a>(
             ShaderRange::new(position.clone(), position.clone()),
         ));
     } else {
+        // Here we recurse define value cuz a define might just be an alias for another define.
+        // If we dont manage to parse it as a number, parse it as another define.
         match get_define_value(preprocessor, name, position) {
             Some(define) => match &define.value {
                 Some(value) => match parse_number(value) {
@@ -121,6 +129,7 @@ fn get_define_as_i32<'a>(
             Some(value) => match value.parse::<i32>() {
                 Ok(parsed_value) => Ok(parsed_value),
                 Err(_) => {
+                    // Recurse result up to 10 times.
                     get_define_as_i32_depth(&preprocessor, value, &ShaderPosition::default(), 10)
                 }
             },
@@ -134,11 +143,7 @@ fn is_define_defined(
     name: &str,
     position: &ShaderPosition,
 ) -> i32 {
-    if get_define_value(preprocessor, name, position).is_some() {
-        1
-    } else {
-        0
-    }
+    get_define_value(preprocessor, name, position).is_some() as i32
 }
 fn resolve_condition(
     cursor: tree_sitter::TreeCursor,
@@ -148,9 +153,17 @@ fn resolve_condition(
     let mut cursor = cursor;
     match cursor.node().kind() {
         "preproc_defined" => {
+            // check if macro is defined.
+            let _ = r#"condition: (preproc_defined
+                "defined"
+                "("
+                (identifier) @identifier
+                ")"
+            )"#;
             assert_tree_sitter!(cursor.goto_first_child());
             assert_node_kind!(cursor, "defined");
             assert_tree_sitter!(cursor.goto_next_sibling());
+            assert_node_kind!(cursor, "(");
             assert_tree_sitter!(cursor.goto_next_sibling());
             assert_node_kind!(cursor, "identifier");
             let condition_macro = get_name(&symbol_tree.content, cursor.node());
@@ -162,6 +175,7 @@ fn resolve_condition(
         }
         "number_literal" => {
             // As simple as it is, but need to be warry of hexa or octal values.
+            let _ = r#"condition: (number_literal)"#;
             let number_str = get_name(&symbol_tree.content, cursor.node());
             let parsed_number = parse_number(number_str);
             match parsed_number {
@@ -174,6 +188,7 @@ fn resolve_condition(
         }
         "identifier" => {
             // An identifier is simply a macro.
+            let _ = r#"condition: (identifier)"#;
             let condition_macro = get_name(&symbol_tree.content, cursor.node());
             let value = get_define_as_i32(
                 preprocessor,
@@ -187,6 +202,11 @@ fn resolve_condition(
         }
         "binary_expression" => {
             // A binary expression might compare two expression or identifier. Recurse them.
+            let _ = r#"condition: (binary_expression
+                left:(_) @identifier.or.expression
+                operator:(_) @binary.operator
+                right(_)  @identifier.or.expression
+            )"#;
             assert_tree_sitter!(cursor.goto_first_child());
             assert_field_name!(cursor, "left");
             let left_condition = match cursor.node().kind() {
@@ -248,19 +268,21 @@ fn resolve_condition(
             )"#;
             // Operator = !~-+
             assert_tree_sitter!(cursor.goto_first_child());
-            assert_tree_sitter!(cursor.field_name().unwrap() == "operator");
-            let operator = get_name(&symbol_tree.content, cursor.node());
+            assert_field_name!(cursor, "operator");
+            let operator = cursor.node().kind(); //get_name(&symbol_tree.content, cursor.node());
             assert_tree_sitter!(cursor.goto_next_sibling());
-            let argument = cursor.node().kind();
+            assert_field_name!(cursor, "argument");
+            let argument = get_name(&symbol_tree.content, cursor.node());
             let position = ShaderPosition::from_tree_sitter_point(
                 cursor.node().start_position(),
                 &symbol_tree.file_path,
             );
+            let value = get_define_as_i32(preprocessor, &argument, &position)?;
             match operator {
-                "!" => Ok(!get_define_as_i32(preprocessor, &argument, &position)?),
-                "+" => Ok(get_define_as_i32(preprocessor, &argument, &position)?),
-                "-" => Ok(-get_define_as_i32(preprocessor, &argument, &position)?),
-                "~" => Ok(!get_define_as_i32(preprocessor, &argument, &position)?),
+                "!" => Ok(!(value != 0) as i32), // Comparing as bool
+                "+" => Ok(value),
+                "-" => Ok(-value),
+                "~" => Ok(!value),
                 value => Err(ShaderError::SymbolQueryError(
                     format!("Unary operator unhandled for {}", value),
                     ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
@@ -335,7 +357,7 @@ pub fn query_regions_in_node(
                         &symbol_tree.file_path,
                     );
                     (
-                        !is_define_defined(preprocessor, condition_macro, &position),
+                        1 - is_define_defined(preprocessor, condition_macro, &position),
                         position,
                     )
                 }
