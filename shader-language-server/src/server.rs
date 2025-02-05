@@ -554,9 +554,10 @@ impl ServerLanguage {
             config,
             |server: &mut ServerLanguage, value: Value| {
                 // Sent 1 item, received 1 in an array
-                let mut parsed_config: Vec<ServerConfig> =
+                let mut parsed_config: Vec<Option<ServerConfig>> =
                     serde_json::from_value(value).expect("Failed to parse received config");
-                let config = parsed_config.remove(0);
+                let config = parsed_config.remove(0).unwrap_or_default();
+
                 info!("Updating server config: {:#?}", config);
                 for (_language, language_data) in &mut server.language_data {
                     language_data.config = config.clone();
