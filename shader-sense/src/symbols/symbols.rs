@@ -353,7 +353,7 @@ pub struct ShaderSymbol {
     pub scope_stack: Option<Vec<ShaderScope>>, // Stack of declaration
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum ShaderSymbolType {
     #[default]
     Types,

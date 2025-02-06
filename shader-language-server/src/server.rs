@@ -16,6 +16,7 @@ mod server_connection;
 mod server_file_cache;
 mod server_language_data;
 
+use common::shader_range_to_lsp_range;
 use debug::{DumpAstParams, DumpAstRequest};
 use log::{debug, error, info, warn};
 use lsp_types::notification::{
@@ -23,17 +24,21 @@ use lsp_types::notification::{
     DidSaveTextDocument, Notification,
 };
 use lsp_types::request::{
-    Completion, DocumentDiagnosticRequest, GotoDefinition, HoverRequest, Request,
-    SignatureHelpRequest, WorkspaceConfiguration,
+    Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, FoldingRangeRequest,
+    GotoDefinition, HoverRequest, Request, SignatureHelpRequest, WorkspaceConfiguration,
+    WorkspaceSymbolRequest,
 };
 use lsp_types::{
     CompletionOptionsCompletionItem, CompletionParams, CompletionResponse, ConfigurationParams,
     DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, GotoDefinitionParams, HoverParams, HoverProviderCapability,
-    RelatedFullDocumentDiagnosticReport, ServerCapabilities, SignatureHelpOptions,
-    SignatureHelpParams, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
+    DocumentSymbolOptions, DocumentSymbolParams, DocumentSymbolResponse, FoldingRange,
+    FoldingRangeKind, FoldingRangeParams, FullDocumentDiagnosticReport, GotoDefinitionParams,
+    HoverParams, HoverProviderCapability, Location, OneOf, RelatedFullDocumentDiagnosticReport,
+    ServerCapabilities, SignatureHelpOptions, SignatureHelpParams, SymbolInformation, SymbolKind,
+    TextDocumentSyncKind, Url, WorkDoneProgressOptions, WorkspaceSymbolOptions,
+    WorkspaceSymbolParams,
 };
 use shader_sense::shader::ShadingLanguage;
 
@@ -44,6 +49,7 @@ use server_config::ServerConfig;
 use server_connection::ServerConnection;
 use server_file_cache::ServerFileCacheHandle;
 use server_language_data::ServerLanguageData;
+use shader_sense::symbols::symbols::ShaderSymbolType;
 
 pub struct ServerLanguage {
     connection: ServerConnection,
@@ -106,8 +112,22 @@ impl ServerLanguage {
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             definition_provider: Some(lsp_types::OneOf::Left(true)),
             type_definition_provider: Some(lsp_types::TypeDefinitionProviderCapability::Simple(
-                false,
-            )), // Disable as definition_provider is doing it.
+                false, // Disable as definition_provider is doing it.
+            )),
+            // This seems to be done automatically by vscode, so not mandatory.
+            //folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
+            document_symbol_provider: Some(OneOf::Right(DocumentSymbolOptions {
+                label: None,
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+            })),
+            workspace_symbol_provider: Some(OneOf::Right(WorkspaceSymbolOptions {
+                resolve_provider: None,
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+            })),
             ..Default::default()
         })?;
         let client_initialization_params = self.connection.initialize(server_capabilities);
@@ -312,6 +332,188 @@ impl ServerLanguage {
                                 format!("Failed to recolt signature : {:#?}", err),
                             ),
                         }
+                    },
+                );
+            }
+            FoldingRangeRequest::METHOD => {
+                let params: FoldingRangeParams = serde_json::from_value(req.params)?;
+                debug!("Received folding range request #{}: {:#?}", req.id, params);
+                let uri = clean_url(&params.text_document.uri);
+                self.visit_watched_file(
+                    &uri,
+                    &mut |connection: &mut ServerConnection,
+                          _shading_language: ShadingLanguage,
+                          _language_data: &mut ServerLanguageData,
+                          cached_file: ServerFileCacheHandle| {
+                        let folding_ranges = RefCell::borrow(&cached_file)
+                            .preprocessor_cache
+                            .regions
+                            .iter()
+                            .map(|region| FoldingRange {
+                                start_line: region.range.start.line,
+                                start_character: Some(region.range.start.pos),
+                                end_line: region.range.end.line,
+                                end_character: Some(region.range.end.pos),
+                                kind: Some(FoldingRangeKind::Region),
+                                collapsed_text: None,
+                            })
+                            .collect();
+                        // TODO: should add scopes aswell to request
+                        connection.send_response::<FoldingRangeRequest>(
+                            req.id.clone(),
+                            Some(folding_ranges),
+                        );
+                    },
+                );
+            }
+            WorkspaceSymbolRequest::METHOD => {
+                let params: WorkspaceSymbolParams = serde_json::from_value(req.params)?;
+                debug!(
+                    "Received workspace symbol request #{}: {:#?}",
+                    req.id, params
+                );
+                let _ = params.query; // Should we filter ?
+                let symbols = self
+                    .language_data
+                    .iter()
+                    .map(|(shading_language, language_data)| {
+                        // TODO: add dependencies as well, should be iterating on all file of workspace instead,
+                        // but might be very costly on big codebase (implement light queries ? only query global func & struct)
+                        // Will need to cache symbols. As they are global to workspace, might be updated every
+                        // change of files, & stored somewhere as watched deps ?
+                        language_data
+                            .watched_files
+                            .files
+                            .iter()
+                            .map(|(uri, cached_file)| {
+                                RefCell::borrow(&cached_file)
+                                    .symbol_cache
+                                    .iter()
+                                    .filter(|(_, ty)| {
+                                        // For workspace, only publish function & types
+                                        *ty == ShaderSymbolType::Functions
+                                            || *ty == ShaderSymbolType::Types
+                                    })
+                                    .map(|(symbols, ty)| {
+                                        symbols
+                                            .iter()
+                                            .filter(|symbol| {
+                                                symbol.range.is_some()
+                                                    && (symbol.scope_stack.is_none()
+                                                        || symbol
+                                                            .scope_stack
+                                                            .as_ref()
+                                                            .unwrap()
+                                                            .is_empty())
+                                            })
+                                            .map(|symbol| {
+                                                #[allow(deprecated)]
+                                                // https://github.com/rust-lang/rust/issues/102777
+                                                SymbolInformation {
+                                                    name: symbol.label.clone(),
+                                                    kind: match ty {
+                                                        ShaderSymbolType::Types => {
+                                                            SymbolKind::TYPE_PARAMETER
+                                                        }
+                                                        ShaderSymbolType::Functions => {
+                                                            SymbolKind::FUNCTION
+                                                        }
+                                                        _ => unreachable!("Should be filtered out"),
+                                                    },
+                                                    tags: None,
+                                                    deprecated: None,
+                                                    location: Location::new(
+                                                        uri.clone(),
+                                                        shader_range_to_lsp_range(
+                                                            &symbol
+                                                                .range
+                                                                .as_ref()
+                                                                .expect("Should be filtered out"),
+                                                        ),
+                                                    ),
+                                                    container_name: Some(
+                                                        shading_language.to_string(),
+                                                    ),
+                                                }
+                                            })
+                                            .collect()
+                                    })
+                                    .collect::<Vec<Vec<SymbolInformation>>>()
+                                    .concat()
+                            })
+                            .collect::<Vec<Vec<SymbolInformation>>>()
+                            .concat()
+                    })
+                    .collect::<Vec<Vec<SymbolInformation>>>()
+                    .concat();
+
+                self.connection.send_response::<DocumentSymbolRequest>(
+                    req.id.clone(),
+                    Some(DocumentSymbolResponse::Flat(symbols)),
+                );
+            }
+            DocumentSymbolRequest::METHOD => {
+                let params: DocumentSymbolParams = serde_json::from_value(req.params)?;
+                debug!(
+                    "Received document symbol request #{}: {:#?}",
+                    req.id, params
+                );
+                let uri = clean_url(&params.text_document.uri);
+                self.visit_watched_file(
+                    &uri,
+                    &mut |connection: &mut ServerConnection,
+                          _shading_language: ShadingLanguage,
+                          _language_data: &mut ServerLanguageData,
+                          cached_file: ServerFileCacheHandle| {
+                        let symbols = RefCell::borrow(&cached_file)
+                            .symbol_cache
+                            .iter()
+                            .map(|(symbols, ty)| {
+                                symbols
+                                    .iter()
+                                    .filter(|symbol| {
+                                        // Dont publish keywords.
+                                        ty != ShaderSymbolType::Keyword && symbol.range.is_some()
+                                    })
+                                    .map(|symbol| {
+                                        #[allow(deprecated)]
+                                        // https://github.com/rust-lang/rust/issues/102777
+                                        SymbolInformation {
+                                            name: symbol.label.clone(),
+                                            kind: match ty {
+                                                ShaderSymbolType::Types => {
+                                                    SymbolKind::TYPE_PARAMETER
+                                                }
+                                                ShaderSymbolType::Constants => SymbolKind::CONSTANT,
+                                                ShaderSymbolType::Variables => SymbolKind::VARIABLE,
+                                                ShaderSymbolType::Functions => SymbolKind::FUNCTION,
+                                                ShaderSymbolType::Keyword => {
+                                                    unreachable!("Should be filtered out")
+                                                }
+                                            },
+                                            tags: None,
+                                            deprecated: None,
+                                            location: Location::new(
+                                                uri.clone(),
+                                                shader_range_to_lsp_range(
+                                                    &symbol
+                                                        .range
+                                                        .as_ref()
+                                                        .expect("Should be filtered out"),
+                                                ),
+                                            ),
+                                            container_name: None,
+                                        }
+                                    })
+                                    .collect()
+                            })
+                            .collect::<Vec<Vec<SymbolInformation>>>()
+                            .concat();
+
+                        connection.send_response::<DocumentSymbolRequest>(
+                            req.id.clone(),
+                            Some(DocumentSymbolResponse::Flat(symbols)),
+                        );
                     },
                 );
             }

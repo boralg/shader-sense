@@ -296,7 +296,6 @@ impl SymbolParser {
             }
         }
         let symbols = symbol_list_builder.get_shader_symbol_list();
-        drop(symbol_list_builder);
         Ok(symbols)
     }
 }
