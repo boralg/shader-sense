@@ -300,6 +300,22 @@ fn resolve_condition(
             assert_tree_sitter!(cursor.goto_next_sibling());
             resolve_condition(cursor, symbol_tree, preprocessor)
         }
+        "call_expression" => {
+            // This expression is a function call
+            let _ = r#"condition: (call_expression 
+                function: (identifier) @function.name
+                arguments: (argument_list
+                    "("
+                    (
+                        (identifier) @argument
+                        (",")?
+                    )*
+                    ")"
+                )
+            )"#;
+            // TODO: should solve this complex expression, simply ignoring it for now.
+            Ok(0)
+        }
         value => Err(ShaderError::SymbolQueryError(
             format!("Condition unhandled for {}", value),
             ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
