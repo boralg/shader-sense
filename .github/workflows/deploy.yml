@@ -37,7 +37,7 @@ jobs:
           path: ./bin-macos
       - name: Download WASI binary
         uses: actions/download-artifact@v4
-        if: ${{ vars.COMPILE_WASI == 'true' }}
+        #if: ${{ vars.COMPILE_WASI == 'true' }}
         with:
           name: wasi
           path: ./bin-wasi
