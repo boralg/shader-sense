@@ -31,7 +31,7 @@ fn query_all_symbol(shading_language: ShadingLanguage, shader_path: &Path) {
     match SymbolTree::new(symbol_provider.as_mut(), shader_path, &shader_content) {
         Ok(symbol_tree) => {
             let preprocessor = symbol_provider
-                .query_preprocessor(&symbol_tree, &ShaderSymbolParams::default())
+                .query_preprocessor(&symbol_tree, &ShaderSymbolParams::default(), true)
                 .unwrap();
             let symbol_list = symbol_provider
                 .query_file_symbols(&symbol_tree, Some(&preprocessor))

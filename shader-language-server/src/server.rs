@@ -335,6 +335,7 @@ impl ServerLanguage {
                     },
                 );
             }
+            // Provider not enabled as vscode already does this nicely with grammar files
             FoldingRangeRequest::METHOD => {
                 let params: FoldingRangeParams = serde_json::from_value(req.params)?;
                 debug!("Received folding range request #{}: {:#?}", req.id, params);

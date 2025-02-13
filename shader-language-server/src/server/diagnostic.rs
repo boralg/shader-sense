@@ -166,26 +166,28 @@ impl ServerLanguageData {
                     }
                 });
                 // Add inactive regions to diag
-                let mut inactive_diagnostics = RefCell::borrow(cached_file)
-                    .preprocessor_cache
-                    .regions
-                    .iter()
-                    .filter_map(|region| {
-                        (!region.is_active).then_some(Diagnostic {
-                            range: shader_range_to_lsp_range(&region.range),
-                            severity: Some(DiagnosticSeverity::HINT),
-                            message: "Code disabled by currently used macros".into(),
-                            source: Some("shader-validator".to_string()),
-                            tags: Some(vec![DiagnosticTag::UNNECESSARY]),
-                            ..Default::default()
+                if self.config.regions {
+                    let mut inactive_diagnostics = RefCell::borrow(cached_file)
+                        .preprocessor_cache
+                        .regions
+                        .iter()
+                        .filter_map(|region| {
+                            (!region.is_active).then_some(Diagnostic {
+                                range: shader_range_to_lsp_range(&region.range),
+                                severity: Some(DiagnosticSeverity::HINT),
+                                message: "Code disabled by currently used macros".into(),
+                                source: Some("shader-validator".to_string()),
+                                tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+                                ..Default::default()
+                            })
                         })
-                    })
-                    .collect();
+                        .collect();
 
-                match diagnostics.get_mut(&uri) {
-                    Some(diagnostics) => diagnostics.append(&mut inactive_diagnostics),
-                    None => {
-                        diagnostics.insert(uri.clone(), inactive_diagnostics);
+                    match diagnostics.get_mut(&uri) {
+                        Some(diagnostics) => diagnostics.append(&mut inactive_diagnostics),
+                        None => {
+                            diagnostics.insert(uri.clone(), inactive_diagnostics);
+                        }
                     }
                 }
                 Ok(diagnostics)

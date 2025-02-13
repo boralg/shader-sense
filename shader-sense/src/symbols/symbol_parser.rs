@@ -196,6 +196,7 @@ impl SymbolParser {
         &self,
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
+        enable_regions: bool // REGION_BETA
     ) -> Result<ShaderPreprocessor, ShaderError> {
         let mut preprocessor = ShaderPreprocessor::default();
         for parser in &self.preprocessor_parsers {
@@ -225,18 +226,20 @@ impl SymbolParser {
                 })
                 .collect(),
         );
-        // Query regions.
-        preprocessor.regions =
-            (self.region_finder)(symbol_tree, symbol_tree.tree.root_node(), &preprocessor)?;
-        // Filter out defines in inactive regions.
-        preprocessor.defines.retain(|define| match &define.range {
-            Some(range) => preprocessor
-                .regions
-                .iter()
-                .find(|region| !region.is_active && region.range.contain_bounds(&range))
-                .is_none(),
-            None => true,
-        });
+        if enable_regions {
+            // Query regions.
+            preprocessor.regions =
+                (self.region_finder)(symbol_tree, symbol_tree.tree.root_node(), &preprocessor)?;
+            // Filter out defines in inactive regions.
+            preprocessor.defines.retain(|define| match &define.range {
+                Some(range) => preprocessor
+                    .regions
+                    .iter()
+                    .find(|region| !region.is_active && region.range.contain_bounds(&range))
+                    .is_none(),
+                None => true,
+            });
+        }
         Ok(preprocessor)
     }
     pub fn query_file_symbols(
@@ -248,7 +251,7 @@ impl SymbolParser {
             Some(preprocessor) => preprocessor.clone(),
             // This will not include external preprocessor symbols
             // (such as file included through another file, and having parent file preproc)
-            None => self.query_file_preprocessor(symbol_tree, &ShaderSymbolParams::default())?,
+            None => self.query_file_preprocessor(symbol_tree, &ShaderSymbolParams::default(), false)?,
         };
         // TODO: Should use something else than name...
         // Required for shader stage filtering...
