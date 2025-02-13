@@ -60,7 +60,7 @@ impl SymbolProvider for GlslSymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
-        enable_regions: bool // REGION_BETA
+        enable_regions: bool, // REGION_BETA
     ) -> Result<ShaderPreprocessor, ShaderError> {
         self.symbol_parser
             .query_file_preprocessor(symbol_tree, symbol_params, enable_regions)

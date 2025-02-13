@@ -196,7 +196,7 @@ impl SymbolParser {
         &self,
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
-        enable_regions: bool // REGION_BETA
+        enable_regions: bool, // REGION_BETA
     ) -> Result<ShaderPreprocessor, ShaderError> {
         let mut preprocessor = ShaderPreprocessor::default();
         for parser in &self.preprocessor_parsers {
@@ -251,7 +251,9 @@ impl SymbolParser {
             Some(preprocessor) => preprocessor.clone(),
             // This will not include external preprocessor symbols
             // (such as file included through another file, and having parent file preproc)
-            None => self.query_file_preprocessor(symbol_tree, &ShaderSymbolParams::default(), false)?,
+            None => {
+                self.query_file_preprocessor(symbol_tree, &ShaderSymbolParams::default(), false)?
+            }
         };
         // TODO: Should use something else than name...
         // Required for shader stage filtering...

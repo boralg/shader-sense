@@ -64,8 +64,11 @@ impl ServerFileCache {
 
         let now_get_preproc = std::time::Instant::now();
         // Cache symbols
-        self.preprocessor_cache =
-            symbol_provider.query_preprocessor(&self.symbol_tree, &config.into_symbol_params(), config.regions)?;
+        self.preprocessor_cache = symbol_provider.query_preprocessor(
+            &self.symbol_tree,
+            &config.into_symbol_params(),
+            config.regions,
+        )?;
         debug!(
             "{}:timing:update:get_preproc   {}ms",
             file_path.display(),
@@ -119,8 +122,11 @@ impl ServerLanguageFileCache {
             None => {
                 assert!(self.files.get(&uri).is_none());
                 let symbol_tree = SymbolTree::new(symbol_provider, &file_path, &text)?;
-                let preprocessor_cache = symbol_provider
-                    .query_preprocessor(&symbol_tree, &config.into_symbol_params(), config.regions)?;
+                let preprocessor_cache = symbol_provider.query_preprocessor(
+                    &symbol_tree,
+                    &config.into_symbol_params(),
+                    config.regions,
+                )?;
                 let symbol_list =
                     symbol_provider.query_file_symbols(&symbol_tree, Some(&preprocessor_cache))?;
                 let cached_file = Rc::new(RefCell::new(ServerFileCache {
@@ -184,8 +190,11 @@ impl ServerLanguageFileCache {
                 None => {
                     let text = read_string_lossy(&file_path).unwrap();
                     let symbol_tree = SymbolTree::new(symbol_provider, &file_path, &text)?;
-                    let preprocessor_cache = symbol_provider
-                        .query_preprocessor(&symbol_tree, &config.into_symbol_params(), config.regions)?;
+                    let preprocessor_cache = symbol_provider.query_preprocessor(
+                        &symbol_tree,
+                        &config.into_symbol_params(),
+                        config.regions,
+                    )?;
                     let symbol_list = symbol_provider
                         .query_file_symbols(&symbol_tree, Some(&preprocessor_cache))?;
                     let cached_file = Rc::new(RefCell::new(ServerFileCache {
