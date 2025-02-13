@@ -14,7 +14,7 @@ Cargo.lock
 *.pdb
 
 # Local test
-test/local/
+shader-sense/test/local/
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
