@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-shader-sense = { version = "0.2.0", path = "../shader-sense" }
+shader-sense = { version = "0.2.0-pre1", path = "../shader-sense" }
 regex = "1.10.6"
 scraper = "0.20.0"
 serde = { version = "1.0.208", features = ["derive"] }
