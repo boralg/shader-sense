@@ -1,13 +1,11 @@
 use std::path::Path;
 
 use crate::symbols::symbol_parser::ShaderSymbolListBuilder;
-use crate::{include::IncludeHandler, shader::ShadingLanguage};
 
 use crate::symbols::{
     symbol_parser::{get_name, SymbolTreeParser},
     symbols::{
-        ShaderParameter, ShaderPosition, ShaderRange, ShaderScope, ShaderSignature, ShaderSymbol,
-        ShaderSymbolData,
+        ShaderParameter, ShaderRange, ShaderScope, ShaderSignature, ShaderSymbol, ShaderSymbolData,
     },
 };
 
@@ -16,115 +14,9 @@ pub fn get_glsl_parsers() -> Vec<Box<dyn SymbolTreeParser>> {
         Box::new(GlslFunctionTreeParser {}),
         Box::new(GlslStructTreeParser {}),
         Box::new(GlslVariableTreeParser {}),
-        Box::new(GlslIncludeTreeParser {}),
-        Box::new(GlslDefineTreeParser {}),
     ]
 }
 
-struct GlslIncludeTreeParser {}
-
-impl SymbolTreeParser for GlslIncludeTreeParser {
-    fn get_query(&self) -> String {
-        // string_content unsupported on tree_sitter 0.20.9
-        /*r#"(preproc_include
-            (#include)
-            path: (string_literal
-                (string_content) @include
-            )
-        )"#*/
-        r#"(preproc_include
-            (#include)
-            path: (string_literal) @include
-        )"#
-        .into()
-    }
-    fn process_match(
-        &self,
-        matches: tree_sitter::QueryMatch,
-        file_path: &Path,
-        shader_content: &str,
-        _scopes: &Vec<ShaderScope>,
-        symbols: &mut ShaderSymbolListBuilder,
-    ) {
-        let include_node = matches.captures[0].node;
-        let range = ShaderRange::from_range(include_node.range(), file_path.into());
-        let mut include_handler = IncludeHandler::new(file_path, vec![]); // TODO: pass includes aswell ?
-        let relative_path = get_name(shader_content, include_node);
-        let relative_path = &relative_path[1..relative_path.len() - 1]; // TODO: use string_content instead
-
-        // Only add symbol if path can be resolved.
-        match include_handler.search_path_in_includes(Path::new(relative_path)) {
-            Some(absolute_path) => {
-                symbols.add_function(ShaderSymbol {
-                    label: relative_path.into(),
-                    description: format!("Including file {}", absolute_path.display()),
-                    version: "".into(),
-                    stages: vec![],
-                    link: None,
-                    data: ShaderSymbolData::Link {
-                        target: ShaderPosition::new(absolute_path, 0, 0),
-                    },
-                    range: Some(range),
-                    scope_stack: None, // No scope for include
-                });
-            }
-            None => {}
-        }
-    }
-}
-
-struct GlslDefineTreeParser {}
-
-impl SymbolTreeParser for GlslDefineTreeParser {
-    fn get_query(&self) -> String {
-        r#"(preproc_def
-            (#define)
-            name: (identifier) @define.label
-            value: (preproc_arg)? @define.value
-        )"#
-        .into()
-    }
-    fn process_match(
-        &self,
-        matches: tree_sitter::QueryMatch,
-        file_path: &Path,
-        shader_content: &str,
-        _scopes: &Vec<ShaderScope>,
-        symbols: &mut ShaderSymbolListBuilder,
-    ) {
-        let identifier_node = matches.captures[0].node;
-        let range = ShaderRange::from_range(identifier_node.range(), file_path.into());
-        let value = if matches.captures.len() > 1 {
-            Some(get_name(shader_content, matches.captures[1].node).trim())
-        } else {
-            None
-        };
-        symbols.add_function(ShaderSymbol {
-            label: get_name(shader_content, identifier_node).into(),
-            description: match value {
-                Some(value) => format!(
-                    "Preprocessor macro. Expanding to \n```{}\n{}\n```",
-                    ShadingLanguage::Glsl.to_string(),
-                    value
-                ),
-                None => format!("Preprocessor macro."),
-            },
-            version: "".into(),
-            stages: vec![],
-            link: None,
-            data: ShaderSymbolData::Constants {
-                ty: "#define".into(),
-                qualifier: "".into(),
-                value: match value {
-                    Some(value) => value.into(),
-                    None => "".into(),
-                },
-            },
-            range: Some(range),
-            scope_stack: None, // No scope for include
-        });
-    }
-}
 struct GlslFunctionTreeParser {}
 
 impl SymbolTreeParser for GlslFunctionTreeParser {

@@ -1,11 +1,13 @@
 mod glsl_filter;
 mod glsl_parser;
+mod glsl_preprocessor;
 mod glsl_regions;
 mod glsl_word;
 mod glsl_word_chain;
 
 use glsl_filter::get_glsl_filters;
 use glsl_parser::get_glsl_parsers;
+use glsl_preprocessor::get_glsl_preprocessor_parser;
 use tree_sitter::Parser;
 
 use crate::shader_error::ShaderError;
@@ -37,7 +39,7 @@ impl GlslSymbolProvider {
                 r#"(compound_statement) @scope"#,
                 get_glsl_parsers(),
                 get_glsl_filters(),
-                vec![],
+                get_glsl_preprocessor_parser(),
                 glsl_regions::query_regions_in_node,
             ),
             shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
