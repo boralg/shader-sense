@@ -2,7 +2,7 @@ name: Deploy Extension
 
 on:
   release:
-    types: [released]
+    types: [published]
 
 env:
   CARGO_TERM_COLOR: always
