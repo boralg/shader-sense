@@ -10,6 +10,7 @@ mod diagnostic;
 mod goto;
 mod hover;
 mod signature;
+mod shader_variant;
 
 mod server_config;
 mod server_connection;
@@ -50,6 +51,7 @@ use server_connection::ServerConnection;
 use server_file_cache::ServerFileCacheHandle;
 use server_language_data::ServerLanguageData;
 use shader_sense::symbols::symbols::ShaderSymbolType;
+use shader_variant::{DidChangeShaderVariant, DidChangeShaderVariantParams};
 
 pub struct ServerLanguage {
     connection: ServerConnection,
@@ -135,7 +137,7 @@ impl ServerLanguage {
             "Received client params: {:#?}",
             client_initialization_params
         );
-
+        // Request configuration as its not sent automatically (at least with vscode)
         self.request_configuration();
 
         return Ok(());
@@ -700,10 +702,27 @@ impl ServerLanguage {
             DidChangeConfiguration::METHOD => {
                 let params: DidChangeConfigurationParams =
                     serde_json::from_value(notification.params)?;
-                debug!("Received did change configuration document: {:#?}", params);
+                debug!("Received did change configuration: {:#?}", params);
                 // Here config received is empty. we need to request it to user.
                 //let config : ServerConfig = serde_json::from_value(params.settings)?;
                 self.request_configuration();
+            }
+            DidChangeShaderVariant::METHOD => {
+                debug!("{}", serde_json::to_string(&HashMap::from([("oui", 1), ("non", 0)])).unwrap());
+                debug!("Received did change shader variant as JSON: {:#?}", notification.params);
+                let params: DidChangeShaderVariantParams =
+                    serde_json::from_value(notification.params)?;
+                let uri = clean_url(&params.text_document.uri);
+                debug!("Received did change shader variant: {:#?}", params);
+                self.visit_watched_file(
+                    &uri,
+                    &mut |connection: &mut ServerConnection,
+                          _shading_language: ShadingLanguage,
+                          language_data: &mut ServerLanguageData,
+                          cached_file: ServerFileCacheHandle| {
+                        //cached_file.shader_variants = params.shader_variants;
+                    }
+                );
             }
             _ => info!("Received unhandled notification: {:#?}", notification),
         }
