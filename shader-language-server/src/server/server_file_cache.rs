@@ -16,7 +16,7 @@ use shader_sense::{
     },
 };
 
-use super::server_config::ServerConfig;
+use super::{server_config::ServerConfig, shader_variant::ShaderVariant};
 
 pub type ServerFileCacheHandle = Rc<RefCell<ServerFileCache>>;
 
@@ -26,7 +26,8 @@ pub struct ServerFileCache {
     pub symbol_tree: SymbolTree, // Store content on change as its not on disk.
     pub preprocessor_cache: ShaderPreprocessor, // Store preprocessor to avoid computing them at every change.
     pub symbol_cache: ShaderSymbolList, // Store symbol to avoid computing them at every change.
-    pub dependencies: HashMap<PathBuf, ServerFileCacheHandle>, // Store all dependencies of this file.
+    pub dependencies: HashMap<PathBuf, ServerFileCacheHandle>, // Store all direct dependencies of this file.
+    pub shader_variant: Option<ShaderVariant>,
 }
 
 pub struct ServerLanguageFileCache {
@@ -139,6 +140,7 @@ impl ServerLanguageFileCache {
                         ShaderSymbolList::default()
                     },
                     dependencies: HashMap::new(), // Will be filled by validator.
+                    shader_variant: None,
                 }));
                 let none = self.files.insert(uri.clone(), Rc::clone(&cached_file));
                 assert!(none.is_none());
@@ -207,6 +209,7 @@ impl ServerLanguageFileCache {
                             ShaderSymbolList::default()
                         },
                         dependencies: HashMap::new(), // Will be filled by validator.
+                        shader_variant: None,
                     }));
                     let none = self
                         .dependencies

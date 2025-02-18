@@ -21,7 +21,7 @@ pub enum DidChangeShaderVariant {}
 #[serde(rename_all = "camelCase")]
 pub struct DidChangeShaderVariantParams {
     pub text_document: TextDocumentIdentifier,
-    pub shader_variants: Vec<ShaderVariant>
+    pub shader_variant: Option<ShaderVariant>,
 }
 
 impl Notification for DidChangeShaderVariant {

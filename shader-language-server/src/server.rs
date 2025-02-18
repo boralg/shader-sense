@@ -9,8 +9,8 @@ mod debug;
 mod diagnostic;
 mod goto;
 mod hover;
-mod signature;
 mod shader_variant;
+mod signature;
 
 mod server_config;
 mod server_connection;
@@ -708,21 +708,34 @@ impl ServerLanguage {
                 self.request_configuration();
             }
             DidChangeShaderVariant::METHOD => {
-                debug!("{}", serde_json::to_string(&HashMap::from([("oui", 1), ("non", 0)])).unwrap());
-                debug!("Received did change shader variant as JSON: {:#?}", notification.params);
                 let params: DidChangeShaderVariantParams =
                     serde_json::from_value(notification.params)?;
                 let uri = clean_url(&params.text_document.uri);
                 debug!("Received did change shader variant: {:#?}", params);
-                self.visit_watched_file(
-                    &uri,
-                    &mut |connection: &mut ServerConnection,
-                          _shading_language: ShadingLanguage,
-                          language_data: &mut ServerLanguageData,
-                          cached_file: ServerFileCacheHandle| {
-                        //cached_file.shader_variants = params.shader_variants;
-                    }
-                );
+                // Check if variant is watched.
+                // Should request from client aswell when opening files.
+                // Client should only send update if watched file.
+                if self.file_language.get(&uri).is_some() {
+                    self.visit_watched_file(
+                        &uri,
+                        &mut |_connection: &mut ServerConnection,
+                              _shading_language: ShadingLanguage,
+                              _language_data: &mut ServerLanguageData,
+                              cached_file: ServerFileCacheHandle| {
+                            RefCell::borrow_mut(&cached_file).shader_variant =
+                                params.shader_variant.clone();
+                            // TODO: relaunch diag for file (& symbols for deps aswell)
+
+                            // If file has multiple variants, get the first one & ignore others entry points.
+                            // OR better, from client, only send 0 or 1 variant per file.
+                            // Still need to handle shared deps (first arrived, first served, or some hashmap caching both depending on entry point...)
+                            // 1. Preprocess file, get deps & regions.
+                            // 2. For each deps, preprocess with previous context (add macros).
+                            // 3. Recurse until all deps reached.
+                            // 4. Compute symbols.
+                        },
+                    );
+                }
             }
             _ => info!("Received unhandled notification: {:#?}", notification),
         }
