@@ -572,6 +572,7 @@ impl ServerLanguage {
                 match ShadingLanguage::from_str(params.text_document.language_id.as_str()) {
                     Ok(shading_language) => match self.language_data.get_mut(&shading_language) {
                         Some(language_data) => {
+                            language_data.request_variants(&mut self.connection, &uri);
                             match language_data.watched_files.watch_file(
                                 &uri,
                                 shading_language.clone(),
@@ -583,6 +584,8 @@ impl ServerLanguage {
                                     // Dont care if we replace file_language input.
                                     self.file_language
                                         .insert(uri.clone(), shading_language.clone());
+                                    // Should compute following after variant received.
+                                    // + it seems variant are coming too early on client and too late here...
                                     language_data.publish_diagnostic(
                                         &self.connection,
                                         &uri,
