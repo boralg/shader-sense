@@ -560,36 +560,31 @@ impl ServerLanguage {
                 }
                 self.request_variants(&uri);
                 match ShadingLanguage::from_str(params.text_document.language_id.as_str()) {
-                    Ok(shading_language) => match self.language_data.get_mut(&shading_language) {
-                        Some(language_data) => {
-                            match self.watched_files.watch_file(
-                                &uri,
-                                shading_language.clone(),
-                                &params.text_document.text,
-                                language_data.symbol_provider.as_mut(),
-                                &self.config,
-                            ) {
-                                Ok(cached_file) => {
-                                    // Should compute following after variant received.
-                                    // + it seems variant are coming too early on client and too late here...
-                                    self.publish_diagnostic(
-                                        &uri,
-                                        &cached_file,
-                                        Some(params.text_document.version),
-                                    );
-                                }
-                                Err(error) => self.connection.send_notification_error(format!(
-                                    "Failed to watch file {}: {}",
-                                    uri.to_string(),
-                                    error.to_string()
-                                )),
+                    Ok(shading_language) => {
+                        let language_data = self.language_data.get_mut(&shading_language).unwrap();
+                        match self.watched_files.watch_file(
+                            &uri,
+                            shading_language.clone(),
+                            &params.text_document.text,
+                            language_data.symbol_provider.as_mut(),
+                            &self.config,
+                        ) {
+                            Ok(cached_file) => {
+                                // Should compute following after variant received.
+                                // + it seems variant are coming too early on client and too late here...
+                                self.publish_diagnostic(
+                                    &uri,
+                                    &cached_file,
+                                    Some(params.text_document.version),
+                                );
                             }
+                            Err(error) => self.connection.send_notification_error(format!(
+                                "Failed to watch file {}: {}",
+                                uri.to_string(),
+                                error.to_string()
+                            )),
                         }
-                        None => self.connection.send_notification_error(format!(
-                            "Trying to get language data with invalid language : {}",
-                            shading_language.to_string()
-                        )),
-                    },
+                    }
                     Err(_) => self.connection.send_notification_error(format!(
                         "Failed to parse language id : {}",
                         params.text_document.language_id
