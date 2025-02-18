@@ -11,12 +11,11 @@ use shader_sense::shader_error::{ShaderDiagnosticSeverity, ShaderError};
 
 use crate::server::common::shader_range_to_lsp_range;
 
-use super::{ServerConnection, ServerFileCacheHandle, ServerLanguageData};
+use super::{ServerConnection, ServerFileCacheHandle, ServerLanguage};
 
-impl ServerLanguageData {
+impl ServerLanguage {
     pub fn publish_diagnostic(
         &mut self,
-        connection: &ServerConnection,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
         version: Option<i32>,
@@ -35,13 +34,13 @@ impl ServerLanguageData {
                             diagnostics: diagnostic.1,
                             version: version,
                         };
-                        connection
+                        self.connection
                             .send_notification::<lsp_types::notification::PublishDiagnostics>(
                                 publish_diagnostics_params,
                             );
                     }
                 }
-                Err(err) => connection.send_notification_error(format!(
+                Err(err) => self.connection.send_notification_error(format!(
                     "Failed to compute diagnostic for file {}: {}",
                     uri, err
                 )),
@@ -71,10 +70,14 @@ impl ServerLanguageData {
     ) -> Result<HashMap<Url, Vec<Diagnostic>>, ShaderError> {
         let file_path = uri.to_file_path().unwrap();
         let validation_params = self.config.into_validation_params();
+        let language_data = self
+            .language_data
+            .get_mut(&RefCell::borrow(&cached_file).shading_language)
+            .unwrap();
         let shading_language = RefCell::borrow(&cached_file).shading_language;
         let content = RefCell::borrow(&cached_file).symbol_tree.content.clone();
         debug!("Validating file {}", file_path.display());
-        match self.validator.validate_shader(
+        match language_data.validator.validate_shader(
             content,
             file_path.as_path(),
             validation_params.clone(),
@@ -87,7 +90,7 @@ impl ServerLanguageData {
                         match self.watched_files.watch_dependency(
                             &deps_uri,
                             shading_language,
-                            self.symbol_provider.as_mut(),
+                            language_data.symbol_provider.as_mut(),
                             &self.config,
                         ) {
                             Ok(deps_file) => deps_file,

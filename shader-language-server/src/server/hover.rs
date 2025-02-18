@@ -1,12 +1,12 @@
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use lsp_types::{Hover, HoverContents, MarkupContent, Position, Url};
 
 use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderPosition};
 
-use super::{common::shader_range_to_lsp_range, ServerFileCacheHandle, ServerLanguageData};
+use super::{common::shader_range_to_lsp_range, ServerFileCacheHandle, ServerLanguage};
 
-impl ServerLanguageData {
+impl ServerLanguage {
     pub fn recolt_hover(
         &mut self,
         uri: &Url,
@@ -19,15 +19,20 @@ impl ServerLanguageData {
             line: position.line as u32,
             pos: position.character as u32,
         };
-        let cached_file = cached_file.borrow();
-        match self
+        let cached_file = RefCell::borrow(&cached_file);
+        let language_data = self
+            .language_data
+            .get(&cached_file.shading_language)
+            .unwrap();
+        match language_data
             .symbol_provider
             .get_word_range_at_position(&cached_file.symbol_tree, shader_position.clone())
         {
             // word_range should be the same as symbol range
             Ok((word, _word_range)) => match self.watched_files.get(uri) {
                 Some(target_cached_file) => {
-                    let all_symbol_list = self.get_all_symbols(Rc::clone(&target_cached_file));
+                    let all_symbol_list =
+                        language_data.get_all_symbols(Rc::clone(&target_cached_file));
                     let target_cached_file = target_cached_file.borrow();
                     let symbol_list = all_symbol_list.filter_scoped_symbol(shader_position);
                     let matching_symbols = symbol_list.find_symbols(word);

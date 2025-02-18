@@ -12,44 +12,33 @@ use shader_sense::{
 #[cfg(not(target_os = "wasi"))]
 use shader_sense::validator::dxc::Dxc;
 
-use super::{
-    server_config::ServerConfig,
-    server_file_cache::{ServerFileCacheHandle, ServerLanguageFileCache},
-};
+use super::server_file_cache::{ServerFileCacheHandle, ServerLanguageFileCache};
 
 pub struct ServerLanguageData {
-    pub watched_files: ServerLanguageFileCache,
     pub validator: Box<dyn Validator>,
     pub symbol_provider: Box<dyn SymbolProvider>,
-    pub config: ServerConfig,
 }
 
 impl ServerLanguageData {
     pub fn glsl() -> Self {
         Self {
-            watched_files: ServerLanguageFileCache::new(),
             validator: Box::new(Glslang::glsl()),
             symbol_provider: Box::new(GlslSymbolProvider::new()),
-            config: ServerConfig::default(),
         }
     }
     pub fn hlsl() -> Self {
         Self {
-            watched_files: ServerLanguageFileCache::new(),
             #[cfg(target_os = "wasi")]
             validator: Box::new(Glslang::hlsl()),
             #[cfg(not(target_os = "wasi"))]
             validator: Box::new(Dxc::new().unwrap()),
             symbol_provider: Box::new(HlslSymbolProvider::new()),
-            config: ServerConfig::default(),
         }
     }
     pub fn wgsl() -> Self {
         Self {
-            watched_files: ServerLanguageFileCache::new(),
             validator: Box::new(Naga::new()),
             symbol_provider: Box::new(WgslSymbolProvider::new()),
-            config: ServerConfig::default(),
         }
     }
     pub fn get_all_symbols(&self, cached_file: ServerFileCacheHandle) -> ShaderSymbolList {
@@ -58,7 +47,7 @@ impl ServerLanguageData {
         let mut symbol_cache = cached_file.symbol_cache.clone();
         let mut preprocess_cache = cached_file.preprocessor_cache.clone();
         // Add config macros.
-        preprocess_cache.defines.append(
+        /*preprocess_cache.defines.append(
             &mut self
                 .config
                 .defines
@@ -69,7 +58,7 @@ impl ServerLanguageData {
                     value: Some(define.1.clone()),
                 })
                 .collect::<Vec<ShaderPreprocessorDefine>>(),
-        );
+        );*/
         // Preprocess symbols.
         preprocess_cache.preprocess_symbols(&mut symbol_cache);
         // Add deps symbols

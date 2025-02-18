@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, rc::Rc};
+use std::{cell::RefCell, ffi::OsStr, rc::Rc};
 
 use log::{error, warn};
 use lsp_types::{
@@ -11,9 +11,9 @@ use shader_sense::{
     symbols::symbols::{ShaderPosition, ShaderSymbol, ShaderSymbolData, ShaderSymbolType},
 };
 
-use super::{ServerFileCacheHandle, ServerLanguageData};
+use super::{ServerFileCacheHandle, ServerLanguage};
 
-impl ServerLanguageData {
+impl ServerLanguage {
     fn list_members_and_methods(&self, symbol: &ShaderSymbol) -> Vec<ShaderSymbol> {
         if let ShaderSymbolData::Struct { members, methods } = &symbol.data {
             let mut converted_members: Vec<ShaderSymbol> =
@@ -34,9 +34,13 @@ impl ServerLanguageData {
         position: Position,
         trigger_character: Option<String>,
     ) -> Result<Vec<CompletionItem>, ShaderError> {
+        let cached_file_borrowed = RefCell::borrow(&cached_file);
+        let language_data = self
+            .language_data
+            .get_mut(&cached_file_borrowed.shading_language)
+            .unwrap();
         let file_path = uri.to_file_path().unwrap();
-        let symbol_list = self.get_all_symbols(Rc::clone(&cached_file));
-        let cached_file = cached_file.borrow();
+        let symbol_list = language_data.get_all_symbols(Rc::clone(&cached_file));
         let shader_position = ShaderPosition {
             file_path: file_path.clone(),
             line: position.line as u32,
@@ -50,10 +54,12 @@ impl ServerLanguageData {
         let symbol_list = symbol_list.filter_scoped_symbol(shader_position.clone());
         match trigger_character {
             Some(_) => {
-                match self.symbol_provider.get_word_chain_range_at_position(
-                    &cached_file.symbol_tree,
-                    shader_position.clone(),
-                ) {
+                match language_data
+                    .symbol_provider
+                    .get_word_chain_range_at_position(
+                        &cached_file_borrowed.symbol_tree,
+                        shader_position.clone(),
+                    ) {
                     Ok(chain) => {
                         let mut chain_list = chain.iter().rev();
                         let mut current_symbol = match chain_list.next() {
@@ -121,7 +127,7 @@ impl ServerLanguageData {
                                     CompletionItemKind::VARIABLE
                                 };
                                 convert_completion_item(
-                                    cached_file.shading_language,
+                                    cached_file_borrowed.shading_language,
                                     s,
                                     completion_kind,
                                 )
@@ -144,7 +150,7 @@ impl ServerLanguageData {
                         .into_iter()
                         .map(|s| {
                             convert_completion_item(
-                                cached_file.shading_language,
+                                cached_file_borrowed.shading_language,
                                 s,
                                 match ty {
                                     ShaderSymbolType::Types => CompletionItemKind::TYPE_PARAMETER,

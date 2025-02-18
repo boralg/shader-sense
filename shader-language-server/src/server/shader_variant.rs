@@ -6,9 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use shader_sense::shader::ShaderStage;
 
-use super::{
-    server_connection::ServerConnection, server_language_data::ServerLanguageData, ServerLanguage,
-};
+use super::{server_connection::ServerConnection, ServerLanguage};
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,9 +55,9 @@ impl Request for ShaderVariantRequest {
     const METHOD: &'static str = "textDocument/shaderVariant";
 }
 
-impl ServerLanguageData {
-    pub fn request_variants(&mut self, connection: &mut ServerConnection, uri: &Url) {
-        connection.send_request::<ShaderVariantRequest>(
+impl ServerLanguage {
+    pub fn request_variants(&mut self, uri: &Url) {
+        self.connection.send_request::<ShaderVariantRequest>(
             ShaderVariantParams {
                 text_document: TextDocumentIdentifier { uri: uri.clone() },
             },
@@ -67,14 +65,15 @@ impl ServerLanguageData {
                 let params: ShaderVariantResponse = serde_json::from_value(value).unwrap();
                 // This seems to be received after textDocument notification, this might be an issue...
                 debug!("Received variant {:?}", params);
-                /*server.visit_watched_file(
-                    &uri,
-                    &mut |connection: &mut ServerConnection,
-                          _shading_language: ShadingLanguage,
-                          language_data: &mut ServerLanguageData,
-                          cached_file: ServerFileCacheHandle| {
-                        RefCell::borrow_mut(&cached_file).shader_variant =
-                });*/
+
+                /*match server.watched_files.get(&uri) {
+                    Some(cached_file) => {
+                    }
+                    None => server.connection.send_notification_error(format!(
+                        "Trying to visit file that is not watched : {}",
+                        uri
+                    )),
+                }*/
             },
         );
     }
