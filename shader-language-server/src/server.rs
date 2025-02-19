@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -51,7 +52,7 @@ use server_connection::ServerConnection;
 use server_file_cache::{ServerFileCacheHandle, ServerLanguageFileCache};
 use server_language_data::ServerLanguageData;
 use shader_sense::symbols::symbols::ShaderSymbolType;
-use shader_variant::{DidChangeShaderVariant, DidChangeShaderVariantParams};
+use shader_variant::{DidChangeShaderVariant, DidChangeShaderVariantParams, ShaderVariant};
 
 pub struct ServerLanguage {
     connection: ServerConnection,
@@ -568,7 +569,6 @@ impl ServerLanguage {
                             &params.text_document.text,
                             language_data.symbol_provider.as_mut(),
                             language_data.validator.as_mut(),
-                            None,
                             &self.config,
                         ) {
                             Ok(cached_file) => {
@@ -614,7 +614,6 @@ impl ServerLanguage {
                             &cached_file,
                             language_data.symbol_provider.as_mut(),
                             language_data.validator.as_mut(),
-                            None,
                             &self.config,
                             None,
                             None,
@@ -659,7 +658,6 @@ impl ServerLanguage {
                                 &cached_file,
                                 language_data.symbol_provider.as_mut(),
                                 language_data.validator.as_mut(),
-                                None,
                                 &self.config,
                                 content.range,
                                 Some(&content.text),
@@ -695,26 +693,33 @@ impl ServerLanguage {
                     serde_json::from_value(notification.params)?;
                 let uri = clean_url(&params.text_document.uri);
                 debug!("Received did change shader variant: {:#?}", params);
-                // Check if variant is watched.
-                // Should request from client aswell when opening files.
-                // Client should only send update if watched file.
+                // Store it in cache
+                if let Some(shader_variant) = params.shader_variant {
+                    self.watched_files.set_variant(uri.clone(), shader_variant);
+                } else {
+                    self.watched_files.remove_variant(uri.clone());
+                }
                 match self.watched_files.get(&uri) {
                     Some(cached_file) => {
-                        RefCell::borrow_mut(&cached_file).shader_variant =
-                            params.shader_variant.clone();
-                        // TODO: relaunch diag for file (& symbols for deps aswell)
-
-                        // If file has multiple variants, get the first one & ignore others entry points.
-                        // OR better, from client, only send 0 or 1 variant per file.
-                        // Still need to handle shared deps (first arrived, first served, or some hashmap caching both depending on entry point...)
-                        // 1. Preprocess file, get deps & regions for current file.
-                        // 2. For each deps, preprocess with previous context (add macros).
-                        // 3. Recurse until all deps reached.
-                        // 4. Compute symbols.
+                        let shading_language = RefCell::borrow_mut(&cached_file).shading_language;
+                        let language_data = self.language_data.get_mut(&shading_language).unwrap();
+                        match self.watched_files.update_file(
+                            &uri,
+                            &cached_file,
+                            language_data.symbol_provider.as_mut(),
+                            language_data.validator.as_mut(),
+                            &self.config,
+                            None,
+                            None,
+                        ) {
+                            Ok(()) => {}
+                            Err(err) => self.connection.send_notification_error(format!(
+                                "Failed to update file {} after changing variant : {}",
+                                uri, err
+                            )),
+                        };
                     }
-                    None => {
-                        // TODO: store it still somewhere else.
-                    }
+                    None => {} // Not watched, no need to update.
                 }
             }
             _ => info!("Received unhandled notification: {:#?}", notification),
@@ -756,7 +761,6 @@ impl ServerLanguage {
                         &cached_file,
                         language_data.symbol_provider.as_mut(),
                         language_data.validator.as_mut(),
-                        None,
                         &server.config,
                         None,
                         None,

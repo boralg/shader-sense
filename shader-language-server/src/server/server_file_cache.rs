@@ -34,12 +34,12 @@ pub struct ServerFileCache {
     pub symbol_cache: ShaderSymbolList, // Store symbol to avoid computing them at every change.
     pub dependencies: HashMap<PathBuf, ServerFileCacheHandle>, // Store all direct dependencies of this file.
     pub diagnostic_cache: ShaderDiagnosticList,                // Cached diagnostic
-    pub shader_variant: Option<ShaderVariant>,
 }
 
 pub struct ServerLanguageFileCache {
     pub files: HashMap<Url, ServerFileCacheHandle>,
     pub dependencies: HashMap<Url, ServerFileCacheHandle>,
+    pub variants: HashMap<Url, ShaderVariant>,
 }
 
 impl ServerLanguageFileCache {
@@ -47,6 +47,7 @@ impl ServerLanguageFileCache {
         Self {
             files: HashMap::new(),
             dependencies: HashMap::new(),
+            variants: HashMap::new(),
         }
     }
     fn recurse_file_symbol(
@@ -211,7 +212,6 @@ impl ServerLanguageFileCache {
         text: &String,
         symbol_provider: &mut dyn SymbolProvider,
         validator: &mut dyn Validator,
-        shader_variant: Option<ShaderVariant>,
         config: &ServerConfig,
     ) -> Result<ServerFileCacheHandle, ShaderError> {
         assert!(*uri == clean_url(&uri));
@@ -235,14 +235,13 @@ impl ServerLanguageFileCache {
                     symbol_cache: ShaderSymbolList::default(),
                     dependencies: HashMap::new(), // Will be filled by validator.
                     diagnostic_cache: ShaderDiagnosticList::default(),
-                    shader_variant: None,
                 }));
                 self.cache_file_data(
                     uri,
                     &cached_file,
                     validator,
                     symbol_provider,
-                    shader_variant,
+                    self.variants.get(&uri).cloned(),
                     config,
                 )?;
                 let none = self.files.insert(uri.clone(), Rc::clone(&cached_file));
@@ -301,7 +300,6 @@ impl ServerLanguageFileCache {
                         symbol_cache: ShaderSymbolList::default(),
                         dependencies: HashMap::new(), // Will be filled by validator.
                         diagnostic_cache: ShaderDiagnosticList::default(),
-                        shader_variant: None,
                     }));
                     let none = self
                         .dependencies
@@ -318,13 +316,18 @@ impl ServerLanguageFileCache {
             },
         }
     }
+    pub fn set_variant(&mut self, uri: Url, shader_variant: ShaderVariant) {
+        self.variants.insert(uri, shader_variant);
+    }
+    pub fn remove_variant(&mut self, uri: Url) {
+        self.variants.remove(&uri);
+    }
     pub fn update_file(
         &mut self,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
         symbol_provider: &mut dyn SymbolProvider,
         validator: &mut dyn Validator,
-        shader_variant: Option<ShaderVariant>,
         config: &ServerConfig,
         range: Option<lsp_types::Range>,
         partial_content: Option<&String>,
@@ -357,7 +360,7 @@ impl ServerLanguageFileCache {
             cached_file,
             validator,
             symbol_provider,
-            shader_variant,
+            self.variants.get(&uri).cloned(),
             config,
         )?;
         debug!(
