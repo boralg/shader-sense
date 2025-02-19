@@ -167,9 +167,9 @@ impl Dxc {
 impl Validator for Dxc {
     fn validate_shader(
         &mut self,
-        shader_source: String,
+        shader_source: &String,
         file_path: &Path,
-        params: ValidationParams,
+        params: &ValidationParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
     ) -> Result<(ShaderDiagnosticList, Dependencies), ShaderError> {
         let file_name = self.get_file_name(file_path);

@@ -567,6 +567,8 @@ impl ServerLanguage {
                             shading_language.clone(),
                             &params.text_document.text,
                             language_data.symbol_provider.as_mut(),
+                            language_data.validator.as_mut(),
+                            None,
                             &self.config,
                         ) {
                             Ok(cached_file) => {
@@ -605,14 +607,14 @@ impl ServerLanguage {
                                     && RefCell::borrow(&cached_file).symbol_tree.content
                                         == *params.text.as_ref().unwrap())
                         );
-                        let mut cached_file_borrowed = RefCell::borrow_mut(&cached_file);
-                        let language_data = self
-                            .language_data
-                            .get_mut(&cached_file_borrowed.shading_language)
-                            .unwrap();
-                        match cached_file_borrowed.update(
+                        let shading_language = RefCell::borrow_mut(&cached_file).shading_language;
+                        let language_data = self.language_data.get_mut(&shading_language).unwrap();
+                        match self.watched_files.update_file(
                             &uri,
+                            &cached_file,
                             language_data.symbol_provider.as_mut(),
+                            language_data.validator.as_mut(),
+                            None,
                             &self.config,
                             None,
                             None,
@@ -649,15 +651,15 @@ impl ServerLanguage {
                 debug!("got did change text document: {:#?}", uri);
                 match self.watched_files.get(&uri) {
                     Some(cached_file) => {
-                        let mut cached_file_borrowed = RefCell::borrow_mut(&cached_file);
-                        let language_data = self
-                            .language_data
-                            .get_mut(&cached_file_borrowed.shading_language)
-                            .unwrap();
+                        let shading_language = RefCell::borrow_mut(&cached_file).shading_language;
+                        let language_data = self.language_data.get_mut(&shading_language).unwrap();
                         for content in &params.content_changes {
-                            match cached_file_borrowed.update(
+                            match self.watched_files.update_file(
                                 &uri,
+                                &cached_file,
                                 language_data.symbol_provider.as_mut(),
+                                language_data.validator.as_mut(),
+                                None,
                                 &self.config,
                                 content.range,
                                 Some(&content.text),
@@ -705,7 +707,7 @@ impl ServerLanguage {
                         // If file has multiple variants, get the first one & ignore others entry points.
                         // OR better, from client, only send 0 or 1 variant per file.
                         // Still need to handle shared deps (first arrived, first served, or some hashmap caching both depending on entry point...)
-                        // 1. Preprocess file, get deps & regions.
+                        // 1. Preprocess file, get deps & regions for current file.
                         // 2. For each deps, preprocess with previous context (add macros).
                         // 3. Recurse until all deps reached.
                         // 4. Compute symbols.
@@ -737,18 +739,24 @@ impl ServerLanguage {
                 server.config = config.clone();
                 // Republish all diagnostics
                 let mut file_to_republish = Vec::new();
-                for (url, cached_file) in &server.watched_files.files {
+                let watched_files: Vec<(Url, ServerFileCacheHandle)> = server
+                    .watched_files
+                    .files
+                    .iter()
+                    .map(|e| (e.0.clone(), Rc::clone(&e.1)))
+                    .collect();
+                for (url, cached_file) in watched_files {
                     // Clear diags
                     server.clear_diagnostic(&server.connection, &url);
-                    let mut cached_file_borrowed = RefCell::borrow_mut(&cached_file);
-                    let language_data = server
-                        .language_data
-                        .get_mut(&cached_file_borrowed.shading_language)
-                        .unwrap();
+                    let shading_language = RefCell::borrow_mut(&cached_file).shading_language;
+                    let language_data = server.language_data.get_mut(&shading_language).unwrap();
                     // Update symbols & republish diags.
-                    match cached_file_borrowed.update(
+                    match server.watched_files.update_file(
                         &url,
+                        &cached_file,
                         language_data.symbol_provider.as_mut(),
+                        language_data.validator.as_mut(),
+                        None,
                         &server.config,
                         None,
                         None,

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::symbols::symbols::ShaderRange;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ShaderDiagnosticSeverity {
     Error,
     Warning,
@@ -47,7 +47,7 @@ impl ShaderDiagnosticSeverity {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ShaderDiagnostic {
     pub file_path: Option<PathBuf>,
     pub severity: ShaderDiagnosticSeverity,
@@ -55,7 +55,7 @@ pub struct ShaderDiagnostic {
     pub line: u32,
     pub pos: u32,
 }
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct ShaderDiagnosticList {
     pub diagnostics: Vec<ShaderDiagnostic>,
 }

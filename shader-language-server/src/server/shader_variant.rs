@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use shader_sense::shader::ShaderStage;
 
-use super::{server_connection::ServerConnection, ServerLanguage};
+use super::ServerLanguage;
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -19,6 +19,7 @@ pub struct ShaderVariant {
 
 // Could split with add / delete / update
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum DidChangeShaderVariant {}
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]

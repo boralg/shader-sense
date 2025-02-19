@@ -1,19 +1,25 @@
-use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 use crate::server::{
     clean_url,
     common::{lsp_range_to_shader_range, read_string_lossy},
 };
-use log::debug;
+use log::{debug, warn};
 use lsp_types::Url;
 use shader_sense::{
     shader::ShadingLanguage,
-    shader_error::ShaderError,
+    shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
         symbol_provider::SymbolProvider,
         symbol_tree::SymbolTree,
-        symbols::{ShaderPreprocessor, ShaderSymbolList},
+        symbols::{ShaderPreprocessor, ShaderSymbolList, ShaderSymbolParams},
     },
+    validator::validator::Validator,
 };
 
 use super::{server_config::ServerConfig, shader_variant::ShaderVariant};
@@ -27,6 +33,7 @@ pub struct ServerFileCache {
     pub preprocessor_cache: ShaderPreprocessor, // Store preprocessor to avoid computing them at every change.
     pub symbol_cache: ShaderSymbolList, // Store symbol to avoid computing them at every change.
     pub dependencies: HashMap<PathBuf, ServerFileCacheHandle>, // Store all direct dependencies of this file.
+    pub diagnostic_cache: ShaderDiagnosticList,                // Cached diagnostic
     pub shader_variant: Option<ShaderVariant>,
 }
 
@@ -35,65 +42,6 @@ pub struct ServerLanguageFileCache {
     pub dependencies: HashMap<Url, ServerFileCacheHandle>,
 }
 
-impl ServerFileCache {
-    pub fn update(
-        &mut self,
-        uri: &Url,
-        symbol_provider: &mut dyn SymbolProvider,
-        config: &ServerConfig,
-        range: Option<lsp_types::Range>,
-        partial_content: Option<&String>,
-    ) -> Result<(), ShaderError> {
-        let now_start = std::time::Instant::now();
-        let now_update_ast = std::time::Instant::now();
-        // Update abstract syntax tree
-        let file_path = uri.to_file_path().unwrap();
-        if let (Some(range), Some(partial_content)) = (range, partial_content) {
-            let shader_range = lsp_range_to_shader_range(&range, &file_path);
-            self.symbol_tree
-                .update_partial(symbol_provider, &shader_range, &partial_content)?;
-        } else if let Some(whole_content) = partial_content {
-            self.symbol_tree.update(symbol_provider, &whole_content)?;
-        } else {
-            // No update on content to perform.
-        }
-        debug!(
-            "{}:timing:update:ast           {}ms",
-            file_path.display(),
-            now_update_ast.elapsed().as_millis()
-        );
-
-        let now_get_preproc = std::time::Instant::now();
-        // Cache symbols
-        self.preprocessor_cache = symbol_provider.query_preprocessor(
-            &self.symbol_tree,
-            &config.into_symbol_params(),
-            config.regions,
-        )?;
-        debug!(
-            "{}:timing:update:get_preproc   {}ms",
-            file_path.display(),
-            now_get_preproc.elapsed().as_millis()
-        );
-        let now_get_symbol = std::time::Instant::now();
-        self.symbol_cache = if config.symbols {
-            symbol_provider.query_file_symbols(&self.symbol_tree, Some(&self.preprocessor_cache))?
-        } else {
-            ShaderSymbolList::default()
-        };
-        debug!(
-            "{}:timing:update:get_all_symb  {}ms",
-            file_path.display(),
-            now_get_symbol.elapsed().as_millis()
-        );
-        debug!(
-            "{}:timing:update:              {}ms",
-            file_path.display(),
-            now_start.elapsed().as_millis()
-        );
-        Ok(())
-    }
-}
 impl ServerLanguageFileCache {
     pub fn new() -> Self {
         Self {
@@ -101,12 +49,169 @@ impl ServerLanguageFileCache {
             dependencies: HashMap::new(),
         }
     }
+    fn recurse_file_symbol(
+        &mut self,
+        uri: &Url,
+        cached_file: &ServerFileCacheHandle,
+        symbol_params: ShaderSymbolParams,
+        symbol_provider: &mut dyn SymbolProvider,
+        region_enabled: bool,
+    ) -> Result<(), ShaderError> {
+        let shading_language = RefCell::borrow(cached_file).shading_language;
+        let (preprocessor, symbol_list, diagnostics) = match symbol_provider.query_preprocessor(
+            &RefCell::borrow(cached_file).symbol_tree,
+            &symbol_params,
+            region_enabled,
+        ) {
+            Ok(preprocessor) => {
+                let symbol_list = symbol_provider.query_file_symbols(
+                    &RefCell::borrow(cached_file).symbol_tree,
+                    Some(&preprocessor),
+                )?;
+                (preprocessor, symbol_list, ShaderDiagnosticList::empty())
+            }
+            Err(error) => {
+                // Return this error & store it to display it as a diagnostic & dont prevent linting.
+                if let ShaderError::SymbolQueryError(message, range) = error {
+                    (
+                        ShaderPreprocessor::default(),
+                        ShaderSymbolList::default(),
+                        ShaderDiagnosticList {
+                            diagnostics: vec![ShaderDiagnostic {
+                                file_path: Some(uri.to_file_path().unwrap()),
+                                severity: ShaderDiagnosticSeverity::Error,
+                                error: message,
+                                line: range.start.line,
+                                pos: range.start.pos,
+                            }],
+                        },
+                    )
+                } else {
+                    return Err(error);
+                }
+            }
+        };
+        // Recurse dependencies.
+        for include in &preprocessor.includes {
+            let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
+            let included_file =
+                self.watch_dependency(&include_uri, shading_language, symbol_provider)?;
+            self.recurse_file_symbol(
+                &include_uri,
+                &included_file,
+                symbol_params.clone(),
+                symbol_provider,
+                region_enabled,
+            )?;
+            RefCell::borrow_mut(&cached_file)
+                .dependencies
+                .insert(include.absolute_path.clone(), included_file);
+        }
+        // Store cache.
+        let mut cached_file = RefCell::borrow_mut(&cached_file);
+        cached_file.preprocessor_cache = preprocessor;
+        cached_file.symbol_cache = symbol_list;
+        cached_file.diagnostic_cache = diagnostics;
+        Ok(())
+    }
+    fn cache_file_data(
+        &mut self,
+        uri: &Url,
+        cached_file: &ServerFileCacheHandle,
+        validator: &mut dyn Validator,
+        symbol_provider: &mut dyn SymbolProvider,
+        shader_variant: Option<ShaderVariant>,
+        config: &ServerConfig,
+    ) -> Result<(), ShaderError> {
+        {
+            // Reset cache
+            let mut cached_file = RefCell::borrow_mut(&cached_file);
+            cached_file.preprocessor_cache = ShaderPreprocessor::default();
+            cached_file.symbol_cache = ShaderSymbolList::default();
+            cached_file.diagnostic_cache = ShaderDiagnosticList::default();
+        }
+        // Get symbols for main file.
+        if config.symbols {
+            let mut symbol_params = config.into_symbol_params();
+            // Add variant data if some.
+            if let Some(variant) = shader_variant {
+                for (variable, value) in variant.defines {
+                    symbol_params.defines.insert(variable, value);
+                }
+            }
+            self.recurse_file_symbol(
+                uri,
+                cached_file,
+                symbol_params,
+                symbol_provider,
+                config.regions,
+            )?;
+        }
+        // Get diagnostics
+        if config.validate {
+            let shading_language = RefCell::borrow(cached_file).shading_language;
+            let (mut diagnostic_list, _dependencies) = validator.validate_shader(
+                &RefCell::borrow(cached_file).symbol_tree.content,
+                RefCell::borrow(cached_file).symbol_tree.file_path.as_path(),
+                &config.into_validation_params(),
+                &mut |deps_path: &Path| -> Option<String> {
+                    let deps_uri = Url::from_file_path(deps_path).unwrap();
+                    let deps_file = match self.get_dependency(&deps_uri) {
+                        Some(deps_file) => deps_file,
+                        None => {
+                            debug_assert!(
+                                !config.symbols,
+                                "Should only get there if symbols did not add deps."
+                            );
+                            // If include does not exist, add it to watched files.
+                            match self.watch_dependency(
+                                &deps_uri,
+                                shading_language,
+                                symbol_provider,
+                            ) {
+                                Ok(deps_file) => deps_file,
+                                Err(err) => {
+                                    warn!("Failed to watch deps {}", err);
+                                    return None;
+                                }
+                            }
+                        }
+                    };
+                    let content = RefCell::borrow(&deps_file).symbol_tree.content.clone();
+                    // Add deps if they werent added by symbols.
+                    if !config.symbols {
+                        RefCell::borrow_mut(&cached_file)
+                            .dependencies
+                            .insert(PathBuf::from(deps_path), deps_file);
+                    }
+                    Some(content)
+                },
+            )?;
+            // Clear diagnostic if no errors.
+            // TODO: Should add empty for main file & deps if none to clear them.
+
+            // Filter by severity.
+            let required_severity = ShaderDiagnosticSeverity::from(config.severity.clone());
+            diagnostic_list
+                .diagnostics
+                .retain(|e| e.severity.is_required(required_severity.clone()));
+
+            let mut cached_file = RefCell::borrow_mut(&cached_file);
+            cached_file
+                .diagnostic_cache
+                .diagnostics
+                .append(&mut diagnostic_list.diagnostics);
+        }
+        Ok(())
+    }
     pub fn watch_file(
         &mut self,
         uri: &Url,
         lang: ShadingLanguage,
         text: &String,
         symbol_provider: &mut dyn SymbolProvider,
+        validator: &mut dyn Validator,
+        shader_variant: Option<ShaderVariant>,
         config: &ServerConfig,
     ) -> Result<ServerFileCacheHandle, ShaderError> {
         assert!(*uri == clean_url(&uri));
@@ -123,25 +228,23 @@ impl ServerLanguageFileCache {
             None => {
                 assert!(self.files.get(&uri).is_none());
                 let symbol_tree = SymbolTree::new(symbol_provider, &file_path, &text)?;
-                let preprocessor_cache = symbol_provider.query_preprocessor(
-                    &symbol_tree,
-                    &config.into_symbol_params(),
-                    config.regions,
-                )?;
-                let symbol_list =
-                    symbol_provider.query_file_symbols(&symbol_tree, Some(&preprocessor_cache))?;
                 let cached_file = Rc::new(RefCell::new(ServerFileCache {
                     shading_language: lang,
                     symbol_tree: symbol_tree,
-                    preprocessor_cache,
-                    symbol_cache: if config.symbols {
-                        symbol_list
-                    } else {
-                        ShaderSymbolList::default()
-                    },
+                    preprocessor_cache: ShaderPreprocessor::default(),
+                    symbol_cache: ShaderSymbolList::default(),
                     dependencies: HashMap::new(), // Will be filled by validator.
+                    diagnostic_cache: ShaderDiagnosticList::default(),
                     shader_variant: None,
                 }));
+                self.cache_file_data(
+                    uri,
+                    &cached_file,
+                    validator,
+                    symbol_provider,
+                    shader_variant,
+                    config,
+                )?;
                 let none = self.files.insert(uri.clone(), Rc::clone(&cached_file));
                 assert!(none.is_none());
                 cached_file
@@ -160,7 +263,6 @@ impl ServerLanguageFileCache {
         uri: &Url,
         lang: ShadingLanguage,
         symbol_provider: &mut dyn SymbolProvider,
-        config: &ServerConfig,
     ) -> Result<ServerFileCacheHandle, ShaderError> {
         assert!(*uri == clean_url(&uri));
         let file_path = uri.to_file_path().unwrap();
@@ -192,23 +294,13 @@ impl ServerLanguageFileCache {
                 None => {
                     let text = read_string_lossy(&file_path).unwrap();
                     let symbol_tree = SymbolTree::new(symbol_provider, &file_path, &text)?;
-                    let preprocessor_cache = symbol_provider.query_preprocessor(
-                        &symbol_tree,
-                        &config.into_symbol_params(),
-                        config.regions,
-                    )?;
-                    let symbol_list = symbol_provider
-                        .query_file_symbols(&symbol_tree, Some(&preprocessor_cache))?;
                     let cached_file = Rc::new(RefCell::new(ServerFileCache {
                         shading_language: lang,
-                        preprocessor_cache,
                         symbol_tree: symbol_tree,
-                        symbol_cache: if config.symbols {
-                            symbol_list
-                        } else {
-                            ShaderSymbolList::default()
-                        },
+                        preprocessor_cache: ShaderPreprocessor::default(),
+                        symbol_cache: ShaderSymbolList::default(),
                         dependencies: HashMap::new(), // Will be filled by validator.
+                        diagnostic_cache: ShaderDiagnosticList::default(),
                         shader_variant: None,
                     }));
                     let none = self
@@ -225,6 +317,60 @@ impl ServerLanguageFileCache {
                 }
             },
         }
+    }
+    pub fn update_file(
+        &mut self,
+        uri: &Url,
+        cached_file: &ServerFileCacheHandle,
+        symbol_provider: &mut dyn SymbolProvider,
+        validator: &mut dyn Validator,
+        shader_variant: Option<ShaderVariant>,
+        config: &ServerConfig,
+        range: Option<lsp_types::Range>,
+        partial_content: Option<&String>,
+    ) -> Result<(), ShaderError> {
+        let now_start = std::time::Instant::now();
+        let now_update_ast = std::time::Instant::now();
+        // Update abstract syntax tree
+        let file_path = uri.to_file_path().unwrap();
+        if let (Some(range), Some(partial_content)) = (range, partial_content) {
+            let shader_range = lsp_range_to_shader_range(&range, &file_path);
+            RefCell::borrow_mut(cached_file)
+                .symbol_tree
+                .update_partial(symbol_provider, &shader_range, &partial_content)?;
+        } else if let Some(whole_content) = partial_content {
+            RefCell::borrow_mut(cached_file)
+                .symbol_tree
+                .update(symbol_provider, &whole_content)?;
+        } else {
+            // No update on content to perform.
+        }
+        debug!(
+            "{}:timing:update:ast           {}ms",
+            file_path.display(),
+            now_update_ast.elapsed().as_millis()
+        );
+
+        let now_get_all_symbol = std::time::Instant::now();
+        self.cache_file_data(
+            uri,
+            cached_file,
+            validator,
+            symbol_provider,
+            shader_variant,
+            config,
+        )?;
+        debug!(
+            "{}:timing:update:get_all_symbol{}ms",
+            file_path.display(),
+            now_get_all_symbol.elapsed().as_millis()
+        );
+        debug!(
+            "{}:timing:update:              {}ms",
+            file_path.display(),
+            now_start.elapsed().as_millis()
+        );
+        Ok(())
     }
     pub fn get(&self, uri: &Url) -> Option<ServerFileCacheHandle> {
         assert!(*uri == clean_url(&uri));

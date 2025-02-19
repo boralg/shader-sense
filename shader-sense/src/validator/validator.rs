@@ -20,9 +20,9 @@ pub struct ValidationParams {
 pub trait Validator {
     fn validate_shader(
         &mut self,
-        shader_content: String,
+        shader_content: &String,
         file_path: &Path,
-        params: ValidationParams,
+        params: &ValidationParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
     ) -> Result<(ShaderDiagnosticList, Dependencies), ShaderError>;
 

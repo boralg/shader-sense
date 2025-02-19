@@ -2,9 +2,8 @@ use std::cell::RefCell;
 
 use shader_sense::{
     symbols::{
-        symbol_provider::SymbolProvider,
-        symbols::{ShaderPreprocessorDefine, ShaderSymbolList},
-        GlslSymbolProvider, HlslSymbolProvider, WgslSymbolProvider,
+        symbol_provider::SymbolProvider, symbols::ShaderSymbolList, GlslSymbolProvider,
+        HlslSymbolProvider, WgslSymbolProvider,
     },
     validator::{glslang::Glslang, naga::Naga, validator::Validator},
 };
@@ -12,7 +11,7 @@ use shader_sense::{
 #[cfg(not(target_os = "wasi"))]
 use shader_sense::validator::dxc::Dxc;
 
-use super::server_file_cache::{ServerFileCacheHandle, ServerLanguageFileCache};
+use super::server_file_cache::ServerFileCacheHandle;
 
 pub struct ServerLanguageData {
     pub validator: Box<dyn Validator>,
@@ -45,20 +44,7 @@ impl ServerLanguageData {
         let cached_file = RefCell::borrow(&cached_file);
         // Add current symbols
         let mut symbol_cache = cached_file.symbol_cache.clone();
-        let mut preprocess_cache = cached_file.preprocessor_cache.clone();
-        // Add config macros.
-        /*preprocess_cache.defines.append(
-            &mut self
-                .config
-                .defines
-                .iter()
-                .map(|define| ShaderPreprocessorDefine {
-                    name: define.0.clone(),
-                    range: None,
-                    value: Some(define.1.clone()),
-                })
-                .collect::<Vec<ShaderPreprocessorDefine>>(),
-        );*/
+        let preprocess_cache = cached_file.preprocessor_cache.clone();
         // Preprocess symbols.
         preprocess_cache.preprocess_symbols(&mut symbol_cache);
         // Add deps symbols

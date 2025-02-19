@@ -36,9 +36,9 @@ mod tests {
         let file_path = Path::new("./test/glsl/ok.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams::default(),
+            &ValidationParams::default(),
             &mut include_callback,
         ) {
             Ok(result) => {
@@ -55,9 +55,9 @@ mod tests {
         let file_path = Path::new("./test/glsl/include-config.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams {
+            &ValidationParams {
                 includes: vec!["./test/glsl/inc0/".into()],
                 ..Default::default()
             },
@@ -77,9 +77,9 @@ mod tests {
         let file_path = Path::new("./test/glsl/include-level.comp.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams {
+            &ValidationParams {
                 includes: vec!["./test/glsl/inc0/".into()],
                 ..Default::default()
             },
@@ -99,9 +99,9 @@ mod tests {
         let file_path = Path::new("./test/glsl/nostage.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams {
+            &ValidationParams {
                 includes: vec!["./test/glsl/inc0/".into()],
                 ..Default::default()
             },
@@ -121,9 +121,9 @@ mod tests {
         let file_path = Path::new("./test/glsl/macro.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams {
+            &ValidationParams {
                 defines: HashMap::from([("CUSTOM_MACRO".into(), "42".into())]),
                 ..Default::default()
             },
@@ -143,9 +143,9 @@ mod tests {
         let file_path = Path::new("./test/glsl/error-parsing.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams::default(),
+            &ValidationParams::default(),
             &mut include_callback,
         ) {
             Ok(result) => {
@@ -165,9 +165,9 @@ mod tests {
         let file_path = Path::new("./test/hlsl/ok.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams::default(),
+            &ValidationParams::default(),
             &mut include_callback,
         ) {
             Ok(result) => {
@@ -184,9 +184,9 @@ mod tests {
         let file_path = Path::new("./test/hlsl/include-config.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams {
+            &ValidationParams {
                 includes: vec!["./test/hlsl/inc0/".into()],
                 ..Default::default()
             },
@@ -206,9 +206,9 @@ mod tests {
         let file_path = Path::new("./test/hlsl/folder/folder-file.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams {
+            &ValidationParams {
                 includes: vec!["./test/hlsl/".into()],
                 ..Default::default()
             },
@@ -228,9 +228,9 @@ mod tests {
         let file_path = Path::new("./test/hlsl/include-level.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams {
+            &ValidationParams {
                 includes: vec!["./test/hlsl/inc0/".into()],
                 ..Default::default()
             },
@@ -250,9 +250,9 @@ mod tests {
         let file_path = Path::new("./test/hlsl/macro.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams {
+            &ValidationParams {
                 defines: HashMap::from([("CUSTOM_MACRO".into(), "42".into())]),
                 ..Default::default()
             },
@@ -272,9 +272,9 @@ mod tests {
         let file_path = Path::new("./test/hlsl/16bit-types.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams {
+            &ValidationParams {
                 hlsl_enable16bit_types: true,
                 ..Default::default()
             },
@@ -294,9 +294,9 @@ mod tests {
         let file_path = Path::new("./test/wgsl/ok.wgsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
-            shader_content,
+            &shader_content,
             file_path,
-            ValidationParams::default(),
+            &ValidationParams::default(),
             &mut include_callback,
         ) {
             Ok(result) => {
