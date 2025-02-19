@@ -11,9 +11,9 @@ fn validate_file(shading_language: ShadingLanguage, shader_path: &Path) {
     let mut validator = create_validator(shading_language);
     let shader_content = std::fs::read_to_string(shader_path).unwrap();
     match validator.validate_shader(
-        shader_content,
+        &shader_content,
         shader_path,
-        ValidationParams::default(),
+        &ValidationParams::default(),
         &mut |path: &Path| Some(std::fs::read_to_string(path).unwrap()),
     ) {
         Ok((diagnostic_list, dependencies)) => println!(
