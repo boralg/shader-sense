@@ -120,25 +120,21 @@ impl ServerLanguage {
             }
         }
         // Add inactive regions to diag
-        let mut inactive_diagnostics = if self.config.regions {
-            RefCell::borrow(cached_file)
-                .preprocessor_cache
-                .regions
-                .iter()
-                .filter_map(|region| {
-                    (!region.is_active).then_some(Diagnostic {
-                        range: shader_range_to_lsp_range(&region.range),
-                        severity: Some(DiagnosticSeverity::HINT),
-                        message: "Code disabled by currently used macros".into(),
-                        source: Some("shader-validator".to_string()),
-                        tags: Some(vec![DiagnosticTag::UNNECESSARY]),
-                        ..Default::default()
-                    })
+        let mut inactive_diagnostics = RefCell::borrow(cached_file)
+            .preprocessor_cache
+            .regions
+            .iter()
+            .filter_map(|region| {
+                (!region.is_active).then_some(Diagnostic {
+                    range: shader_range_to_lsp_range(&region.range),
+                    severity: Some(DiagnosticSeverity::HINT),
+                    message: "Code disabled by currently used macros".into(),
+                    source: Some("shader-validator".to_string()),
+                    tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+                    ..Default::default()
                 })
-                .collect()
-        } else {
-            vec![]
-        };
+            })
+            .collect();
         match diagnostics.get_mut(&uri) {
             Some(diagnostics) => {
                 diagnostics.append(&mut inactive_diagnostics);

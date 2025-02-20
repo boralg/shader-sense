@@ -30,7 +30,6 @@ pub struct ServerConfig {
     pub defines: HashMap<String, String>,
     pub validate: bool,
     pub symbols: bool,
-    pub regions: bool,
     pub severity: String,
     pub hlsl: ServerHlslConfig,
     pub glsl: ServerGlslConfig,
@@ -62,7 +61,6 @@ impl Default for ServerConfig {
             defines: HashMap::new(),
             validate: true,
             symbols: true,
-            regions: false, // Beta, disabled by default
             severity: ShaderDiagnosticSeverity::Hint.to_string(),
             hlsl: ServerHlslConfig::default(),
             glsl: ServerGlslConfig::default(),

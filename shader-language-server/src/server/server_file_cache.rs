@@ -3,6 +3,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     rc::Rc,
+    time::Instant,
 };
 
 use crate::server::{
@@ -54,16 +55,16 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
-        symbol_params: ShaderSymbolParams,
+        mut symbol_params: ShaderSymbolParams,
         symbol_provider: &mut dyn SymbolProvider,
-        region_enabled: bool,
     ) -> Result<(), ShaderError> {
+        let file_path = uri.to_file_path().unwrap();
         let shading_language = RefCell::borrow(cached_file).shading_language;
-        let (preprocessor, symbol_list, diagnostics) = match symbol_provider.query_preprocessor(
-            &RefCell::borrow(cached_file).symbol_tree,
-            &symbol_params,
-            region_enabled,
-        ) {
+        // We are recomputing every deps symbols here, but not really required, isnt it ?
+        let now_symbols = Instant::now();
+        let (preprocessor, symbol_list, diagnostics) = match symbol_provider
+            .query_preprocessor(&RefCell::borrow(cached_file).symbol_tree, &symbol_params)
+        {
             Ok(preprocessor) => {
                 let symbol_list = symbol_provider.query_file_symbols(
                     &RefCell::borrow(cached_file).symbol_tree,
@@ -92,6 +93,18 @@ impl ServerLanguageFileCache {
                 }
             }
         };
+        debug!(
+            "{}:timing:symbols:ast          {}ms",
+            file_path.display(),
+            now_symbols.elapsed().as_millis()
+        );
+        // Add context macro for next includes.
+        for define in &preprocessor.defines {
+            symbol_params.defines.insert(
+                define.name.clone(),
+                define.value.clone().unwrap_or_default(),
+            );
+        }
         // Recurse dependencies.
         for include in &preprocessor.includes {
             let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
@@ -102,7 +115,6 @@ impl ServerLanguageFileCache {
                 &included_file,
                 symbol_params.clone(),
                 symbol_provider,
-                region_enabled,
             )?;
             RefCell::borrow_mut(&cached_file)
                 .dependencies
@@ -140,13 +152,7 @@ impl ServerLanguageFileCache {
                     symbol_params.defines.insert(variable, value);
                 }
             }
-            self.recurse_file_symbol(
-                uri,
-                cached_file,
-                symbol_params,
-                symbol_provider,
-                config.regions,
-            )?;
+            self.recurse_file_symbol(uri, cached_file, symbol_params, symbol_provider)?;
         }
         // Get diagnostics
         if config.validate {
@@ -266,20 +272,33 @@ impl ServerLanguageFileCache {
         assert!(*uri == clean_url(&uri));
         let file_path = uri.to_file_path().unwrap();
 
-        // Check watched file already watched as deps
+        // Check watched file already watched as main file
         match self.files.get(&uri) {
-            Some(cached_file) => {
-                // Watched as main, copy it.
-                self.dependencies
-                    .insert(uri.clone(), Rc::clone(cached_file));
-                debug!(
-                    "File already watched as main : {:#?} dependency file at {}. {} deps in cache.",
-                    lang,
-                    file_path.display(),
-                    self.dependencies.len(),
-                );
-                Ok(Rc::clone(&cached_file))
-            }
+            Some(cached_file) => match self.dependencies.get(&uri) {
+                Some(_deps_file) => {
+                    // Watched as main & deps already, copy it.
+                    assert!(Rc::ptr_eq(_deps_file, cached_file));
+                    debug!(
+                        "File already watched as main and deps : {:#?} dependency file at {}. {} deps in cache.",
+                        lang,
+                        file_path.display(),
+                        self.dependencies.len(),
+                    );
+                    Ok(Rc::clone(&cached_file))
+                }
+                None => {
+                    // Watched as main only, copy it.
+                    self.dependencies
+                        .insert(uri.clone(), Rc::clone(cached_file));
+                    debug!(
+                        "File already watched as main : {:#?} dependency file at {}. {} deps in cache.",
+                        lang,
+                        file_path.display(),
+                        self.dependencies.len(),
+                    );
+                    Ok(Rc::clone(&cached_file))
+                }
+            },
             None => match self.dependencies.get(&uri) {
                 Some(cached_file) => {
                     debug!(

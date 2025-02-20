@@ -59,10 +59,9 @@ impl SymbolProvider for WgslSymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
-        enable_regions: bool, // REGION_BETA
     ) -> Result<ShaderPreprocessor, ShaderError> {
         self.symbol_parser
-            .query_file_preprocessor(symbol_tree, symbol_params, enable_regions)
+            .query_file_preprocessor(symbol_tree, symbol_params)
     }
 
     fn query_file_symbols(

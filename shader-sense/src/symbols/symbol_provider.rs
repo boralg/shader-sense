@@ -20,7 +20,6 @@ pub trait SymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
-        enable_regions: bool, // REGION_BETA
     ) -> Result<ShaderPreprocessor, ShaderError>;
     // Query file symbol from file tree.
     fn query_file_symbols(

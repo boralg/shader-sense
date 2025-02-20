@@ -64,10 +64,9 @@ impl SymbolProvider for HlslSymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
-        enable_regions: bool, // REGION_BETA
     ) -> Result<ShaderPreprocessor, ShaderError> {
         self.symbol_parser
-            .query_file_preprocessor(symbol_tree, symbol_params, enable_regions)
+            .query_file_preprocessor(symbol_tree, symbol_params)
     }
     fn query_file_symbols(
         &self,
@@ -120,7 +119,7 @@ mod tests {
         let symbol_tree =
             SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
         let preprocessor = symbol_provider
-            .query_preprocessor(&symbol_tree, &ShaderSymbolParams::default(), true)
+            .query_preprocessor(&symbol_tree, &ShaderSymbolParams::default())
             .unwrap();
         //let symbols = symbol_provider.query_file_symbols(&symbol_tree, Some(&preprocessor));
         let set_region =
