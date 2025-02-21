@@ -176,6 +176,7 @@ pub struct ShaderPreprocessor {
     pub includes: Vec<ShaderPreprocessorInclude>,
     pub defines: Vec<ShaderPreprocessorDefine>,
     pub regions: Vec<ShaderRegion>,
+    pub once: bool,
 }
 impl ShaderPreprocessorDefine {
     pub fn new(name: String, range: ShaderRange, value: Option<String>) -> Self {

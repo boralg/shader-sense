@@ -245,6 +245,19 @@ impl SymbolParser {
                 .find(|region| !region.is_active && region.range.contain_bounds(&include.range))
                 .is_none()
         });
+        // Mark this shader as once if pragma once is set.
+        if let Some(once_position) = symbol_tree.content.find("#pragma once") {
+            let position = ShaderPosition::from_byte_offset(
+                &symbol_tree.content,
+                once_position,
+                &symbol_tree.file_path,
+            );
+            preprocessor.once = preprocessor
+                .regions
+                .iter()
+                .find(|region| !region.is_active && region.range.contain(&position))
+                .is_none();
+        }
         Ok(preprocessor)
     }
     pub fn query_file_symbols(

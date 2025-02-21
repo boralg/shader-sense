@@ -652,13 +652,24 @@ impl ServerLanguageFileCache {
             uri: &Url,
             cached_file: &ServerFileCacheHandle,
             includer_uri: &Url,
+            include_once: &mut HashSet<Url>,
         ) -> ShaderSymbolList {
             let cached_file = RefCell::borrow(&cached_file);
             match cached_file.included_data.get(includer_uri) {
                 Some(data) => {
                     let mut symbol_cache = data.symbol_cache.clone();
+                    if data.preprocessor_cache.once {
+                        include_once.insert(uri.clone());
+                    }
                     for (deps_uri, deps_cached_file) in &data.dependencies {
-                        symbol_cache.append(get_deps(deps_uri, deps_cached_file, includer_uri));
+                        if !include_once.contains(deps_uri) {
+                            symbol_cache.append(get_deps(
+                                deps_uri,
+                                deps_cached_file,
+                                includer_uri,
+                                include_once,
+                            ));
+                        }
                     }
                     symbol_cache
                 }
@@ -669,7 +680,12 @@ impl ServerLanguageFileCache {
             }
         }
         for (deps_uri, deps_cached_file) in &cached_file.data.dependencies {
-            symbol_cache.append(get_deps(deps_uri, deps_cached_file, uri));
+            symbol_cache.append(get_deps(
+                deps_uri,
+                deps_cached_file,
+                uri,
+                &mut HashSet::new(),
+            ));
         }
         // Add intrinsics symbols
         symbol_cache.append(symbol_provider.get_intrinsics_symbol().clone());
