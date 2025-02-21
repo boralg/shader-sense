@@ -65,7 +65,8 @@ impl ServerLanguage {
         cached_file: &ServerFileCacheHandle,
     ) -> Result<HashMap<Url, Vec<Diagnostic>>, ShaderError> {
         let file_path = uri.to_file_path().unwrap();
-        let diagnostic_cache = &RefCell::borrow(&cached_file).diagnostic_cache;
+        // Diagnostic for included file stored in main cache.
+        let diagnostic_cache = &RefCell::borrow(&cached_file).data.diagnostic_cache;
         debug!("Validating file {}", file_path.display());
 
         let mut diagnostics: HashMap<Url, Vec<Diagnostic>> = HashMap::new();
@@ -111,16 +112,16 @@ impl ServerLanguage {
             );
             diagnostics.insert(uri.clone(), vec![]);
         }
-        // Add empty diagnostics to dependencies without errors to clear them.
-        for (dependency_path, _dependency_file) in &RefCell::borrow(&cached_file).dependencies {
-            let uri = Url::from_file_path(&dependency_path).unwrap();
-            if diagnostics.get(&uri).is_none() {
-                info!("Clearing diagnostic for deps file {}", uri);
-                diagnostics.insert(uri.clone(), vec![]);
+        // Add empty diagnostics to direct dependencies without errors to clear them.
+        for (dependency_uri, _dependency_file) in &RefCell::borrow(&cached_file).data.dependencies {
+            if diagnostics.get(&dependency_uri).is_none() {
+                info!("Clearing diagnostic for deps file {}", dependency_uri);
+                diagnostics.insert(dependency_uri.clone(), vec![]);
             }
         }
-        // Add inactive regions to diag
+        // Add inactive regions to diag for open file.
         let mut inactive_diagnostics = RefCell::borrow(cached_file)
+            .data
             .preprocessor_cache
             .regions
             .iter()

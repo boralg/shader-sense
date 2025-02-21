@@ -31,8 +31,11 @@ impl ServerLanguage {
             // word_range should be the same as symbol range
             Ok((word, _word_range)) => match self.watched_files.get(uri) {
                 Some(target_cached_file) => {
-                    let all_symbol_list =
-                        language_data.get_all_symbols(Rc::clone(&target_cached_file));
+                    let all_symbol_list = self.watched_files.get_all_symbols(
+                        uri,
+                        Rc::clone(&target_cached_file),
+                        language_data.symbol_provider.as_ref(),
+                    );
                     let target_cached_file = target_cached_file.borrow();
                     let symbol_list = all_symbol_list.filter_scoped_symbol(shader_position);
                     let matching_symbols = symbol_list.find_symbols(word);

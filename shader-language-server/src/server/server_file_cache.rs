@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
-    collections::HashMap,
-    path::{Path, PathBuf},
+    collections::{HashMap, HashSet},
+    path::Path,
     rc::Rc,
     time::Instant,
 };
@@ -27,20 +27,69 @@ use super::{server_config::ServerConfig, shader_variant::ShaderVariant};
 
 pub type ServerFileCacheHandle = Rc<RefCell<ServerFileCache>>;
 
+#[derive(Debug, Clone, Default)]
+pub struct ServerFileCacheData {
+    pub preprocessor_cache: ShaderPreprocessor, // Store preprocessor to avoid computing them at every change.
+    pub symbol_cache: ShaderSymbolList, // Store symbol to avoid computing them at every change.
+    pub diagnostic_cache: ShaderDiagnosticList, // Cached diagnostic
+    pub dependencies: HashMap<Url, ServerFileCacheHandle>, // Store all direct dependencies of this file.
+}
+
 #[derive(Debug, Clone)]
 pub struct ServerFileCache {
     pub shading_language: ShadingLanguage,
     pub symbol_tree: SymbolTree, // Store content on change as its not on disk.
-    pub preprocessor_cache: ShaderPreprocessor, // Store preprocessor to avoid computing them at every change.
-    pub symbol_cache: ShaderSymbolList, // Store symbol to avoid computing them at every change.
-    pub dependencies: HashMap<PathBuf, ServerFileCacheHandle>, // Store all direct dependencies of this file.
-    pub diagnostic_cache: ShaderDiagnosticList,                // Cached diagnostic
+    pub data: ServerFileCacheData, // Data for file opened and edited.
+    pub included_data: HashMap<Url, ServerFileCacheData>, // Data per entry point for context, depending on it, data might change
 }
 
 pub struct ServerLanguageFileCache {
     pub files: HashMap<Url, ServerFileCacheHandle>,
     pub dependencies: HashMap<Url, ServerFileCacheHandle>,
     pub variants: HashMap<Url, ShaderVariant>,
+}
+
+struct IncludeContext {
+    // using defines should be better as key for handling includes. In the meantime, hashset does the work.
+    //defines: HashMap<String, String>,
+    includer_uri: Url,
+    visited_dependencies: HashSet<Url>,
+}
+
+impl IncludeContext {
+    pub fn main(uri: &Url) -> Self {
+        Self {
+            //defines: HashMap::new(),
+            includer_uri: uri.clone(),
+            visited_dependencies: HashSet::new(),
+        }
+    }
+    pub fn visit_data<F: FnOnce(&mut ServerFileCacheData)>(
+        &self,
+        uri: &Url,
+        cached_file: &ServerFileCacheHandle,
+        visitor: F,
+    ) {
+        if *uri == self.includer_uri {
+            visitor(&mut RefCell::borrow_mut(cached_file).data);
+        } else {
+            let cached_file = &mut RefCell::borrow_mut(cached_file);
+            match cached_file.included_data.get_mut(&self.includer_uri) {
+                Some(data) => visitor(data),
+                None => {
+                    cached_file
+                        .included_data
+                        .insert(self.includer_uri.clone(), ServerFileCacheData::default());
+                    visitor(
+                        cached_file
+                            .included_data
+                            .get_mut(&self.includer_uri)
+                            .unwrap(),
+                    );
+                }
+            }
+        }
+    }
 }
 
 impl ServerLanguageFileCache {
@@ -55,8 +104,9 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
-        mut symbol_params: ShaderSymbolParams,
+        mut symbol_params: ShaderSymbolParams, // TODO: replace symbol params to include context
         symbol_provider: &mut dyn SymbolProvider,
+        include_context: &mut IncludeContext,
     ) -> Result<(), ShaderError> {
         let file_path = uri.to_file_path().unwrap();
         let shading_language = RefCell::borrow(cached_file).shading_language;
@@ -66,10 +116,11 @@ impl ServerLanguageFileCache {
             .query_preprocessor(&RefCell::borrow(cached_file).symbol_tree, &symbol_params)
         {
             Ok(preprocessor) => {
-                let symbol_list = symbol_provider.query_file_symbols(
+                let mut symbol_list = symbol_provider.query_file_symbols(
                     &RefCell::borrow(cached_file).symbol_tree,
                     Some(&preprocessor),
                 )?;
+                preprocessor.preprocess_symbols(&mut symbol_list);
                 (preprocessor, symbol_list, ShaderDiagnosticList::empty())
             }
             Err(error) => {
@@ -80,7 +131,7 @@ impl ServerLanguageFileCache {
                         ShaderSymbolList::default(),
                         ShaderDiagnosticList {
                             diagnostics: vec![ShaderDiagnostic {
-                                file_path: Some(uri.to_file_path().unwrap()),
+                                file_path: Some(file_path.clone()),
                                 severity: ShaderDiagnosticSeverity::Error,
                                 error: message,
                                 line: range.start.line,
@@ -110,21 +161,33 @@ impl ServerLanguageFileCache {
             let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
             let included_file =
                 self.watch_dependency(&include_uri, shading_language, symbol_provider)?;
-            self.recurse_file_symbol(
-                &include_uri,
-                &included_file,
-                symbol_params.clone(),
-                symbol_provider,
-            )?;
-            RefCell::borrow_mut(&cached_file)
-                .dependencies
-                .insert(include.absolute_path.clone(), included_file);
+            // Skip already visited deps.
+            // Should instead have some kind of context.
+            if !include_context.visited_dependencies.contains(&include_uri) {
+                include_context
+                    .visited_dependencies
+                    .insert(include_uri.clone());
+                self.recurse_file_symbol(
+                    &include_uri,
+                    &included_file,
+                    symbol_params.clone(),
+                    symbol_provider,
+                    include_context,
+                )?;
+            }
+            include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
+                data.dependencies.insert(
+                    Url::from_file_path(&include.absolute_path).unwrap(),
+                    included_file,
+                );
+            });
         }
-        // Store cache.
-        let mut cached_file = RefCell::borrow_mut(&cached_file);
-        cached_file.preprocessor_cache = preprocessor;
-        cached_file.symbol_cache = symbol_list;
-        cached_file.diagnostic_cache = diagnostics;
+        // Store symbol cache.
+        include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
+            data.preprocessor_cache = preprocessor;
+            data.symbol_cache = symbol_list;
+            data.diagnostic_cache = diagnostics;
+        });
         Ok(())
     }
     fn cache_file_data(
@@ -136,13 +199,13 @@ impl ServerLanguageFileCache {
         shader_variant: Option<ShaderVariant>,
         config: &ServerConfig,
     ) -> Result<(), ShaderError> {
-        {
-            // Reset cache
-            let mut cached_file = RefCell::borrow_mut(&cached_file);
-            cached_file.preprocessor_cache = ShaderPreprocessor::default();
-            cached_file.symbol_cache = ShaderSymbolList::default();
-            cached_file.diagnostic_cache = ShaderDiagnosticList::default();
-        }
+        let mut include_context = IncludeContext::main(uri);
+        // Reset cache
+        include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
+            data.preprocessor_cache = ShaderPreprocessor::default();
+            data.symbol_cache = ShaderSymbolList::default();
+            data.diagnostic_cache = ShaderDiagnosticList::default();
+        });
         // Get symbols for main file.
         if config.symbols {
             let mut symbol_params = config.into_symbol_params();
@@ -152,7 +215,13 @@ impl ServerLanguageFileCache {
                     symbol_params.defines.insert(variable, value);
                 }
             }
-            self.recurse_file_symbol(uri, cached_file, symbol_params, symbol_provider)?;
+            self.recurse_file_symbol(
+                uri,
+                cached_file,
+                symbol_params,
+                symbol_provider,
+                &mut include_context,
+            )?;
         }
         // Get diagnostics
         if config.validate {
@@ -171,6 +240,7 @@ impl ServerLanguageFileCache {
                                 "Should only get there if symbols did not add deps."
                             );
                             // If include does not exist, add it to watched files.
+                            // Issue here: They will be considered as direct deps, while its not necessarly true, might break symbols.
                             match self.watch_dependency(
                                 &deps_uri,
                                 shading_language,
@@ -185,11 +255,16 @@ impl ServerLanguageFileCache {
                         }
                     };
                     let content = RefCell::borrow(&deps_file).symbol_tree.content.clone();
-                    // Add deps if they werent added by symbols.
+                    // Add deps as direct deps if they werent added by symbols.
                     if !config.symbols {
-                        RefCell::borrow_mut(&cached_file)
-                            .dependencies
-                            .insert(PathBuf::from(deps_path), deps_file);
+                        include_context.visit_data(
+                            uri,
+                            cached_file,
+                            |data: &mut ServerFileCacheData| {
+                                data.dependencies
+                                    .insert(Url::from_file_path(&deps_path).unwrap(), deps_file);
+                            },
+                        );
                     }
                     Some(content)
                 },
@@ -203,11 +278,11 @@ impl ServerLanguageFileCache {
                 .diagnostics
                 .retain(|e| e.severity.is_required(required_severity.clone()));
 
-            let mut cached_file = RefCell::borrow_mut(&cached_file);
-            cached_file
-                .diagnostic_cache
-                .diagnostics
-                .append(&mut diagnostic_list.diagnostics);
+            include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
+                data.diagnostic_cache
+                    .diagnostics
+                    .append(&mut diagnostic_list.diagnostics);
+            });
         }
         Ok(())
     }
@@ -237,10 +312,8 @@ impl ServerLanguageFileCache {
                 let cached_file = Rc::new(RefCell::new(ServerFileCache {
                     shading_language: lang,
                     symbol_tree: symbol_tree,
-                    preprocessor_cache: ShaderPreprocessor::default(),
-                    symbol_cache: ShaderSymbolList::default(),
-                    dependencies: HashMap::new(), // Will be filled by validator.
-                    diagnostic_cache: ShaderDiagnosticList::default(),
+                    data: ServerFileCacheData::default(),
+                    included_data: HashMap::new(),
                 }));
                 self.cache_file_data(
                     uri,
@@ -315,10 +388,8 @@ impl ServerLanguageFileCache {
                     let cached_file = Rc::new(RefCell::new(ServerFileCache {
                         shading_language: lang,
                         symbol_tree: symbol_tree,
-                        preprocessor_cache: ShaderPreprocessor::default(),
-                        symbol_cache: ShaderSymbolList::default(),
-                        dependencies: HashMap::new(), // Will be filled by validator.
-                        diagnostic_cache: ShaderDiagnosticList::default(),
+                        data: ServerFileCacheData::default(),
+                        included_data: HashMap::new(),
                     }));
                     let none = self
                         .dependencies
@@ -408,35 +479,47 @@ impl ServerLanguageFileCache {
             None => None,
         }
     }
-    pub fn remove_dependency(&mut self, uri: &Url) -> Result<(), ShaderError> {
+    pub fn remove_dependency(&mut self, uri: &Url, includer_uri: &Url) -> Result<(), ShaderError> {
         fn list_all_dependencies_count(
-            file_cache: &HashMap<PathBuf, ServerFileCacheHandle>,
-        ) -> HashMap<PathBuf, usize> {
-            let list = HashMap::new();
-            for dependency in file_cache {
-                let mut list = HashMap::new();
-                let cached_dependency = RefCell::borrow_mut(dependency.1);
-                let deps = list_all_dependencies_count(&cached_dependency.dependencies);
-                for dep in deps {
-                    match list.get_mut(&dep.0) {
-                        Some(count) => {
-                            *count += 1;
+            cached_file: &ServerFileCacheHandle,
+            includer_uri: &Url,
+        ) -> HashMap<Url, usize> {
+            let mut list = HashMap::new();
+            match RefCell::borrow(cached_file).included_data.get(includer_uri) {
+                Some(data) => {
+                    for (deps_uri, deps_cached_file) in &data.dependencies {
+                        match list.get_mut(deps_uri) {
+                            Some(count) => {
+                                *count += 1;
+                            }
+                            None => {
+                                list.insert(deps_uri.clone(), 1);
+                            }
                         }
-                        None => {
-                            list.insert(dep.0, 1);
+                        let deps = list_all_dependencies_count(&deps_cached_file, includer_uri);
+                        for (uri, _) in deps {
+                            match list.get_mut(&uri) {
+                                Some(count) => {
+                                    *count += 1;
+                                }
+                                None => {
+                                    list.insert(uri.clone(), 1);
+                                }
+                            }
                         }
                     }
+                }
+                None => {
+                    warn!("Deps has no data for includer {}", includer_uri);
                 }
             }
             list
         }
-        let file_path = uri.to_file_path().unwrap();
         match self.dependencies.get(uri) {
             Some(cached_file) => {
                 // Check if strong_count are not reference to itself within deps.
-                let dependencies_count =
-                    list_all_dependencies_count(&RefCell::borrow(cached_file).dependencies);
-                let is_last_ref = match dependencies_count.get(&file_path) {
+                let dependencies_count = list_all_dependencies_count(cached_file, includer_uri);
+                let is_last_ref = match dependencies_count.get(&uri) {
                     Some(count) => {
                         let ref_count = Rc::strong_count(cached_file);
                         debug!("Found {} deps count with {} strong count", count, ref_count);
@@ -450,19 +533,18 @@ impl ServerLanguageFileCache {
                     drop(cached_file);
                     debug!(
                         "Removing dependency file at {}. {} deps in cache.",
-                        file_path.display(),
+                        uri,
                         self.dependencies.len(),
                     );
                     // Remove every dangling deps
-                    for (dependency_path, dependency_count) in dependencies_count {
-                        let dependency_url = Url::from_file_path(&dependency_path).unwrap();
+                    for (dependency_url, dependency_count) in dependencies_count {
                         match self.dependencies.get(&dependency_url) {
                             Some(dependency_file) => {
                                 if dependency_count >= Rc::strong_count(dependency_file) {
                                     self.dependencies.remove(&dependency_url).unwrap();
                                     debug!(
                                         "Removed dangling dependency file at {}. {} deps in cache.",
-                                        dependency_path.display(),
+                                        dependency_url,
                                         self.dependencies.len(),
                                     );
                                 }
@@ -470,7 +552,7 @@ impl ServerLanguageFileCache {
                             None => {
                                 return Err(ShaderError::InternalErr(format!(
                                     "Could not find dependency file {}",
-                                    dependency_path.display()
+                                    dependency_url
                                 )))
                             }
                         }
@@ -484,21 +566,67 @@ impl ServerLanguageFileCache {
             ))),
         }
     }
+    fn flatten_dependencies(
+        &self,
+        uri: &Url,
+        cached_file: &ServerFileCacheHandle,
+    ) -> HashMap<Url, ServerFileCacheHandle> {
+        fn get_dependencies(
+            uri: &Url,
+            cached_file: &ServerFileCacheHandle,
+            includer_uri: &Url,
+        ) -> HashMap<Url, ServerFileCacheHandle> {
+            let mut flat_dependencies = HashMap::new();
+            match RefCell::borrow(&cached_file)
+                .included_data
+                .get(&includer_uri)
+            {
+                Some(data) => {
+                    for (deps_uri, deps_file) in &data.dependencies {
+                        flat_dependencies.insert(deps_uri.clone(), Rc::clone(deps_file));
+                        let dependencies = get_dependencies(deps_uri, deps_file, includer_uri);
+                        for (deps_deps_uri, deps_deps_file) in dependencies {
+                            flat_dependencies.insert(deps_deps_uri.clone(), deps_deps_file);
+                        }
+                    }
+                }
+                None => {
+                    warn!("Deps {} has no data for includer {}", uri, includer_uri);
+                }
+            }
+            flat_dependencies
+        }
+        let mut flat_dependencies = HashMap::new();
+        for (deps_uri, deps_cached_file) in &RefCell::borrow_mut(&cached_file).data.dependencies {
+            let flat_deps = get_dependencies(&deps_uri, &deps_cached_file, uri);
+            for (deps_deps_uri, deps_deps_cached_file) in flat_deps {
+                flat_dependencies.insert(deps_deps_uri, deps_deps_cached_file);
+            }
+        }
+        flat_dependencies
+    }
     pub fn remove_file(&mut self, uri: &Url) -> Result<bool, ShaderError> {
+        // Remove all file included_data referencing this uri
+        for (_, deps_cached_file) in &self.dependencies {
+            RefCell::borrow_mut(&deps_cached_file)
+                .included_data
+                .remove(uri);
+        }
         match self.files.remove(uri) {
             Some(cached_file) => {
-                let mut cached_file = RefCell::borrow_mut(&cached_file);
-                let dependencies = std::mem::take(&mut cached_file.dependencies);
+                // Gather all dependencies.
+                let flat_dependencies = self.flatten_dependencies(&uri, &cached_file);
+                // Drop Rc, might still have dangling ref in deps though...
                 drop(cached_file);
                 debug!(
                     "Removing main file at {}. {} files in cache.",
                     uri.to_file_path().unwrap().display(),
                     self.files.len(),
                 );
-                for dependency in dependencies {
-                    let deps_uri = Url::from_file_path(&dependency.0).unwrap();
-                    drop(dependency.1); // Decrease ref count.
-                    let _removed = self.remove_dependency(&deps_uri)?;
+                // Remove all flatten dependencies
+                for (dependency_uri, dependency_file) in flat_dependencies {
+                    drop(dependency_file); // Decrease ref count.
+                    let _removed = self.remove_dependency(&dependency_uri, uri)?;
                 }
                 // Check if it was destroyed or we still have it in deps.
                 Ok(self.dependencies.get(&uri).is_none())
@@ -508,5 +636,42 @@ impl ServerLanguageFileCache {
                 uri.path()
             ))),
         }
+    }
+    pub fn get_all_symbols(
+        &self,
+        uri: &Url,
+        cached_file: ServerFileCacheHandle,
+        symbol_provider: &dyn SymbolProvider,
+    ) -> ShaderSymbolList {
+        let cached_file = RefCell::borrow(&cached_file);
+        // Add main file symbols
+        let mut symbol_cache = cached_file.data.symbol_cache.clone();
+        // Add deps symbols
+        fn get_deps(
+            uri: &Url,
+            cached_file: &ServerFileCacheHandle,
+            includer_uri: &Url,
+        ) -> ShaderSymbolList {
+            let cached_file = RefCell::borrow(&cached_file);
+            match cached_file.included_data.get(includer_uri) {
+                Some(data) => {
+                    let mut symbol_cache = data.symbol_cache.clone();
+                    for (deps_uri, deps_cached_file) in &data.dependencies {
+                        symbol_cache.append(get_deps(deps_uri, deps_cached_file, includer_uri));
+                    }
+                    symbol_cache
+                }
+                None => {
+                    warn!("Deps {} has no data for includer {}", uri, includer_uri);
+                    ShaderSymbolList::default()
+                }
+            }
+        }
+        for (deps_uri, deps_cached_file) in &cached_file.data.dependencies {
+            symbol_cache.append(get_deps(deps_uri, deps_cached_file, uri));
+        }
+        // Add intrinsics symbols
+        symbol_cache.append(symbol_provider.get_intrinsics_symbol().clone());
+        symbol_cache
     }
 }

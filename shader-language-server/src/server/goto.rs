@@ -27,7 +27,11 @@ impl ServerLanguage {
             line: position.line as u32,
             pos: position.character as u32,
         };
-        let all_symbol_list = language_data.get_all_symbols(Rc::clone(&cached_file));
+        let all_symbol_list = self.watched_files.get_all_symbols(
+            uri,
+            Rc::clone(&cached_file),
+            language_data.symbol_provider.as_ref(),
+        );
         match language_data
             .symbol_provider
             .get_word_range_at_position(&cached_file_borrowed.symbol_tree, shader_position.clone())

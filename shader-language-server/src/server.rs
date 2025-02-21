@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -52,7 +51,7 @@ use server_connection::ServerConnection;
 use server_file_cache::{ServerFileCacheHandle, ServerLanguageFileCache};
 use server_language_data::ServerLanguageData;
 use shader_sense::symbols::symbols::ShaderSymbolType;
-use shader_variant::{DidChangeShaderVariant, DidChangeShaderVariantParams, ShaderVariant};
+use shader_variant::{DidChangeShaderVariant, DidChangeShaderVariantParams};
 
 pub struct ServerLanguage {
     connection: ServerConnection,
@@ -349,6 +348,7 @@ impl ServerLanguage {
                 match self.watched_files.get(&uri) {
                     Some(cached_file) => {
                         let folding_ranges = RefCell::borrow(&cached_file)
+                            .data
                             .preprocessor_cache
                             .regions
                             .iter()
@@ -391,6 +391,7 @@ impl ServerLanguage {
                     .map(|(uri, cached_file)| {
                         let shading_language = RefCell::borrow(&cached_file).shading_language;
                         RefCell::borrow(&cached_file)
+                            .data
                             .symbol_cache
                             .iter()
                             .filter(|(_, ty)| {
@@ -454,6 +455,7 @@ impl ServerLanguage {
                 match self.watched_files.get(&uri) {
                     Some(cached_file) => {
                         let symbols = RefCell::borrow(&cached_file)
+                            .data
                             .symbol_cache
                             .iter()
                             .map(|(symbols, ty)| {
