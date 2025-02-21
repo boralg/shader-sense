@@ -315,19 +315,20 @@ impl ServerLanguageFileCache {
                     data: ServerFileCacheData::default(),
                     included_data: HashMap::new(),
                 }));
-                self.cache_file_data(
-                    uri,
-                    &cached_file,
-                    validator,
-                    symbol_provider,
-                    self.variants.get(&uri).cloned(),
-                    config,
-                )?;
                 let none = self.files.insert(uri.clone(), Rc::clone(&cached_file));
                 assert!(none.is_none());
                 cached_file
             }
         };
+        // Cache file data from new context.
+        self.cache_file_data(
+            uri,
+            &cached_file,
+            validator,
+            symbol_provider,
+            self.variants.get(&uri).cloned(),
+            config,
+        )?;
         debug!(
             "Starting watching {:#?} main file at {}. {} files in cache.",
             lang,
