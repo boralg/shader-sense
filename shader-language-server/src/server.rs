@@ -609,21 +609,33 @@ impl ServerLanguage {
                                     && RefCell::borrow(&cached_file).symbol_tree.content
                                         == *params.text.as_ref().unwrap())
                         );
-                        let shading_language = RefCell::borrow_mut(&cached_file).shading_language;
-                        let language_data = self.language_data.get_mut(&shading_language).unwrap();
-                        match self.watched_files.update_file(
-                            &uri,
-                            &cached_file,
-                            language_data.symbol_provider.as_mut(),
-                            language_data.validator.as_mut(),
-                            &self.config,
-                            None,
-                            None,
-                        ) {
-                            Ok(_) => {}
-                            Err(err) => self.connection.send_notification_error(format!("{}", err)),
-                        };
-                        self.publish_diagnostic(&uri, &cached_file, None);
+                        // Only update cache if content changed.
+                        match params.text {
+                            Some(text) => {
+                                if text != RefCell::borrow(&cached_file).symbol_tree.content {
+                                    let shading_language =
+                                        RefCell::borrow_mut(&cached_file).shading_language;
+                                    let language_data =
+                                        self.language_data.get_mut(&shading_language).unwrap();
+                                    match self.watched_files.update_file(
+                                        &uri,
+                                        &cached_file,
+                                        language_data.symbol_provider.as_mut(),
+                                        language_data.validator.as_mut(),
+                                        &self.config,
+                                        None,
+                                        None,
+                                    ) {
+                                        Ok(_) => {}
+                                        Err(err) => self
+                                            .connection
+                                            .send_notification_error(format!("{}", err)),
+                                    };
+                                    self.publish_diagnostic(&uri, &cached_file, None);
+                                }
+                            }
+                            None => {}
+                        }
                     }
                     None => self.connection.send_notification_error(format!(
                         "Trying to visit file that is not watched : {}",
