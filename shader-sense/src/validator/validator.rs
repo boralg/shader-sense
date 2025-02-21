@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     include::Dependencies,
@@ -10,6 +13,7 @@ use crate::{
 pub struct ValidationParams {
     pub includes: Vec<String>,
     pub defines: HashMap<String, String>,
+    pub path_remapping: HashMap<PathBuf, PathBuf>,
     pub hlsl_shader_model: HlslShaderModel,
     pub hlsl_version: HlslVersion,
     pub hlsl_enable16bit_types: bool,

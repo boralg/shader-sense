@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -10,8 +10,9 @@ pub struct Dependencies {
 
 pub struct IncludeHandler {
     includes: Vec<String>,
-    directory_stack: Vec<PathBuf>, // Could be replace by deps.
+    directory_stack: Vec<PathBuf>, // Could be replace by deps. Or replaced by hashset to reduce occurences.
     dependencies: Dependencies,    // TODO: Remove
+    path_remapping: HashMap<PathBuf, PathBuf>, // remapping of path / virtual path
 }
 // std::fs::canonicalize not supported on wasi target... Emulate it.
 // On Windows, std::fs::canonicalize return a /? prefix that break hashmap.
@@ -63,7 +64,11 @@ impl Dependencies {
 }
 
 impl IncludeHandler {
-    pub fn new(file: &Path, includes: Vec<String>) -> Self {
+    pub fn new(
+        file: &Path,
+        includes: Vec<String>,
+        path_remapping: HashMap<PathBuf, PathBuf>,
+    ) -> Self {
         // Add local path to include path
         let mut includes_mut = includes;
         let cwd = file.parent().unwrap();
@@ -74,6 +79,7 @@ impl IncludeHandler {
             includes: includes_mut,
             directory_stack: Vec::new(),
             dependencies: Dependencies::new(),
+            path_remapping: path_remapping,
         }
     }
     pub fn search_in_includes(
@@ -118,7 +124,64 @@ impl IncludeHandler {
                     return Some(path);
                 }
             }
+            // Check virtual paths
+            if let Some(target_path) =
+                Self::resolve_virtual_path(relative_path, &self.path_remapping)
+            {
+                if target_path.exists() {
+                    if let Some(parent) = target_path.parent() {
+                        // TODO: should filter paths
+                        self.directory_stack.push(PathBuf::from(parent));
+                    }
+                    self.dependencies.add_dependency(target_path.clone());
+                    return Some(target_path);
+                }
+            }
             return None;
+        }
+    }
+    fn resolve_virtual_path(
+        virtual_path: &Path,
+        virtual_folders: &HashMap<PathBuf, PathBuf>,
+    ) -> Option<PathBuf> {
+        // Virtual path need to start with /
+        // Dxc automatically insert .\ in front of path that are not absolute.
+        // We should simply strip it, but how do we know its a virtual path or a real relative path ?
+        // Instead dirty hack to remove it and try to load it, as its the last step of include, should be fine...
+        let virtual_path = if virtual_path.starts_with("./") || virtual_path.starts_with(".\\") {
+            let mut comp = virtual_path.components();
+            comp.next();
+            Path::new("/").join(comp.as_path())
+        } else {
+            PathBuf::from(virtual_path)
+        };
+        if virtual_path.starts_with("/") || virtual_path.starts_with("\\") {
+            // Browse possible mapping & find a match.
+            for (virtual_folder, target_path) in virtual_folders {
+                let mut path_components = virtual_path.components();
+                let mut found = true;
+                for virtual_folder_component in virtual_folder.components() {
+                    match path_components.next() {
+                        Some(component) => {
+                            if component != virtual_folder_component {
+                                found = false;
+                                break;
+                            }
+                        }
+                        None => {
+                            found = false;
+                            break;
+                        }
+                    }
+                }
+                if found {
+                    let resolved_path = target_path.join(path_components.as_path());
+                    return Some(resolved_path.into());
+                }
+            }
+            None
+        } else {
+            None
         }
     }
     pub fn get_dependencies(&self) -> &Dependencies {

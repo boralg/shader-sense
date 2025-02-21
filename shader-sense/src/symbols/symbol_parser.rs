@@ -126,6 +126,7 @@ pub trait SymbolTreePreprocessorParser {
         matches: QueryMatch,
         file_path: &Path,
         shader_content: &str,
+        symbol_params: &ShaderSymbolParams,
         preprocessor: &mut ShaderPreprocessor,
     );
 }
@@ -209,6 +210,7 @@ impl SymbolParser {
                     matches,
                     &symbol_tree.file_path,
                     &symbol_tree.content,
+                    symbol_params,
                     &mut preprocessor,
                 );
             }

@@ -142,6 +142,8 @@ impl ShaderRange {
 #[derive(Debug, Default, Clone)]
 pub struct ShaderSymbolParams {
     pub defines: HashMap<String, String>,
+    pub includes: Vec<String>,
+    pub path_remapping: HashMap<PathBuf, PathBuf>,
 }
 
 #[derive(Debug, Default, Clone)]

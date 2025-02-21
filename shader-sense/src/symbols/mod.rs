@@ -24,7 +24,7 @@ pub fn create_symbol_provider(shading_language: ShadingLanguage) -> Box<dyn Symb
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashSet,
+        collections::{HashMap, HashSet},
         path::{Path, PathBuf},
     };
 
@@ -79,7 +79,7 @@ mod tests {
         file_path: &Path,
         shader_content: &String,
     ) -> Result<ShaderSymbolList, ShaderError> {
-        let mut include_handler = IncludeHandler::new(&file_path, vec![]);
+        let mut include_handler = IncludeHandler::new(&file_path, vec![], HashMap::new());
         let deps = find_dependencies(&mut include_handler, &shader_content);
         let mut symbols = symbol_provider.get_intrinsics_symbol().clone();
         let symbol_tree = SymbolTree::new(symbol_provider, file_path, shader_content).unwrap();

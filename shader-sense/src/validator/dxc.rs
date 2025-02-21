@@ -1,5 +1,8 @@
 use hassle_rs::*;
-use std::path::Path;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     include::{Dependencies, IncludeHandler},
@@ -29,10 +32,11 @@ impl<'a> DxcIncludeHandler<'a> {
     pub fn new(
         file: &Path,
         includes: Vec<String>,
+        path_remapping: HashMap<PathBuf, PathBuf>,
         include_callback: &'a mut dyn FnMut(&Path) -> Option<String>,
     ) -> Self {
         Self {
-            include_handler: IncludeHandler::new(file, includes),
+            include_handler: IncludeHandler::new(file, includes, path_remapping),
             include_callback: include_callback,
         }
     }
@@ -77,6 +81,7 @@ impl Dxc {
         errors: &String,
         file: &Path,
         includes: &Vec<String>,
+        path_remapping: HashMap<PathBuf, PathBuf>,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         let mut shader_error_list = ShaderDiagnosticList::empty();
 
@@ -89,7 +94,7 @@ impl Dxc {
         }
         starts.push(errors.len());
         let internal_reg = regex::Regex::new(r"(?s)^(.*?):(\d+):(\d+): (.*?):(.*)")?;
-        let mut include_handler = IncludeHandler::new(file, includes.clone());
+        let mut include_handler = IncludeHandler::new(file, includes.clone(), path_remapping);
         for start in 0..starts.len() - 1 {
             let first = starts[start];
             let length = starts[start + 1] - starts[start];
@@ -132,9 +137,12 @@ impl Dxc {
         params: &ValidationParams,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         match error {
-            HassleError::CompileError(err) => {
-                Dxc::parse_dxc_errors(&err, file_path, &params.includes)
-            }
+            HassleError::CompileError(err) => Dxc::parse_dxc_errors(
+                &err,
+                file_path,
+                &params.includes,
+                params.path_remapping.clone(),
+            ),
             HassleError::ValidationError(err) => {
                 Ok(ShaderDiagnosticList::from(ShaderDiagnostic {
                     file_path: None, // None means main file.
@@ -190,8 +198,12 @@ impl Validator for Dxc {
             .iter()
             .map(|v| (&v.0 as &str, Some(&v.1 as &str)))
             .collect();
-        let mut include_handler =
-            DxcIncludeHandler::new(file_path, params.includes.clone(), include_callback);
+        let mut include_handler = DxcIncludeHandler::new(
+            file_path,
+            params.includes.clone(),
+            params.path_remapping.clone(),
+            include_callback,
+        );
         let dxc_options = {
             let hlsl_version = format!(
                 "-HV {}",

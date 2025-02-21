@@ -11,6 +11,7 @@ use glslang::{
 };
 use std::{
     borrow::Borrow,
+    collections::HashMap,
     path::{Path, PathBuf},
 };
 
@@ -70,10 +71,11 @@ impl<'a> GlslangIncludeHandler<'a> {
         file: &'a Path,
         includes: Vec<String>,
         content: Option<&'a String>,
+        path_remapping: HashMap<PathBuf, PathBuf>,
         include_callback: &'a mut dyn FnMut(&Path) -> Option<String>,
     ) -> Self {
         Self {
-            include_handler: IncludeHandler::new(file, includes),
+            include_handler: IncludeHandler::new(file, includes, path_remapping),
             content: content,
             file_name: file,
             include_callback: include_callback,
@@ -140,6 +142,7 @@ impl Glslang {
         errors: &String,
         file_path: &Path,
         includes: &Vec<String>,
+        path_remapping: HashMap<PathBuf, PathBuf>,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         let mut shader_error_list = ShaderDiagnosticList::empty();
 
@@ -154,7 +157,7 @@ impl Glslang {
         let internal_reg = regex::Regex::new(
             r"(?s)^(.*?):(?: ((?:[a-zA-Z]:)?[\d\w\.\/\\\-]+):(\d+):(\d+):)?(.+)",
         )?;
-        let mut include_handler = IncludeHandler::new(file_path, includes.clone());
+        let mut include_handler = IncludeHandler::new(file_path, includes.clone(), path_remapping);
         for start in 0..starts.len() - 1 {
             let first = starts[start];
             let length = starts[start + 1] - starts[start];
@@ -214,15 +217,24 @@ impl Glslang {
         params: &ValidationParams,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         match err {
-            GlslangError::PreprocessError(error) => {
-                Glslang::parse_errors(&error, file_path, &params.includes)
-            }
-            GlslangError::ParseError(error) => {
-                Glslang::parse_errors(&error, file_path, &params.includes)
-            }
-            GlslangError::LinkError(error) => {
-                Glslang::parse_errors(&error, file_path, &params.includes)
-            }
+            GlslangError::PreprocessError(error) => Glslang::parse_errors(
+                &error,
+                file_path,
+                &params.includes,
+                params.path_remapping.clone(),
+            ),
+            GlslangError::ParseError(error) => Glslang::parse_errors(
+                &error,
+                file_path,
+                &params.includes,
+                params.path_remapping.clone(),
+            ),
+            GlslangError::LinkError(error) => Glslang::parse_errors(
+                &error,
+                file_path,
+                &params.includes,
+                params.path_remapping.clone(),
+            ),
             GlslangError::ShaderStageNotFound(stage) => Err(ShaderError::InternalErr(format!(
                 "Shader stage not found: {:#?}",
                 stage
@@ -277,6 +289,7 @@ impl Validator for Glslang {
             file_path,
             params.includes.clone(),
             Some(&content),
+            params.path_remapping.clone(),
             include_callback,
         );
 
