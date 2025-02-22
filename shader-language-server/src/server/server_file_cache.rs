@@ -40,7 +40,7 @@ pub struct ServerFileCache {
     pub shading_language: ShadingLanguage,
     pub symbol_tree: SymbolTree, // Store content on change as its not on disk.
     pub data: ServerFileCacheData, // Data for file opened and edited.
-    pub included_data: HashMap<Url, ServerFileCacheData>, // Data per entry point for context, depending on it, data might change
+    pub included_data: HashMap<Url, ServerFileCacheData>, // Data per entry point for context, data might change depending on it, and file might be included multiple times.
 }
 
 pub struct ServerLanguageFileCache {
@@ -50,18 +50,23 @@ pub struct ServerLanguageFileCache {
 }
 
 struct IncludeContext {
-    // using defines should be better as key for handling includes. In the meantime, hashset does the work.
-    //defines: HashMap<String, String>,
-    includer_uri: Url,
-    visited_dependencies: HashSet<Url>,
+    includer_uri: Url,                  // The file from which this file is included.
+    visited_dependencies: HashSet<Url>, // Already visited deps, needed for once.
 }
 
 impl IncludeContext {
     pub fn main(uri: &Url) -> Self {
         Self {
-            //defines: HashMap::new(),
             includer_uri: uri.clone(),
             visited_dependencies: HashSet::new(),
+        }
+    }
+    pub fn should_visit(&mut self, uri: &Url, _preprocessor: &ShaderPreprocessor) -> bool {
+        // For now, every include is included once, should cover 99% of case.
+        if self.visited_dependencies.insert(uri.clone()) {
+            true
+        } else {
+            false // !preprocessor.once
         }
     }
     pub fn visit_data<F: FnOnce(&mut ServerFileCacheData)>(
@@ -161,12 +166,8 @@ impl ServerLanguageFileCache {
             let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
             let included_file =
                 self.watch_dependency(&include_uri, shading_language, symbol_provider)?;
-            // Skip already visited deps.
-            // Should instead have some kind of context.
-            if !include_context.visited_dependencies.contains(&include_uri) {
-                include_context
-                    .visited_dependencies
-                    .insert(include_uri.clone());
+            // Skip already visited deps if once.
+            if include_context.should_visit(&include_uri, &preprocessor) {
                 self.recurse_file_symbol(
                     &include_uri,
                     &included_file,
@@ -652,22 +653,19 @@ impl ServerLanguageFileCache {
             uri: &Url,
             cached_file: &ServerFileCacheHandle,
             includer_uri: &Url,
-            include_once: &mut HashSet<Url>,
+            include_context: &mut IncludeContext,
         ) -> ShaderSymbolList {
             let cached_file = RefCell::borrow(&cached_file);
             match cached_file.included_data.get(includer_uri) {
                 Some(data) => {
                     let mut symbol_cache = data.symbol_cache.clone();
-                    if data.preprocessor_cache.once {
-                        include_once.insert(uri.clone());
-                    }
                     for (deps_uri, deps_cached_file) in &data.dependencies {
-                        if !include_once.contains(deps_uri) {
+                        if include_context.should_visit(deps_uri, &data.preprocessor_cache) {
                             symbol_cache.append(get_deps(
                                 deps_uri,
                                 deps_cached_file,
                                 includer_uri,
-                                include_once,
+                                include_context,
                             ));
                         }
                     }
@@ -684,7 +682,7 @@ impl ServerLanguageFileCache {
                 deps_uri,
                 deps_cached_file,
                 uri,
-                &mut HashSet::new(),
+                &mut IncludeContext::main(uri),
             ));
         }
         // Add intrinsics symbols
