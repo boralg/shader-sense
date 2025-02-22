@@ -49,11 +49,24 @@ impl ServerLanguage {
                             Some(link) => format!("[Online documentation]({})", link),
                             None => "".into(),
                         };
+                        let location = match &symbol.range {
+                            Some(range) => format!(
+                                "Defined in {}, line {}",
+                                if range.start.file_path == file_path {
+                                    "this file".into()
+                                } else {
+                                    range.start.file_path.file_name().unwrap().to_string_lossy()
+                                },
+                                range.start.line + 1
+                            ),
+                            None => "".into(),
+                        };
+
                         Ok(Some(Hover {
                             contents: HoverContents::Markup(MarkupContent {
                                 kind: lsp_types::MarkupKind::Markdown,
                                 value: format!(
-                                    "```{}\n{}\n```\n{}{}\n\n{}",
+                                    "```{}\n{}\n```\n{}{}\n{}\n\n{}",
                                     target_cached_file.shading_language.to_string(),
                                     label,
                                     if matching_symbols.len() > 1 {
@@ -62,6 +75,7 @@ impl ServerLanguage {
                                         "".into()
                                     },
                                     description,
+                                    location,
                                     link
                                 ),
                             }),
