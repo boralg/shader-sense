@@ -42,7 +42,7 @@ impl ServerLanguage {
         let file_path = uri.to_file_path().unwrap();
         let symbol_list = self.watched_files.get_all_symbols(
             uri,
-            Rc::clone(&cached_file),
+            &cached_file,
             language_data.symbol_provider.as_ref(),
         );
         let shader_position = ShaderPosition {

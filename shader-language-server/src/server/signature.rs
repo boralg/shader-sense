@@ -34,7 +34,7 @@ impl ServerLanguage {
         // Should simply get symbol & read parameters. Need to get parameter index though...
         let all_symbol_list = self.watched_files.get_all_symbols(
             uri,
-            Rc::clone(&cached_file),
+            &cached_file,
             language_data.symbol_provider.as_ref(),
         );
         let function_parameter =

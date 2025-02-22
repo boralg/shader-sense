@@ -33,7 +33,7 @@ impl ServerLanguage {
                 Some(target_cached_file) => {
                     let all_symbol_list = self.watched_files.get_all_symbols(
                         uri,
-                        Rc::clone(&target_cached_file),
+                        &target_cached_file,
                         language_data.symbol_provider.as_ref(),
                     );
                     let target_cached_file = target_cached_file.borrow();

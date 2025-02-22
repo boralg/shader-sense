@@ -642,7 +642,7 @@ impl ServerLanguageFileCache {
     pub fn get_all_symbols(
         &self,
         uri: &Url,
-        cached_file: ServerFileCacheHandle,
+        cached_file: &ServerFileCacheHandle,
         symbol_provider: &dyn SymbolProvider,
     ) -> ShaderSymbolList {
         let cached_file = RefCell::borrow(&cached_file);

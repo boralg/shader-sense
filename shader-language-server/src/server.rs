@@ -7,10 +7,12 @@ mod common;
 mod completion;
 mod debug;
 mod diagnostic;
+mod document_symbol;
 mod goto;
 mod hover;
 mod shader_variant;
 mod signature;
+mod workspace_symbol;
 
 mod server_config;
 mod server_connection;
@@ -39,7 +41,7 @@ use lsp_types::{
     HoverParams, HoverProviderCapability, Location, OneOf, RelatedFullDocumentDiagnosticReport,
     ServerCapabilities, SignatureHelpOptions, SignatureHelpParams, SymbolInformation, SymbolKind,
     TextDocumentSyncKind, Url, WorkDoneProgressOptions, WorkspaceSymbolOptions,
-    WorkspaceSymbolParams,
+    WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use shader_sense::shader::ShadingLanguage;
 
@@ -380,70 +382,16 @@ impl ServerLanguage {
                     req.id, params
                 );
                 let _ = params.query; // Should we filter ?
-                                      // TODO: add dependencies as well, should be iterating on all file of workspace instead,
-                                      // but might be very costly on big codebase (implement light queries ? only query global func & struct)
-                                      // Will need to cache symbols. As they are global to workspace, might be updated every
-                                      // change of files, & stored somewhere as watched deps ?
-                let symbols = self
-                    .watched_files
-                    .files
-                    .iter()
-                    .map(|(uri, cached_file)| {
-                        let shading_language = RefCell::borrow(&cached_file).shading_language;
-                        RefCell::borrow(&cached_file)
-                            .data
-                            .symbol_cache
-                            .iter()
-                            .filter(|(_, ty)| {
-                                // For workspace, only publish function & types
-                                *ty == ShaderSymbolType::Functions || *ty == ShaderSymbolType::Types
-                            })
-                            .map(|(symbols, ty)| {
-                                symbols
-                                    .iter()
-                                    .filter(|symbol| {
-                                        symbol.range.is_some()
-                                            && (symbol.scope_stack.is_none()
-                                                || symbol.scope_stack.as_ref().unwrap().is_empty())
-                                    })
-                                    .map(|symbol| {
-                                        #[allow(deprecated)]
-                                        // https://github.com/rust-lang/rust/issues/102777
-                                        SymbolInformation {
-                                            name: symbol.label.clone(),
-                                            kind: match ty {
-                                                ShaderSymbolType::Types => {
-                                                    SymbolKind::TYPE_PARAMETER
-                                                }
-                                                ShaderSymbolType::Functions => SymbolKind::FUNCTION,
-                                                _ => unreachable!("Should be filtered out"),
-                                            },
-                                            tags: None,
-                                            deprecated: None,
-                                            location: Location::new(
-                                                uri.clone(),
-                                                shader_range_to_lsp_range(
-                                                    &symbol
-                                                        .range
-                                                        .as_ref()
-                                                        .expect("Should be filtered out"),
-                                                ),
-                                            ),
-                                            container_name: Some(shading_language.to_string()),
-                                        }
-                                    })
-                                    .collect()
-                            })
-                            .collect::<Vec<Vec<SymbolInformation>>>()
-                            .concat()
-                    })
-                    .collect::<Vec<Vec<SymbolInformation>>>()
-                    .concat();
-
-                self.connection.send_response::<DocumentSymbolRequest>(
-                    req.id.clone(),
-                    Some(DocumentSymbolResponse::Flat(symbols)),
-                );
+                match self.recolt_workspace_symbol() {
+                    Ok(symbols) => self.connection.send_response::<WorkspaceSymbolRequest>(
+                        req.id.clone(),
+                        Some(WorkspaceSymbolResponse::Flat(symbols)),
+                    ),
+                    Err(err) => self.connection.send_notification_error(format!(
+                        "Failed to compute symbols for workspace : {}",
+                        err.to_string()
+                    )),
+                }
             }
             DocumentSymbolRequest::METHOD => {
                 let params: DocumentSymbolParams = serde_json::from_value(req.params)?;
@@ -453,58 +401,17 @@ impl ServerLanguage {
                 );
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get(&uri) {
-                    Some(cached_file) => {
-                        let symbols = RefCell::borrow(&cached_file)
-                            .data
-                            .symbol_cache
-                            .iter()
-                            .map(|(symbols, ty)| {
-                                symbols
-                                    .iter()
-                                    .filter(|symbol| {
-                                        // Dont publish keywords.
-                                        ty != ShaderSymbolType::Keyword && symbol.range.is_some()
-                                    })
-                                    .map(|symbol| {
-                                        #[allow(deprecated)]
-                                        // https://github.com/rust-lang/rust/issues/102777
-                                        SymbolInformation {
-                                            name: symbol.label.clone(),
-                                            kind: match ty {
-                                                ShaderSymbolType::Types => {
-                                                    SymbolKind::TYPE_PARAMETER
-                                                }
-                                                ShaderSymbolType::Constants => SymbolKind::CONSTANT,
-                                                ShaderSymbolType::Variables => SymbolKind::VARIABLE,
-                                                ShaderSymbolType::Functions => SymbolKind::FUNCTION,
-                                                ShaderSymbolType::Keyword => {
-                                                    unreachable!("Should be filtered out")
-                                                }
-                                            },
-                                            tags: None,
-                                            deprecated: None,
-                                            location: Location::new(
-                                                uri.clone(),
-                                                shader_range_to_lsp_range(
-                                                    &symbol
-                                                        .range
-                                                        .as_ref()
-                                                        .expect("Should be filtered out"),
-                                                ),
-                                            ),
-                                            container_name: None,
-                                        }
-                                    })
-                                    .collect()
-                            })
-                            .collect::<Vec<Vec<SymbolInformation>>>()
-                            .concat();
-
-                        self.connection.send_response::<DocumentSymbolRequest>(
+                    Some(cached_file) => match self.recolt_document_symbol(&uri, &cached_file) {
+                        Ok(symbols) => self.connection.send_response::<DocumentSymbolRequest>(
                             req.id.clone(),
                             Some(DocumentSymbolResponse::Flat(symbols)),
-                        );
-                    }
+                        ),
+                        Err(err) => self.connection.send_notification_error(format!(
+                            "Failed to compute symbols for file {} : {}",
+                            uri,
+                            err.to_string()
+                        )),
+                    },
                     None => self.connection.send_notification_error(format!(
                         "Trying to visit file that is not watched : {}",
                         uri
