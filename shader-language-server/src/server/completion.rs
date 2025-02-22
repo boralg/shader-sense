@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ffi::OsStr, rc::Rc};
+use std::{cell::RefCell, ffi::OsStr};
 
 use log::{error, warn};
 use lsp_types::{

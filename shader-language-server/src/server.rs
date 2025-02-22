@@ -19,7 +19,6 @@ mod server_connection;
 mod server_file_cache;
 mod server_language_data;
 
-use common::shader_range_to_lsp_range;
 use debug::{DumpAstParams, DumpAstRequest};
 use log::{debug, error, info, warn};
 use lsp_types::notification::{
@@ -38,10 +37,10 @@ use lsp_types::{
     DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentDiagnosticReportResult,
     DocumentSymbolOptions, DocumentSymbolParams, DocumentSymbolResponse, FoldingRange,
     FoldingRangeKind, FoldingRangeParams, FullDocumentDiagnosticReport, GotoDefinitionParams,
-    HoverParams, HoverProviderCapability, Location, OneOf, RelatedFullDocumentDiagnosticReport,
-    ServerCapabilities, SignatureHelpOptions, SignatureHelpParams, SymbolInformation, SymbolKind,
-    TextDocumentSyncKind, Url, WorkDoneProgressOptions, WorkspaceSymbolOptions,
-    WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    HoverParams, HoverProviderCapability, OneOf, RelatedFullDocumentDiagnosticReport,
+    ServerCapabilities, SignatureHelpOptions, SignatureHelpParams, TextDocumentSyncKind, Url,
+    WorkDoneProgressOptions, WorkspaceSymbolOptions, WorkspaceSymbolParams,
+    WorkspaceSymbolResponse,
 };
 use shader_sense::shader::ShadingLanguage;
 
@@ -52,7 +51,6 @@ use server_config::ServerConfig;
 use server_connection::ServerConnection;
 use server_file_cache::{ServerFileCacheHandle, ServerLanguageFileCache};
 use server_language_data::ServerLanguageData;
-use shader_sense::symbols::symbols::ShaderSymbolType;
 use shader_variant::{DidChangeShaderVariant, DidChangeShaderVariantParams};
 
 pub struct ServerLanguage {

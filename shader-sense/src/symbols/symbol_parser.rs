@@ -58,11 +58,6 @@ impl<'a> ShaderSymbolListBuilder<'a> {
             filter_callback: Box::new(filter_callback),
         }
     }
-    pub fn add_constant(&mut self, shader_symbol: ShaderSymbol) {
-        if (self.filter_callback)(&shader_symbol) {
-            self.shader_symbol_list.constants.push(shader_symbol);
-        }
-    }
     pub fn add_variable(&mut self, shader_symbol: ShaderSymbol) {
         if (self.filter_callback)(&shader_symbol) {
             self.shader_symbol_list.variables.push(shader_symbol);

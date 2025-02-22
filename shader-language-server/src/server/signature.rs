@@ -1,7 +1,6 @@
 use std::{
     cell::RefCell,
     io::{BufRead, BufReader},
-    rc::Rc,
 };
 
 use log::debug;

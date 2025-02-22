@@ -1,12 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::cell::RefCell;
 
-use log::debug;
-use lsp_types::{Location, SymbolInformation, SymbolKind, Url};
+use lsp_types::{Location, SymbolInformation, SymbolKind};
 use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderSymbolType};
 
-use super::{
-    common::shader_range_to_lsp_range, server_file_cache::ServerFileCacheHandle, ServerLanguage,
-};
+use super::{common::shader_range_to_lsp_range, ServerLanguage};
 
 impl ServerLanguage {
     pub fn recolt_workspace_symbol(&mut self) -> Result<Vec<SymbolInformation>, ShaderError> {

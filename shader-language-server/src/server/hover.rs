@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, Position, Url};
 
