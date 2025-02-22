@@ -10,7 +10,7 @@ use crate::server::{
     clean_url,
     common::{lsp_range_to_shader_range, read_string_lossy},
 };
-use log::{debug, warn};
+use log::{debug, info, warn};
 use lsp_types::Url;
 use shader_sense::{
     shader::ShadingLanguage,
@@ -236,10 +236,13 @@ impl ServerLanguageFileCache {
                     let deps_file = match self.get_dependency(&deps_uri) {
                         Some(deps_file) => deps_file,
                         None => {
-                            debug_assert!(
-                                !config.symbols,
-                                "Should only get there if symbols did not add deps."
-                            );
+                            if config.symbols {
+                                warn!(
+                                    "Should only get there if symbols did not add deps: {} from {}.",
+                                    deps_uri,
+                                    uri
+                                );
+                            }
                             // If include does not exist, add it to watched files.
                             // Issue here: They will be considered as direct deps, while its not necessarly true, might break symbols.
                             match self.watch_dependency(
@@ -330,7 +333,7 @@ impl ServerLanguageFileCache {
             self.variants.get(&uri).cloned(),
             config,
         )?;
-        debug!(
+        info!(
             "Starting watching {:#?} main file at {}. {} files in cache.",
             lang,
             file_path.display(),
@@ -397,7 +400,7 @@ impl ServerLanguageFileCache {
                         .dependencies
                         .insert(uri.clone(), Rc::clone(&cached_file));
                     assert!(none.is_none());
-                    debug!(
+                    info!(
                         "Starting watching {:#?} dependency file at {}. {} deps in cache.",
                         lang,
                         file_path.display(),
