@@ -4,6 +4,7 @@ mod wgsl_regions;
 use tree_sitter::Parser;
 use wgsl_filter::get_wgsl_filters;
 use wgsl_parser::get_wgsl_parsers;
+use wgsl_regions::WgslRegionFinder;
 
 use crate::shader_error::ShaderError;
 
@@ -37,7 +38,7 @@ impl WgslSymbolProvider {
                 get_wgsl_parsers(),
                 get_wgsl_filters(),
                 vec![],
-                wgsl_regions::query_regions_in_node,
+                Box::new(WgslRegionFinder {}),
             ),
             shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
                 "wgsl-intrinsics.json"

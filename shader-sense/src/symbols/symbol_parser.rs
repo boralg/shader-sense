@@ -117,6 +117,15 @@ pub trait SymbolTreeFilter {
     fn filter_symbol(&self, shader_symbol: &ShaderSymbol, file_name: &String) -> bool;
 }
 
+pub trait SymbolRegionFinder {
+    fn query_regions_in_node(
+        &self,
+        symbol_tree: &SymbolTree,
+        node: tree_sitter::Node,
+        preprocessor: &ShaderPreprocessor,
+    ) -> Result<Vec<ShaderRegion>, ShaderError>;
+}
+
 pub trait SymbolTreePreprocessorParser {
     // The query to match tree node
     fn get_query(&self) -> String;
@@ -131,19 +140,13 @@ pub trait SymbolTreePreprocessorParser {
     );
 }
 
-pub type SymbolRegionCallback = fn(
-    &SymbolTree,
-    tree_sitter::Node,
-    &ShaderPreprocessor,
-) -> Result<Vec<ShaderRegion>, ShaderError>;
-
 pub struct SymbolParser {
     symbol_parsers: Vec<(Box<dyn SymbolTreeParser>, tree_sitter::Query)>,
     symbol_filters: Vec<Box<dyn SymbolTreeFilter>>,
     scope_query: Query,
 
     preprocessor_parsers: Vec<(Box<dyn SymbolTreePreprocessorParser>, tree_sitter::Query)>,
-    region_finder: SymbolRegionCallback,
+    region_finder: Box<dyn SymbolRegionFinder>,
 }
 
 impl SymbolParser {
@@ -153,7 +156,7 @@ impl SymbolParser {
         parsers: Vec<Box<dyn SymbolTreeParser>>,
         filters: Vec<Box<dyn SymbolTreeFilter>>,
         preprocessor_parsers: Vec<Box<dyn SymbolTreePreprocessorParser>>,
-        region_finder: SymbolRegionCallback,
+        region_finder: Box<dyn SymbolRegionFinder>,
     ) -> Self {
         Self {
             symbol_parsers: parsers
@@ -228,8 +231,11 @@ impl SymbolParser {
                 .collect(),
         );
         // Query regions.
-        preprocessor.regions =
-            (self.region_finder)(symbol_tree, symbol_tree.tree.root_node(), &preprocessor)?;
+        preprocessor.regions = self.region_finder.query_regions_in_node(
+            symbol_tree,
+            symbol_tree.tree.root_node(),
+            &preprocessor,
+        )?;
         // Filter out defines in inactive regions.
         preprocessor.defines.retain(|define| match &define.range {
             Some(range) => preprocessor

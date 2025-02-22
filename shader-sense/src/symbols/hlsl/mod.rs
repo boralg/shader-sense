@@ -8,6 +8,7 @@ mod hlsl_word_chain;
 use hlsl_filter::get_hlsl_filters;
 use hlsl_parser::get_hlsl_parsers;
 use hlsl_preprocessor::get_hlsl_preprocessor_parser;
+use hlsl_regions::HlslSymbolRegionFinder;
 use tree_sitter::Parser;
 
 use crate::shader_error::ShaderError;
@@ -43,7 +44,7 @@ impl HlslSymbolProvider {
                 get_hlsl_parsers(),
                 get_hlsl_filters(),
                 get_hlsl_preprocessor_parser(),
-                hlsl_regions::query_regions_in_node,
+                Box::new(HlslSymbolRegionFinder::new()),
             ),
             shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
                 "hlsl-intrinsics.json"

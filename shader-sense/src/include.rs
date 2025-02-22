@@ -10,8 +10,8 @@ pub struct Dependencies {
 
 pub struct IncludeHandler {
     includes: Vec<String>,
-    directory_stack: Vec<PathBuf>, // Could be replace by deps. Or replaced by hashset to reduce occurences.
-    dependencies: Dependencies,    // TODO: Remove
+    directory_stack: HashSet<PathBuf>,
+    dependencies: Dependencies,                // TODO: Remove
     path_remapping: HashMap<PathBuf, PathBuf>, // remapping of path / virtual path
 }
 // std::fs::canonicalize not supported on wasi target... Emulate it.
@@ -77,7 +77,7 @@ impl IncludeHandler {
         includes_mut.push(str);
         Self {
             includes: includes_mut,
-            directory_stack: Vec::new(),
+            directory_stack: HashSet::new(),
             dependencies: Dependencies::new(),
             path_remapping: path_remapping,
         }
@@ -97,16 +97,20 @@ impl IncludeHandler {
             .map(|e| canonicalize(&e).expect("Failed to convert relative path to absolute"))
     }
     pub fn search_path_in_includes_relative(&mut self, relative_path: &Path) -> Option<PathBuf> {
+        // Checking for file existence is a bit costly.
+        // Some options are available and have been tested
+        // - path.exists(): approximatively 100us
+        // - path.is_file(): approximatively 40us
+        // - std::fs::exists(&path).unwrap_or(false): approximatively 40us but only stable with Rust>1.81
         if relative_path.exists() {
             Some(PathBuf::from(relative_path))
         } else {
             // Check directory stack.
             for directory_stack in &self.directory_stack {
                 let path = Path::new(directory_stack).join(&relative_path);
-                if path.exists() {
+                if path.is_file() {
                     if let Some(parent) = path.parent() {
-                        // TODO: should filter paths
-                        self.directory_stack.push(PathBuf::from(parent));
+                        self.directory_stack.insert(PathBuf::from(parent));
                     }
                     self.dependencies.add_dependency(path.clone());
                     return Some(path);
@@ -115,10 +119,9 @@ impl IncludeHandler {
             // Check include paths
             for include_path in &self.includes {
                 let path = Path::new(include_path).join(&relative_path);
-                if path.exists() {
+                if path.is_file() {
                     if let Some(parent) = path.parent() {
-                        // TODO: should filter paths
-                        self.directory_stack.push(PathBuf::from(parent));
+                        self.directory_stack.insert(PathBuf::from(parent));
                     }
                     self.dependencies.add_dependency(path.clone());
                     return Some(path);
@@ -128,10 +131,9 @@ impl IncludeHandler {
             if let Some(target_path) =
                 Self::resolve_virtual_path(relative_path, &self.path_remapping)
             {
-                if target_path.exists() {
+                if target_path.is_file() {
                     if let Some(parent) = target_path.parent() {
-                        // TODO: should filter paths
-                        self.directory_stack.push(PathBuf::from(parent));
+                        self.directory_stack.insert(PathBuf::from(parent));
                     }
                     self.dependencies.add_dependency(target_path.clone());
                     return Some(target_path);
