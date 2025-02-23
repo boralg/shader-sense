@@ -637,6 +637,9 @@ impl ServerLanguage {
                                 uri, err
                             )),
                         };
+                        // Republish diagnostics.
+                        // TODO: republish symbols someway for updating toggles.
+                        self.publish_diagnostic(&uri, &cached_file, None);
                     }
                     None => {} // Not watched, no need to update.
                 }
@@ -708,12 +711,13 @@ pub fn run() {
     }
 
     match server.run() {
-        Ok(_) => info!("Client disconnected"),
+        Ok(_) => {
+            info!("Client disconnected");
+            match server.connection.join() {
+                Ok(_) => info!("Server shutting down gracefully"),
+                Err(value) => error!("Server failed to join threads: {:#?}", value),
+            }
+        }
         Err(value) => error!("Client disconnected: {:#?}", value),
-    }
-
-    match server.connection.join() {
-        Ok(_) => info!("Server shutting down gracefully"),
-        Err(value) => error!("Server failed to join threads: {:#?}", value),
     }
 }
