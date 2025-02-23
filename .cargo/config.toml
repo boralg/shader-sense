@@ -7,3 +7,4 @@ rustflags = [
   #"-C", "link-arg=--import-memory",
   #"-C", "link-arg=--export-memory",
 ]
+runner = "wasmtime --dir ../shader-sense/test::/test --wasm-features=threads --wasi-modules=experimental-wasi-threads"

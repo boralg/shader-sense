@@ -159,6 +159,7 @@ mod tests {
         };
     }
 
+    #[cfg(not(target_os = "wasi"))]
     #[test]
     fn hlsl_ok() {
         let mut validator = dxc::Dxc::new().unwrap();
@@ -178,6 +179,7 @@ mod tests {
         };
     }
 
+    #[cfg(not(target_os = "wasi"))]
     #[test]
     fn hlsl_include_config() {
         let mut validator = dxc::Dxc::new().unwrap();
@@ -200,6 +202,7 @@ mod tests {
         };
     }
 
+    #[cfg(not(target_os = "wasi"))]
     #[test]
     fn hlsl_include_parent_folder() {
         let mut validator = dxc::Dxc::new().unwrap();
@@ -222,6 +225,7 @@ mod tests {
         };
     }
 
+    #[cfg(not(target_os = "wasi"))]
     #[test]
     fn hlsl_include_level() {
         let mut validator = dxc::Dxc::new().unwrap();
@@ -244,6 +248,7 @@ mod tests {
         };
     }
 
+    #[cfg(not(target_os = "wasi"))]
     #[test]
     fn hlsl_macro() {
         let mut validator = dxc::Dxc::new().unwrap();
@@ -266,6 +271,7 @@ mod tests {
         };
     }
 
+    #[cfg(not(target_os = "wasi"))]
     #[test]
     fn hlsl_16bits_types_ok() {
         let mut validator = dxc::Dxc::new().unwrap();
