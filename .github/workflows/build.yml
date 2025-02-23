@@ -105,7 +105,7 @@ jobs:
       - name: Add target
         run: rustup target add wasm32-wasip1-threads
       - name: Test WASI
-        run: cargo test --target wasm32-wasip1-threads --verbose
+        run: cargo install wasmtime-cli && cargo test --target wasm32-wasip1-threads --verbose
         env: # Somehow this VM has clang14 by default, which is not supported...
           CC: clang-17
           CXX: clang++-17
