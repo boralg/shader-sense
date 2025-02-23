@@ -211,9 +211,11 @@ impl ServerLanguageFileCache {
         if config.symbols {
             let mut symbol_params = config.into_symbol_params();
             // Add variant data if some.
-            if let Some(variant) = shader_variant {
-                for (variable, value) in variant.defines {
-                    symbol_params.defines.insert(variable, value);
+            if let Some(variant) = &shader_variant {
+                for (variable, value) in &variant.defines {
+                    symbol_params
+                        .defines
+                        .insert(variable.clone(), value.clone());
                 }
             }
             self.recurse_file_symbol(
@@ -227,10 +229,18 @@ impl ServerLanguageFileCache {
         // Get diagnostics
         if config.validate {
             let shading_language = RefCell::borrow(cached_file).shading_language;
+            let mut validation_params = config.into_validation_params();
+            if let Some(variant) = &shader_variant {
+                for (variable, value) in &variant.defines {
+                    validation_params
+                        .defines
+                        .insert(variable.clone(), value.clone());
+                }
+            }
             let (mut diagnostic_list, _dependencies) = validator.validate_shader(
                 &RefCell::borrow(cached_file).symbol_tree.content,
                 RefCell::borrow(cached_file).symbol_tree.file_path.as_path(),
-                &config.into_validation_params(),
+                &validation_params,
                 &mut |deps_path: &Path| -> Option<String> {
                     let deps_uri = Url::from_file_path(deps_path).unwrap();
                     let deps_file = match self.get_dependency(&deps_uri) {
