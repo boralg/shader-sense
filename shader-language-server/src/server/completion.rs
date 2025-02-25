@@ -162,6 +162,8 @@ impl ServerLanguage {
                                     ShaderSymbolType::Variables => CompletionItemKind::VARIABLE,
                                     ShaderSymbolType::Functions => CompletionItemKind::FUNCTION,
                                     ShaderSymbolType::Keyword => CompletionItemKind::KEYWORD,
+                                    ShaderSymbolType::Macros => CompletionItemKind::CONSTANT,
+                                    ShaderSymbolType::Include => CompletionItemKind::FILE,
                                 },
                             )
                         })

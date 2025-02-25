@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use lsp_types::{Location, Url};
 use shader_sense::symbols::symbols::{ShaderPosition, ShaderRange};
 
 pub fn shader_range_to_lsp_range(range: &ShaderRange) -> lsp_types::Range {
@@ -28,6 +29,13 @@ pub fn lsp_range_to_shader_range(range: &lsp_types::Range, file_path: &Path) -> 
             pos: range.end.character,
         },
     }
+}
+
+pub fn shader_range_to_location(range: &ShaderRange) -> Location {
+    Location::new(
+        Url::from_file_path(&range.start.file_path).unwrap(),
+        shader_range_to_lsp_range(range),
+    )
 }
 
 // Handle non-utf8 characters

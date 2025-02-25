@@ -27,8 +27,8 @@ use lsp_types::notification::{
 };
 use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, FoldingRangeRequest,
-    GotoDefinition, HoverRequest, Request, SignatureHelpRequest, WorkspaceConfiguration,
-    WorkspaceSymbolRequest,
+    GotoDefinition, HoverRequest, Request, SemanticTokensFullRequest, SignatureHelpRequest,
+    WorkspaceConfiguration, WorkspaceSymbolRequest,
 };
 use lsp_types::{
     CompletionOptionsCompletionItem, CompletionParams, CompletionResponse, ConfigurationParams,
@@ -38,9 +38,11 @@ use lsp_types::{
     DocumentSymbolOptions, DocumentSymbolParams, DocumentSymbolResponse, FoldingRange,
     FoldingRangeKind, FoldingRangeParams, FullDocumentDiagnosticReport, GotoDefinitionParams,
     HoverParams, HoverProviderCapability, OneOf, RelatedFullDocumentDiagnosticReport,
-    ServerCapabilities, SignatureHelpOptions, SignatureHelpParams, TextDocumentSyncKind, Url,
-    WorkDoneProgressOptions, WorkspaceSymbolOptions, WorkspaceSymbolParams,
-    WorkspaceSymbolResponse,
+    SemanticToken, SemanticTokenType, SemanticTokens, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    SignatureHelpParams, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
+    WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use shader_sense::shader::ShadingLanguage;
 
@@ -132,6 +134,19 @@ impl ServerLanguage {
                     work_done_progress: None,
                 },
             })),
+            semantic_tokens_provider: Some(
+                SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
+                    legend: SemanticTokensLegend {
+                        token_modifiers: vec![],
+                        token_types: vec![SemanticTokenType::MACRO],
+                    },
+                    range: Some(true),
+                    full: Some(SemanticTokensFullOptions::Bool(true)),
+                }),
+            ),
             ..Default::default()
         })?;
         let client_initialization_params = self.connection.initialize(server_capabilities);
@@ -433,6 +448,57 @@ impl ServerLanguage {
                     )),
                 }
             }
+            SemanticTokensFullRequest::METHOD => {
+                let params: SemanticTokensParams = serde_json::from_value(req.params)?;
+                debug!("Received semantic token request #{}: {:#?}", req.id, params);
+                let uri = clean_url(&params.text_document.uri);
+                match self.watched_files.get(&uri) {
+                    Some(cached_file) => {
+                        let shading_language = RefCell::borrow(&cached_file).shading_language;
+                        let symbols = self.watched_files.get_all_symbols(
+                            &uri,
+                            &cached_file,
+                            self.language_data
+                                .get(&shading_language)
+                                .unwrap()
+                                .symbol_provider
+                                .as_ref(),
+                        );
+                        self.connection.send_response::<SemanticTokensFullRequest>(
+                            req.id.clone(),
+                            Some(SemanticTokensResult::Tokens(SemanticTokens {
+                                result_id: None,
+                                data: symbols
+                                    .macros
+                                    .iter()
+                                    .filter_map(|e| match &e.range {
+                                        Some(range) => {
+                                            let start_byte = range.start.to_byte_offset(
+                                                &RefCell::borrow(&cached_file).symbol_tree.content,
+                                            );
+                                            let end_byte = range.end.to_byte_offset(
+                                                &RefCell::borrow(&cached_file).symbol_tree.content,
+                                            );
+                                            Some(SemanticToken {
+                                                delta_line: range.start.line,
+                                                delta_start: range.start.pos,
+                                                length: (end_byte - start_byte) as u32,
+                                                token_type: 0, // SemanticTokenType::MACRO, view registration
+                                                token_modifiers_bitset: 0,
+                                            })
+                                        }
+                                        None => None,
+                                    })
+                                    .collect(),
+                            })),
+                        );
+                    }
+                    None => self.connection.send_notification_error(format!(
+                        "Trying to visit file that is not watched : {}",
+                        uri
+                    )),
+                }
+            }
             _ => warn!("Received unhandled request: {:#?}", req),
         }
         Ok(())
@@ -638,8 +704,8 @@ impl ServerLanguage {
                             )),
                         };
                         // Republish diagnostics.
-                        // TODO: republish symbols someway for updating toggles.
                         self.publish_diagnostic(&uri, &cached_file, None);
+                        // TODO: symbols should republished here aswell as they might change but there is no way to do so...
                     }
                     None => {} // Not watched, no need to update.
                 }

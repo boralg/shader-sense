@@ -138,6 +138,8 @@ impl IntrinsicParser for HlslIntrinsicParser {
             variables: Vec::new(),
             functions: Vec::new(),
             keywords: Vec::new(),
+            macros: Vec::new(),
+            includes: Vec::new(),
         };
         // Doc is so bad its totally unscrappable. Do it manually.
         self.add_functions(&mut symbols);

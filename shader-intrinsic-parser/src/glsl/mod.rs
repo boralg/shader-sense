@@ -124,6 +124,8 @@ impl IntrinsicParser for GlslIntrinsicParser {
             variables: Vec::new(),
             functions: Vec::new(),
             keywords: Vec::new(),
+            includes: Vec::new(),
+            macros: Vec::new(),
             //extensions: HashMap::new(),
         };
 

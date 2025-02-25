@@ -3,7 +3,10 @@ use std::cell::RefCell;
 use lsp_types::{Location, SymbolInformation, SymbolKind};
 use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderSymbolType};
 
-use super::{common::shader_range_to_lsp_range, ServerLanguage};
+use super::{
+    common::{shader_range_to_location, shader_range_to_lsp_range},
+    ServerLanguage,
+};
 
 impl ServerLanguage {
     pub fn recolt_workspace_symbol(&mut self) -> Result<Vec<SymbolInformation>, ShaderError> {
@@ -50,11 +53,8 @@ impl ServerLanguage {
                                     },
                                     tags: None,
                                     deprecated: None,
-                                    location: Location::new(
-                                        uri.clone(),
-                                        shader_range_to_lsp_range(
-                                            &symbol.range.as_ref().expect("Should be filtered out"),
-                                        ),
+                                    location: shader_range_to_location(
+                                        symbol.range.as_ref().expect("Should be filtered out"),
                                     ),
                                     container_name: Some(shading_language.to_string()),
                                 }
