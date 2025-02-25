@@ -10,6 +10,7 @@ mod diagnostic;
 mod document_symbol;
 mod goto;
 mod hover;
+mod semantic_token;
 mod shader_variant;
 mod signature;
 mod workspace_symbol;
@@ -453,46 +454,18 @@ impl ServerLanguage {
                 debug!("Received semantic token request #{}: {:#?}", req.id, params);
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get(&uri) {
-                    Some(cached_file) => {
-                        let shading_language = RefCell::borrow(&cached_file).shading_language;
-                        let symbols = self.watched_files.get_all_symbols(
-                            &uri,
-                            &cached_file,
-                            self.language_data
-                                .get(&shading_language)
-                                .unwrap()
-                                .symbol_provider
-                                .as_ref(),
-                        );
-                        self.connection.send_response::<SemanticTokensFullRequest>(
-                            req.id.clone(),
-                            Some(SemanticTokensResult::Tokens(SemanticTokens {
-                                result_id: None,
-                                data: symbols
-                                    .macros
-                                    .iter()
-                                    .filter_map(|e| match &e.range {
-                                        Some(range) => {
-                                            let start_byte = range.start.to_byte_offset(
-                                                &RefCell::borrow(&cached_file).symbol_tree.content,
-                                            );
-                                            let end_byte = range.end.to_byte_offset(
-                                                &RefCell::borrow(&cached_file).symbol_tree.content,
-                                            );
-                                            Some(SemanticToken {
-                                                delta_line: range.start.line,
-                                                delta_start: range.start.pos,
-                                                length: (end_byte - start_byte) as u32,
-                                                token_type: 0, // SemanticTokenType::MACRO, view registration
-                                                token_modifiers_bitset: 0,
-                                            })
-                                        }
-                                        None => None,
-                                    })
-                                    .collect(),
-                            })),
-                        );
-                    }
+                    Some(cached_file) => match self.recolt_semantic_tokens(&uri, cached_file) {
+                        Ok(semantic_tokens) => {
+                            self.connection.send_response::<SemanticTokensFullRequest>(
+                                req.id.clone(),
+                                Some(semantic_tokens),
+                            )
+                        }
+                        Err(err) => self.connection.send_notification_error(format!(
+                            "Failed to recolt semantic tokens for {}: {}",
+                            uri, err
+                        )),
+                    },
                     None => self.connection.send_notification_error(format!(
                         "Trying to visit file that is not watched : {}",
                         uri
