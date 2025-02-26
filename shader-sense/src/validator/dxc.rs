@@ -115,7 +115,7 @@ impl Dxc {
                         _ => ShaderDiagnosticSeverity::Error,
                     },
                     error: String::from(msg),
-                    line: line.parse::<u32>().unwrap_or(0),
+                    line: line.parse::<u32>().unwrap_or(1) - 1,
                     pos: pos.parse::<u32>().unwrap_or(0),
                 });
             }

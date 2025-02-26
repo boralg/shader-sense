@@ -29,7 +29,7 @@ impl Naga {
                 file_path: None,
                 severity: ShaderDiagnosticSeverity::Error,
                 error,
-                line: loc.line_number,
+                line: loc.line_number - 1,
                 pos: loc.line_position,
             }
         } else {

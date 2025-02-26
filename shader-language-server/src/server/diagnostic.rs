@@ -81,8 +81,8 @@ impl ServerLanguage {
             {
                 let diagnostic = Diagnostic {
                     range: lsp_types::Range::new(
-                        lsp_types::Position::new(diagnostic.line - 1, diagnostic.pos),
-                        lsp_types::Position::new(diagnostic.line - 1, diagnostic.pos),
+                        lsp_types::Position::new(diagnostic.line, diagnostic.pos),
+                        lsp_types::Position::new(diagnostic.line, diagnostic.pos),
                     ),
                     severity: Some(match diagnostic.severity {
                         ShaderDiagnosticSeverity::Hint => lsp_types::DiagnosticSeverity::HINT,
