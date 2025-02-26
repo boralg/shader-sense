@@ -207,7 +207,6 @@ impl HlslSymbolRegionFinder {
                 if cursor.node().kind() == "(" {
                     assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
                 }
-                assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
                 assert_node_kind!(symbol_tree.file_path, cursor, "identifier");
                 let condition_macro = get_name(&symbol_tree.content, cursor.node());
                 let position = ShaderPosition::from_tree_sitter_point(
