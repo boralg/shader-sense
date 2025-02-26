@@ -39,10 +39,9 @@ use lsp_types::{
     DocumentSymbolOptions, DocumentSymbolParams, DocumentSymbolResponse, FoldingRange,
     FoldingRangeKind, FoldingRangeParams, FullDocumentDiagnosticReport, GotoDefinitionParams,
     HoverParams, HoverProviderCapability, OneOf, RelatedFullDocumentDiagnosticReport,
-    SemanticToken, SemanticTokenType, SemanticTokens, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult,
-    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
-    SignatureHelpParams, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
+    SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensParams, SemanticTokensServerCapabilities, ServerCapabilities,
+    SignatureHelpOptions, SignatureHelpParams, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
     WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use shader_sense::shader::ShadingLanguage;
