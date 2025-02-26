@@ -40,14 +40,17 @@ impl ServerLanguage {
                     }
                     None => 0, // No range means its everywhere
                 };
-                // TODO: regex instead of this to match word (ex: half4 will be caught for half...)
                 // Need to ignore comment aswell... Might need tree sitter instead.
                 // Looking for preproc_arg & identifier might be enough.
                 // Need to check for regions too...
-                let occurences: Vec<(usize, &str)> = content.match_indices(&symbol.label).collect();
-                occurences
+                let reg = regex::Regex::new(format!("\\b({})\\b", symbol.label).as_str()).unwrap();
+                let word_offsets: Vec<usize> = reg
+                    .captures_iter(&content)
+                    .map(|e| e.get(0).unwrap().range().start)
+                    .collect();
+                word_offsets
                     .iter()
-                    .filter_map(|(offset, label)| {
+                    .filter_map(|offset| {
                         let position =
                             ShaderPosition::from_byte_offset(&content, *offset, &file_path);
                         if offset_start > *offset {
@@ -56,7 +59,7 @@ impl ServerLanguage {
                             Some(SemanticToken {
                                 delta_line: position.line,
                                 delta_start: position.pos,
-                                length: label.len() as u32,
+                                length: symbol.label.len() as u32,
                                 token_type: 0, // SemanticTokenType::MACRO, view registration
                                 token_modifiers_bitset: 0,
                             })
