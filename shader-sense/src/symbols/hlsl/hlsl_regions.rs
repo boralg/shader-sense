@@ -7,9 +7,7 @@ use crate::{
     symbols::{
         symbol_parser::{get_name, SymbolRegionFinder},
         symbol_tree::SymbolTree,
-        symbols::{
-            ShaderPosition, ShaderPreprocessor, ShaderPreprocessorDefine, ShaderRange, ShaderRegion,
-        },
+        symbols::{ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderRegion},
     },
 };
 
@@ -93,22 +91,39 @@ impl HlslSymbolRegionFinder {
         .unwrap();
         Self { query_if }
     }
-    fn get_define_value<'a>(
-        preprocessor: &'a ShaderPreprocessor,
+    fn get_define_value(
+        preprocessor: &ShaderPreprocessor,
         name: &str,
         position: &ShaderPosition,
-    ) -> Option<&'a ShaderPreprocessorDefine> {
-        preprocessor.defines.iter().find(|define| {
-            let same_name = define.name == name;
-            let has_range = define.range.is_some(); // None, mean global define.
-            let same_file =
-                has_range && define.range.as_ref().unwrap().start.file_path == position.file_path;
-            // Here, there is also case where macro defined in another file.
-            // We cannot check this, but it should be correctly set in preprocessor.
-            let defined_before =
-                (same_file && define.range.as_ref().unwrap().start < *position) || !same_file;
-            same_name && defined_before
-        })
+    ) -> Option<String> {
+        let context = preprocessor
+            .context
+            .defines
+            .iter()
+            .find(|(key, _)| *key == name)
+            .map(|(_, value)| value.clone());
+        if let Some(value) = context {
+            return Some(value);
+        }
+        let local = preprocessor
+            .defines
+            .iter()
+            .find(|define| {
+                let same_name = define.name == name;
+                let has_range = define.range.is_some(); // None, mean global define.
+                let same_file = has_range
+                    && define.range.as_ref().unwrap().start.file_path == position.file_path;
+                // Check position
+                let defined_before =
+                    (same_file && define.range.as_ref().unwrap().start < *position) || !same_file;
+                same_name && defined_before
+            })
+            .map(|e| e.value.clone());
+        if let Some(value) = local {
+            return value;
+        } else {
+            return None;
+        }
     }
     fn parse_number(number: &str) -> Result<i32, ParseIntError> {
         if number.starts_with("0x") && number.len() > 2 {
@@ -138,17 +153,14 @@ impl HlslSymbolRegionFinder {
             // Here we recurse define value cuz a define might just be an alias for another define.
             // If we dont manage to parse it as a number, parse it as another define.
             match Self::get_define_value(preprocessor, name, position) {
-                Some(define) => match &define.value {
-                    Some(value) => match Self::parse_number(value) {
-                        Ok(parsed_value) => Ok(parsed_value),
-                        Err(_) => Self::get_define_as_i32_depth(
-                            &preprocessor,
-                            value,
-                            &ShaderPosition::default(),
-                            depth - 1,
-                        ),
-                    },
-                    None => Ok(0), // Return false instead of error
+                Some(value) => match Self::parse_number(value.as_str()) {
+                    Ok(parsed_value) => Ok(parsed_value),
+                    Err(_) => Self::get_define_as_i32_depth(
+                        &preprocessor,
+                        value.as_str(),
+                        &ShaderPosition::default(), // TODO: get child position.
+                        depth - 1,
+                    ),
                 },
                 None => Ok(0), // Return false instead of error
             }
@@ -160,20 +172,17 @@ impl HlslSymbolRegionFinder {
         position: &ShaderPosition,
     ) -> Result<i32, ShaderError> {
         match Self::get_define_value(preprocessor, name, position) {
-            Some(define) => match &define.value {
-                Some(value) => match value.parse::<i32>() {
-                    Ok(parsed_value) => Ok(parsed_value),
-                    Err(_) => {
-                        // Recurse result up to 10 times.
-                        Self::get_define_as_i32_depth(
-                            &preprocessor,
-                            value,
-                            &ShaderPosition::default(),
-                            10,
-                        )
-                    }
-                },
-                None => Ok(0), // Return false instead of error
+            Some(value) => match value.parse::<i32>() {
+                Ok(parsed_value) => Ok(parsed_value),
+                Err(_) => {
+                    // Recurse result up to 10 times for macro that define other macro.
+                    Self::get_define_as_i32_depth(
+                        &preprocessor,
+                        value.as_str(),
+                        &ShaderPosition::default(),
+                        10,
+                    )
+                }
             },
             None => Ok(0), // Return false instead of error
         }

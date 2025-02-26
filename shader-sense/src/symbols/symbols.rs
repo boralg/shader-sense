@@ -160,6 +160,32 @@ impl ShaderRegion {
 }
 
 #[derive(Debug, Default, Clone)]
+pub struct ShaderPreprocessorContext {
+    pub defines: HashMap<String, String>,
+}
+
+impl ShaderPreprocessorContext {
+    pub fn is_dirty(&self, symbol_params: &ShaderSymbolParams) -> bool {
+        // Compare defines to get if context is different.
+        if symbol_params.defines.len() == self.defines.len() {
+            for (key, value) in &symbol_params.defines {
+                match self.defines.get(key) {
+                    Some(define) => {
+                        if *define != *value {
+                            return true;
+                        }
+                    }
+                    None => return true,
+                }
+            }
+            false
+        } else {
+            true
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessorInclude {
     pub relative_path: String,
     pub absolute_path: PathBuf,
@@ -175,6 +201,8 @@ pub struct ShaderPreprocessorDefine {
 
 #[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessor {
+    pub context: ShaderPreprocessorContext,
+
     pub includes: Vec<ShaderPreprocessorInclude>,
     pub defines: Vec<ShaderPreprocessorDefine>,
     pub regions: Vec<ShaderRegion>,
@@ -200,6 +228,17 @@ impl ShaderPreprocessorInclude {
 }
 
 impl ShaderPreprocessor {
+    pub fn new(symbol_params: &ShaderSymbolParams) -> Self {
+        Self {
+            context: ShaderPreprocessorContext {
+                defines: symbol_params.defines.clone(),
+            },
+            includes: Vec::new(),
+            defines: Vec::new(),
+            regions: Vec::new(),
+            once: false,
+        }
+    }
     pub fn preprocess_symbols(&self, shader_symbols: &mut ShaderSymbolList) {
         // Filter inactive regions symbols
         shader_symbols.filter(|symbol| {

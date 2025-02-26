@@ -9,10 +9,7 @@ use crate::{
 
 use super::{
     symbol_tree::SymbolTree,
-    symbols::{
-        ShaderPreprocessor, ShaderPreprocessorDefine, ShaderRegion, ShaderScope, ShaderSymbol,
-        ShaderSymbolParams,
-    },
+    symbols::{ShaderPreprocessor, ShaderRegion, ShaderScope, ShaderSymbol, ShaderSymbolParams},
 };
 
 pub(super) fn get_name<'a>(shader_content: &'a str, node: Node) -> &'a str {
@@ -196,7 +193,7 @@ impl SymbolParser {
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
     ) -> Result<ShaderPreprocessor, ShaderError> {
-        let mut preprocessor = ShaderPreprocessor::default();
+        let mut preprocessor = ShaderPreprocessor::new(symbol_params);
         for parser in &self.preprocessor_parsers {
             let mut query_cursor = QueryCursor::new();
             for matches in query_cursor.matches(
@@ -213,18 +210,6 @@ impl SymbolParser {
                 );
             }
         }
-        // Add settings define
-        preprocessor.defines.append(
-            &mut symbol_params
-                .defines
-                .iter()
-                .map(|(define, value)| ShaderPreprocessorDefine {
-                    name: define.clone(),
-                    range: None,
-                    value: Some(value.clone()),
-                })
-                .collect(),
-        );
         // Query regions.
         preprocessor.regions = self.region_finder.query_regions_in_node(
             symbol_tree,
