@@ -271,9 +271,7 @@ impl ShaderPreprocessor {
                     version: "".into(),
                     stages: vec![],
                     link: None,
-                    data: ShaderSymbolData::Constants {
-                        ty: "#define".into(),
-                        qualifier: "".into(),
+                    data: ShaderSymbolData::Macro {
                         value: match &define.value {
                             Some(value) => value.clone(),
                             None => "".into(),
@@ -375,6 +373,9 @@ pub enum ShaderSymbolData {
     Keyword {},
     Link {
         target: ShaderPosition,
+    },
+    Macro {
+        value: String,
     },
 }
 
@@ -739,6 +740,9 @@ impl ShaderSymbol {
             ShaderSymbolData::Keyword {} => format!("{}", self.label.clone()),
             ShaderSymbolData::Link { target } => {
                 format!("\"{}\":{}:{}", self.label, target.line, target.pos)
+            }
+            ShaderSymbolData::Macro { value } => {
+                format!("#define {} {}", self.label, value)
             }
         }
     }
