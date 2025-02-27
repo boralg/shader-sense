@@ -18,7 +18,10 @@ use shader_sense::{
     symbols::{
         symbol_provider::SymbolProvider,
         symbol_tree::SymbolTree,
-        symbols::{ShaderPreprocessor, ShaderSymbolList, ShaderSymbolParams},
+        symbols::{
+            ShaderPreprocessor, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
+            ShaderSymbolParams,
+        },
     },
     validator::validator::Validator,
 };
@@ -109,7 +112,7 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
-        mut symbol_params: ShaderSymbolParams, // TODO: replace symbol params to include context
+        symbol_params: &mut ShaderSymbolParams, // TODO: replace symbol params to include context
         symbol_provider: &mut dyn SymbolProvider,
         include_context: &mut IncludeContext,
     ) -> Result<(), ShaderError> {
@@ -118,7 +121,7 @@ impl ServerLanguageFileCache {
         // We are recomputing every deps symbols here, but not really required, isnt it ?
         let now_symbols = Instant::now();
         let (preprocessor, symbol_list, diagnostics) = match symbol_provider
-            .query_preprocessor(&RefCell::borrow(cached_file).symbol_tree, &symbol_params)
+            .query_preprocessor(&RefCell::borrow(cached_file).symbol_tree, symbol_params)
         {
             Ok(preprocessor) => {
                 let mut symbol_list = symbol_provider.query_file_symbols(
@@ -132,7 +135,7 @@ impl ServerLanguageFileCache {
                 // Return this error & store it to display it as a diagnostic & dont prevent linting.
                 if let ShaderError::SymbolQueryError(message, range) = error {
                     (
-                        ShaderPreprocessor::default(),
+                        ShaderPreprocessor::new(symbol_params),
                         ShaderSymbolList::default(),
                         ShaderDiagnosticList {
                             diagnostics: vec![ShaderDiagnostic {
@@ -171,7 +174,7 @@ impl ServerLanguageFileCache {
                 self.recurse_file_symbol(
                     &include_uri,
                     &included_file,
-                    symbol_params.clone(),
+                    symbol_params,
                     symbol_provider,
                     include_context,
                 )?;
@@ -221,7 +224,7 @@ impl ServerLanguageFileCache {
             self.recurse_file_symbol(
                 uri,
                 cached_file,
-                symbol_params,
+                &mut symbol_params,
                 symbol_provider,
                 &mut include_context,
             )?;
@@ -590,30 +593,36 @@ impl ServerLanguageFileCache {
             uri: &Url,
             cached_file: &ServerFileCacheHandle,
             includer_uri: &Url,
+            unique_deps: &mut HashSet<Url>,
         ) -> HashMap<Url, ServerFileCacheHandle> {
             let mut flat_dependencies = HashMap::new();
-            match RefCell::borrow(&cached_file)
-                .included_data
-                .get(&includer_uri)
-            {
+            match RefCell::borrow(cached_file).included_data.get(includer_uri) {
                 Some(data) => {
                     for (deps_uri, deps_file) in &data.dependencies {
                         flat_dependencies.insert(deps_uri.clone(), Rc::clone(deps_file));
-                        let dependencies = get_dependencies(deps_uri, deps_file, includer_uri);
-                        for (deps_deps_uri, deps_deps_file) in dependencies {
-                            flat_dependencies.insert(deps_deps_uri.clone(), deps_deps_file);
+                        // Avoid stack overflow.
+                        if unique_deps.insert(uri.clone()) {
+                            let dependencies =
+                                get_dependencies(deps_uri, deps_file, includer_uri, unique_deps);
+                            for (deps_deps_uri, deps_deps_file) in dependencies {
+                                flat_dependencies.insert(deps_deps_uri.clone(), deps_deps_file);
+                            }
                         }
                     }
                 }
                 None => {
-                    warn!("Deps {} has no data for includer {}", uri, includer_uri);
+                    warn!(
+                        "Deps {} flatten has no data for includer {}",
+                        uri, includer_uri
+                    );
                 }
             }
             flat_dependencies
         }
         let mut flat_dependencies = HashMap::new();
         for (deps_uri, deps_cached_file) in &RefCell::borrow_mut(&cached_file).data.dependencies {
-            let flat_deps = get_dependencies(&deps_uri, &deps_cached_file, uri);
+            let flat_deps =
+                get_dependencies(&deps_uri, &deps_cached_file, uri, &mut HashSet::new());
             for (deps_deps_uri, deps_deps_cached_file) in flat_deps {
                 flat_dependencies.insert(deps_deps_uri, deps_deps_cached_file);
             }
@@ -621,16 +630,17 @@ impl ServerLanguageFileCache {
         flat_dependencies
     }
     pub fn remove_file(&mut self, uri: &Url) -> Result<bool, ShaderError> {
-        // Remove all file included_data referencing this uri
-        for (_, deps_cached_file) in &self.dependencies {
-            RefCell::borrow_mut(&deps_cached_file)
-                .included_data
-                .remove(uri);
-        }
         match self.files.remove(uri) {
             Some(cached_file) => {
                 // Gather all dependencies.
                 let flat_dependencies = self.flatten_dependencies(&uri, &cached_file);
+                // Remove all file included_data referencing this uri
+                // TODO: should clear their diagnostic aswell...
+                for (_, deps_cached_file) in &self.dependencies {
+                    RefCell::borrow_mut(&deps_cached_file)
+                        .included_data
+                        .remove(uri);
+                }
                 // Drop Rc, might still have dangling ref in deps though...
                 drop(cached_file);
                 debug!(
@@ -685,7 +695,10 @@ impl ServerLanguageFileCache {
                     symbol_cache
                 }
                 None => {
-                    warn!("Deps {} has no data for includer {}", uri, includer_uri);
+                    warn!(
+                        "Deps {} get_all_symbols has no data for includer {}",
+                        uri, includer_uri
+                    );
                     ShaderSymbolList::default()
                 }
             }
@@ -697,6 +710,24 @@ impl ServerLanguageFileCache {
                 uri,
                 &mut IncludeContext::main(uri),
             ));
+        }
+        // Add config symbols
+        for (key, value) in &cached_file.data.preprocessor_cache.context.defines {
+            symbol_cache.macros.push(ShaderSymbol {
+                label: key.clone(),
+                description: format!(
+                    "Config preprocessor macro. Expanding to \n```\n{}\n```",
+                    value
+                ),
+                version: "".into(),
+                stages: vec![],
+                link: None,
+                data: ShaderSymbolData::Macro {
+                    value: value.clone(),
+                },
+                range: None,
+                scope_stack: None,
+            });
         }
         // Add intrinsics symbols
         symbol_cache.append(symbol_provider.get_intrinsics_symbol().clone());
