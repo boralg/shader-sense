@@ -154,6 +154,8 @@ mod tests {
             set_region(38, 43, 40, 0, false),
             // if unary
             set_region(43, 22, 45, 0, false),
+            // if defined multiple
+            set_region(47, 66, 49, 0, false),
         ];
         assert!(preprocessor.regions.len() == expected_regions.len());
         for region_index in 0..preprocessor.regions.len() {

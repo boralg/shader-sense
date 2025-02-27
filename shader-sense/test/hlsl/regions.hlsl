@@ -44,4 +44,8 @@ void main() {
 #if !CONDITION_DEFINED
     float f = 1;
 #endif
+
+#if !defined(CONDITION_DEFINED) && !defined(CONDITION_NOT_DEFINED)
+    float h = 1.0; //woops
+#endif
 }

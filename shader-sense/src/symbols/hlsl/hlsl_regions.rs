@@ -34,31 +34,74 @@ macro_rules! assert_tree_sitter {
 }
 macro_rules! assert_field_name {
     ($file_path:expr, $cursor:expr, $value:expr) => {
-        if $cursor.field_name().unwrap() != $value {
-            return Err(ShaderError::InternalErr(format!(
-                "Unexpected query field name {}:{} \"{}\" from {}:{}:{}",
-                file!(),
-                line!(),
-                $value,
-                $file_path.display(),
-                $cursor.node().range().start_point.row,
-                $cursor.node().range().start_point.column,
-            )));
+        match $cursor.field_name() {
+            Some(field_name) => {
+                if field_name != $value {
+                    return Err(ShaderError::SymbolQueryError(
+                        format!(
+                            "Unexpected query field name \"{}\" (at {}:{})",
+                            field_name,
+                            file!(),
+                            line!(),
+                        ),
+                        ShaderRange::new(
+                            ShaderPosition::new(
+                                $file_path.clone(),
+                                $cursor.node().range().start_point.row as u32,
+                                $cursor.node().range().start_point.column as u32,
+                            ),
+                            ShaderPosition::new(
+                                $file_path.clone(),
+                                $cursor.node().range().end_point.row as u32,
+                                $cursor.node().range().end_point.column as u32,
+                            ),
+                        ),
+                    ));
+                }
+            }
+            None => {
+                return Err(ShaderError::SymbolQueryError(
+                    format!("Missing query field name (at {}:{})", file!(), line!(),),
+                    ShaderRange::new(
+                        ShaderPosition::new(
+                            $file_path.clone(),
+                            $cursor.node().range().start_point.row as u32,
+                            $cursor.node().range().start_point.column as u32,
+                        ),
+                        ShaderPosition::new(
+                            $file_path.clone(),
+                            $cursor.node().range().end_point.row as u32,
+                            $cursor.node().range().end_point.column as u32,
+                        ),
+                    ),
+                ));
+            }
         }
     };
 }
 macro_rules! assert_node_kind {
     ($file_path:expr, $cursor:expr, $value:expr) => {
         if $cursor.node().kind() != $value {
-            return Err(ShaderError::InternalErr(format!(
-                "Unexpected query node kind {}:{} \"{}\" from {}:{}:{}",
-                file!(),
-                line!(),
-                $value,
-                $file_path.display(),
-                $cursor.node().range().start_point.row,
-                $cursor.node().range().start_point.column,
-            )));
+            return Err(ShaderError::SymbolQueryError(
+                format!(
+                    "Unexpected query node kind \"{}\" (at {}:{})",
+                    $cursor.node().kind(),
+                    file!(),
+                    line!(),
+                ),
+                ShaderRange::new(
+                    ShaderPosition::new(
+                        $file_path.clone(),
+                        $cursor.node().range().start_point.row as u32,
+                        $cursor.node().range().start_point.column as u32,
+                    ),
+                    ShaderPosition::new(
+                        $file_path.clone(),
+                        $cursor.node().range().end_point.row as u32,
+                        $cursor.node().range().end_point.column as u32,
+                    ),
+                ),
+            ));
         }
     };
 }
@@ -138,8 +181,8 @@ impl HlslSymbolRegionFinder {
             number.parse::<i32>()
         }
     }
-    fn get_define_as_i32_depth<'a>(
-        preprocessor: &'a ShaderPreprocessor,
+    fn get_define_as_i32_depth(
+        preprocessor: &ShaderPreprocessor,
         name: &str,
         position: &ShaderPosition,
         depth: u32,
@@ -166,8 +209,8 @@ impl HlslSymbolRegionFinder {
             }
         }
     }
-    fn get_define_as_i32<'a>(
-        preprocessor: &'a ShaderPreprocessor,
+    fn get_define_as_i32(
+        preprocessor: &ShaderPreprocessor,
         name: &str,
         position: &ShaderPosition,
     ) -> Result<i32, ShaderError> {
@@ -264,33 +307,15 @@ impl HlslSymbolRegionFinder {
                 )"#;
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
                 assert_field_name!(symbol_tree.file_path, cursor, "left");
-                let left_condition = match cursor.node().kind() {
-                    "identifier" => Self::get_define_as_i32(
-                        preprocessor,
-                        &get_name(&symbol_tree.content, cursor.node()),
-                        &ShaderPosition::from_tree_sitter_point(
-                            cursor.node().start_position(),
-                            &symbol_tree.file_path,
-                        ),
-                    )?,
-                    _ => Self::resolve_condition(cursor.clone(), symbol_tree, preprocessor)?,
-                };
+                let left_condition =
+                    Self::resolve_condition(cursor.clone(), symbol_tree, preprocessor)?;
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
                 assert_field_name!(symbol_tree.file_path, cursor, "operator");
                 let operator = cursor.node().kind();
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
                 assert_field_name!(symbol_tree.file_path, cursor, "right");
-                let right_condition = match cursor.node().kind() {
-                    "identifier" => Self::get_define_as_i32(
-                        preprocessor,
-                        &get_name(&symbol_tree.content, cursor.node()),
-                        &ShaderPosition::from_tree_sitter_point(
-                            cursor.node().start_position(),
-                            &symbol_tree.file_path,
-                        ),
-                    )?,
-                    _ => Self::resolve_condition(cursor.clone(), symbol_tree, preprocessor)?,
-                };
+                let right_condition =
+                    Self::resolve_condition(cursor.clone(), symbol_tree, preprocessor)?;
                 match operator {
                     "&&" => Ok(((left_condition != 0) && (right_condition != 0)) as i32),
                     "||" => Ok(((left_condition != 0) || (right_condition != 0)) as i32),
@@ -324,15 +349,11 @@ impl HlslSymbolRegionFinder {
                 // Operator = !~-+
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
                 assert_field_name!(symbol_tree.file_path, cursor, "operator");
-                let operator = cursor.node().kind(); //get_name(&symbol_tree.content, cursor.node());
+                let operator = cursor.node().kind();
+                assert_node_kind!(symbol_tree.file_path, cursor, "!");
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
                 assert_field_name!(symbol_tree.file_path, cursor, "argument");
-                let argument = get_name(&symbol_tree.content, cursor.node());
-                let position = ShaderPosition::from_tree_sitter_point(
-                    cursor.node().start_position(),
-                    &symbol_tree.file_path,
-                );
-                let value = Self::get_define_as_i32(preprocessor, &argument, &position)?;
+                let value = Self::resolve_condition(cursor.clone(), symbol_tree, preprocessor)?;
                 match operator {
                     "!" => Ok(!(value != 0) as i32), // Comparing as bool
                     "+" => Ok(value),
@@ -400,8 +421,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 let (is_active_region, region_start) = match cursor.node().kind() {
                     "#ifdef" => {
                         assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                        let field_name = cursor.field_name().unwrap();
-                        assert_tree_sitter!(symbol_tree.file_path, field_name == "name");
+                        assert_field_name!(symbol_tree.file_path, cursor, "name");
                         let condition_macro = get_name(&symbol_tree.content, cursor.node());
                         let position = ShaderPosition::from_tree_sitter_point(
                             cursor.node().range().end_point,
@@ -418,8 +438,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     }
                     "#ifndef" => {
                         assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                        let field_name = cursor.field_name().unwrap();
-                        assert_tree_sitter!(symbol_tree.file_path, field_name == "name");
+                        assert_field_name!(symbol_tree.file_path, cursor, "name");
                         let condition_macro = get_name(&symbol_tree.content, cursor.node());
                         let position = ShaderPosition::from_tree_sitter_point(
                             cursor.node().range().end_point,
@@ -436,8 +455,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     }
                     "#if" => {
                         assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                        let field_name = cursor.field_name().unwrap();
-                        assert_tree_sitter!(symbol_tree.file_path, field_name == "condition");
+                        assert_field_name!(symbol_tree.file_path, cursor, "condition");
                         let position = ShaderPosition::from_tree_sitter_point(
                             cursor.node().range().end_point,
                             &symbol_tree.file_path,
@@ -460,8 +478,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     ),
                     "#elif" => {
                         assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                        let field_name = cursor.field_name().unwrap();
-                        assert_tree_sitter!(symbol_tree.file_path, field_name == "condition");
+                        assert_field_name!(symbol_tree.file_path, cursor, "condition");
                         let position = ShaderPosition::from_tree_sitter_point(
                             cursor.node().range().end_point,
                             &symbol_tree.file_path,
