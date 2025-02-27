@@ -426,6 +426,64 @@ impl ShaderSymbolList {
         serde_json::from_str::<ShaderSymbolList>(&file_content)
             .expect("Failed to parse ShaderSymbolList")
     }
+    pub fn find_symbols_after(
+        &self,
+        label: String,
+        position: &ShaderPosition,
+    ) -> Vec<ShaderSymbol> {
+        self.iter()
+            .map(|e| {
+                e.0.iter()
+                    .filter_map(|e| {
+                        if e.label == label {
+                            match &e.range {
+                                Some(range) => {
+                                    if *position < range.start {
+                                        Some(e.clone())
+                                    } else {
+                                        None
+                                    }
+                                }
+                                None => Some(e.clone()),
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<ShaderSymbol>>()
+            })
+            .collect::<Vec<Vec<ShaderSymbol>>>()
+            .concat()
+    }
+    pub fn find_symbols_before(
+        &self,
+        label: String,
+        position: &ShaderPosition,
+    ) -> Vec<ShaderSymbol> {
+        self.iter()
+            .map(|e| {
+                e.0.iter()
+                    .filter_map(|e| {
+                        if e.label == label {
+                            match &e.range {
+                                Some(range) => {
+                                    if *position > range.start {
+                                        Some(e.clone())
+                                    } else {
+                                        None
+                                    }
+                                }
+                                None => Some(e.clone()),
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<ShaderSymbol>>()
+            })
+            .collect::<Vec<Vec<ShaderSymbol>>>()
+            .concat()
+    }
     pub fn find_symbols(&self, label: String) -> Vec<ShaderSymbol> {
         self.iter()
             .map(|e| {
@@ -528,7 +586,7 @@ impl ShaderSymbolList {
         self.macros.retain(&predicate);
         self.includes.retain(&predicate);
     }
-    pub fn filter_scoped_symbol(&self, cursor_position: ShaderPosition) -> ShaderSymbolList {
+    pub fn filter_scoped_symbol(&self, cursor_position: &ShaderPosition) -> ShaderSymbolList {
         // Ensure symbols are already defined at pos
         let filter_position = |shader_symbol: &ShaderSymbol| -> bool {
             match &shader_symbol.scope_stack {

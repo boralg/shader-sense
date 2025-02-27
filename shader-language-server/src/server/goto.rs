@@ -37,8 +37,8 @@ impl ServerLanguage {
             .get_word_range_at_position(&cached_file_borrowed.symbol_tree, shader_position.clone())
         {
             Ok((word, word_range)) => {
-                let symbol_list = all_symbol_list.filter_scoped_symbol(shader_position);
-                let matching_symbols = symbol_list.find_symbols(word);
+                let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);
+                let matching_symbols = symbol_list.find_symbols_before(word, &shader_position);
                 Ok(Some(GotoDefinitionResponse::Link(
                     matching_symbols
                         .iter()

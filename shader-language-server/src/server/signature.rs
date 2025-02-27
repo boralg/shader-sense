@@ -41,7 +41,7 @@ impl ServerLanguage {
         debug!("Found requested func name {:?}", function_parameter);
 
         let file_path = uri.to_file_path().unwrap();
-        let completion = all_symbol_list.filter_scoped_symbol(ShaderPosition {
+        let completion = all_symbol_list.filter_scoped_symbol(&ShaderPosition {
             file_path: file_path.clone(),
             line: position.line as u32,
             pos: position.character as u32,

@@ -158,7 +158,7 @@ mod tests {
         let mut symbol_provider = create_symbol_provider(ShadingLanguage::Glsl);
         let symbols = get_all_symbols(symbol_provider.as_mut(), file_path, &shader_content)
             .unwrap()
-            .filter_scoped_symbol(ShaderPosition {
+            .filter_scoped_symbol(&ShaderPosition {
                 file_path: PathBuf::from(file_path),
                 line: 16,
                 pos: 0,

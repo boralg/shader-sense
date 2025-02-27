@@ -55,7 +55,7 @@ impl ServerLanguage {
                 position.character - 1
             },
         };
-        let symbol_list = symbol_list.filter_scoped_symbol(shader_position.clone());
+        let symbol_list = symbol_list.filter_scoped_symbol(&shader_position);
         match trigger_character {
             Some(_) => {
                 match language_data
