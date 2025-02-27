@@ -114,7 +114,7 @@ pub trait SymbolRegionFinder {
         &self,
         symbol_tree: &SymbolTree,
         node: tree_sitter::Node,
-        preprocessor: &ShaderPreprocessor,
+        preprocessor: &mut ShaderPreprocessor,
     ) -> Result<Vec<ShaderRegion>, ShaderError>;
 }
 
@@ -211,28 +211,12 @@ impl SymbolParser {
             }
         }
         // Query regions.
+        // Will filter includes & defines in inactive regions
         preprocessor.regions = self.region_finder.query_regions_in_node(
             symbol_tree,
             symbol_tree.tree.root_node(),
-            &preprocessor,
+            &mut preprocessor,
         )?;
-        // Filter out defines in inactive regions.
-        preprocessor.defines.retain(|define| match &define.range {
-            Some(range) => preprocessor
-                .regions
-                .iter()
-                .find(|region| !region.is_active && region.range.contain_bounds(&range))
-                .is_none(),
-            None => true,
-        });
-        // Filter out includes in inactive regions
-        preprocessor.includes.retain(|include| {
-            preprocessor
-                .regions
-                .iter()
-                .find(|region| !region.is_active && region.range.contain_bounds(&include.range))
-                .is_none()
-        });
         // Mark this shader as once if pragma once is set.
         if let Some(once_position) = symbol_tree.content.find("#pragma once") {
             let position = ShaderPosition::from_byte_offset(

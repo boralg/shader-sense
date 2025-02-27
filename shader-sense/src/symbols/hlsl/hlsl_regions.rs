@@ -404,16 +404,16 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         &self,
         symbol_tree: &SymbolTree,
         node: tree_sitter::Node,
-        preprocessor: &ShaderPreprocessor,
+        preprocessor: &mut ShaderPreprocessor,
     ) -> Result<Vec<ShaderRegion>, ShaderError> {
         let mut query_cursor = QueryCursor::new();
         let mut regions = Vec::new();
         for region_match in
             query_cursor.matches(&self.query_if, node, symbol_tree.content.as_bytes())
         {
-            fn find_regions(
+            fn parse_region(
                 symbol_tree: &SymbolTree,
-                preprocessor: &ShaderPreprocessor,
+                preprocessor: &mut ShaderPreprocessor,
                 cursor: &mut tree_sitter::TreeCursor,
                 found_active_region: bool,
             ) -> Result<Vec<ShaderRegion>, ShaderError> {
@@ -506,7 +506,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         ))
                     }
                 };
-                // Now find alternative & loop on it
+                // Now find alternative blocks & loop on it
                 let mut regions = Vec::new();
                 while cursor.goto_next_sibling() {
                     match cursor.field_name() {
@@ -516,11 +516,26 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                     cursor.node().range().start_point,
                                     &symbol_tree.file_path,
                                 );
+                                let region_range = ShaderRange::new(region_start, region_end);
                                 regions.push(ShaderRegion::new(
-                                    ShaderRange::new(region_start, region_end),
+                                    region_range.clone(),
                                     is_active_region != 0,
                                 ));
-                                let mut next_region = find_regions(
+                                // Filter out local define & include in region as it may impact next region in file.
+                                preprocessor.defines.retain(|define| match &define.range {
+                                    Some(range) => {
+                                        is_active_region != 0
+                                            || (is_active_region == 0
+                                                && !region_range.contain_bounds(&range))
+                                    }
+                                    None => true,
+                                });
+                                preprocessor.includes.retain(|include| {
+                                    is_active_region != 0
+                                        || (is_active_region == 0
+                                            && !region_range.contain_bounds(&include.range))
+                                });
+                                let mut next_region = parse_region(
                                     symbol_tree,
                                     preprocessor,
                                     cursor,
@@ -539,19 +554,33 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 } else {
                     cursor.node().range().end_point
                 };
-                let region_end =
-                    ShaderPosition::from_tree_sitter_point(end_point, &symbol_tree.file_path);
+                let region_range = ShaderRange::new(
+                    region_start,
+                    ShaderPosition::from_tree_sitter_point(end_point, &symbol_tree.file_path),
+                );
                 regions.push(ShaderRegion::new(
-                    ShaderRange::new(region_start, region_end),
+                    region_range.clone(),
                     is_active_region != 0,
                 ));
+                // Filter out local define & include in region as it may impact next region in file.
+                preprocessor.defines.retain(|define| match &define.range {
+                    Some(range) => {
+                        is_active_region != 0
+                            || (is_active_region == 0 && !region_range.contain_bounds(&range))
+                    }
+                    None => true,
+                });
+                preprocessor.includes.retain(|include| {
+                    is_active_region != 0
+                        || (is_active_region == 0 && !region_range.contain_bounds(&include.range))
+                });
                 Ok(regions)
             }
             let node = region_match.captures[0].node;
             let mut cursor = node.walk();
-            regions.append(&mut find_regions(
+            regions.append(&mut parse_region(
                 symbol_tree,
-                &preprocessor,
+                preprocessor,
                 &mut cursor,
                 false,
             )?)

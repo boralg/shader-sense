@@ -14,7 +14,7 @@ impl SymbolRegionFinder for GgslRegionFinder {
         &self,
         _symbol_tree: &SymbolTree,
         _node: tree_sitter::Node,
-        _preprocessor: &ShaderPreprocessor,
+        _preprocessor: &mut ShaderPreprocessor,
     ) -> Result<Vec<ShaderRegion>, ShaderError> {
         Ok(vec![])
     }
