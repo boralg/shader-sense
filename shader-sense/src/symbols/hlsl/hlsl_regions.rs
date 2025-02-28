@@ -188,10 +188,17 @@ impl HlslSymbolRegionFinder {
         depth: u32,
     ) -> Result<i32, ShaderError> {
         if depth == 0 {
-            return Err(ShaderError::SymbolQueryError(
+            Err(ShaderError::SymbolQueryError(
                 format!("Failed to parse number_literal {}", name),
                 ShaderRange::new(position.clone(), position.clone()),
-            ));
+            ))
+        } else if name.contains(" ") {
+            // Here we try to detect expression that cannot be parsed, such as expression (#define MACRO (MACRO0 + MACRO1)).
+            // TODO: We should store a proxy tree that is used to query over it for solving them.
+            Err(ShaderError::SymbolQueryError(
+                format!("Macro expression solving not implemented ({}). Regions behaviour may be incorrect.", name),
+                ShaderRange::new(position.clone(), position.clone()),
+            ))
         } else {
             // Here we recurse define value cuz a define might just be an alias for another define.
             // If we dont manage to parse it as a number, parse it as another define.
@@ -201,7 +208,7 @@ impl HlslSymbolRegionFinder {
                     Err(_) => Self::get_define_as_i32_depth(
                         &preprocessor,
                         value.as_str(),
-                        &ShaderPosition::default(), // TODO: get child position.
+                        position,
                         depth - 1,
                     ),
                 },
@@ -219,12 +226,7 @@ impl HlslSymbolRegionFinder {
                 Ok(parsed_value) => Ok(parsed_value),
                 Err(_) => {
                     // Recurse result up to 10 times for macro that define other macro.
-                    Self::get_define_as_i32_depth(
-                        &preprocessor,
-                        value.as_str(),
-                        &ShaderPosition::default(),
-                        10,
-                    )
+                    Self::get_define_as_i32_depth(&preprocessor, value.as_str(), &position, 10)
                 }
             },
             None => Ok(0), // Return false instead of error
@@ -390,7 +392,10 @@ impl HlslSymbolRegionFinder {
                     )
                 )"#;
                 // TODO: should solve this complex expression, simply ignoring it for now.
-                Ok(0)
+                Err(ShaderError::SymbolQueryError(
+                    format!("Call expression solving not implemented ({}). Regions behaviour may be incorrect.", get_name(&symbol_tree.content, cursor.node())),
+                    ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
+                ))
             }
             value => Err(ShaderError::SymbolQueryError(
                 format!("Condition unhandled for {}", value),
