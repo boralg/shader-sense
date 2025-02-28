@@ -3,7 +3,7 @@ use std::num::ParseIntError;
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
-    shader_error::ShaderError,
+    shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
         symbol_parser::{get_name, SymbolRegionFinder},
         symbol_tree::SymbolTree,
@@ -466,11 +466,25 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             &symbol_tree.file_path,
                         );
                         (
-                            HlslSymbolRegionFinder::resolve_condition(
+                            match HlslSymbolRegionFinder::resolve_condition(
                                 cursor.clone(),
                                 symbol_tree,
                                 preprocessor,
-                            )?,
+                            ) {
+                                Ok(value) => value,
+                                Err(err) => {
+                                    if let ShaderError::SymbolQueryError(message, range) = err {
+                                        preprocessor.diagnostics.push(ShaderDiagnostic {
+                                            severity: ShaderDiagnosticSeverity::Warning,
+                                            error: message,
+                                            range,
+                                        });
+                                        0 // Return zero as default.
+                                    } else {
+                                        return Err(err);
+                                    }
+                                }
+                            },
                             position,
                         )
                     }
@@ -492,11 +506,25 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             if found_active_region {
                                 0
                             } else {
-                                HlslSymbolRegionFinder::resolve_condition(
+                                match HlslSymbolRegionFinder::resolve_condition(
                                     cursor.clone(),
                                     symbol_tree,
                                     preprocessor,
-                                )?
+                                ) {
+                                    Ok(value) => value,
+                                    Err(err) => {
+                                        if let ShaderError::SymbolQueryError(message, range) = err {
+                                            preprocessor.diagnostics.push(ShaderDiagnostic {
+                                                severity: ShaderDiagnosticSeverity::Warning,
+                                                error: message,
+                                                range,
+                                            });
+                                            0 // Return zero as default.
+                                        } else {
+                                            return Err(err);
+                                        }
+                                    }
+                                }
                             },
                             position,
                         )
@@ -508,7 +536,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         return Err(ShaderError::SymbolQueryError(
                             format!("preproc operator not implemented: {}", child),
                             ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
-                        ))
+                        ));
                     }
                 };
                 // Now find alternative blocks & loop on it

@@ -6,7 +6,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::shader::ShaderStage;
+use crate::{shader::ShaderStage, shader_error::ShaderDiagnostic};
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderParameter {
@@ -206,6 +206,7 @@ pub struct ShaderPreprocessor {
     pub includes: Vec<ShaderPreprocessorInclude>,
     pub defines: Vec<ShaderPreprocessorDefine>,
     pub regions: Vec<ShaderRegion>,
+    pub diagnostics: Vec<ShaderDiagnostic>, // preprocessor errors
     pub once: bool,
 }
 impl ShaderPreprocessorDefine {
@@ -236,6 +237,7 @@ impl ShaderPreprocessor {
             includes: Vec::new(),
             defines: Vec::new(),
             regions: Vec::new(),
+            diagnostics: Vec::new(),
             once: false,
         }
     }

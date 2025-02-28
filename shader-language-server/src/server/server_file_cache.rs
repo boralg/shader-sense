@@ -375,6 +375,9 @@ impl ServerLanguageFileCache {
             include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
                 data.diagnostic_cache
                     .diagnostics
+                    .append(&mut data.preprocessor_cache.diagnostics);
+                data.diagnostic_cache
+                    .diagnostics
                     .append(&mut diagnostic_list.diagnostics);
             });
         }
