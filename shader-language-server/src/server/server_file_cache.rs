@@ -139,11 +139,9 @@ impl ServerLanguageFileCache {
                         ShaderSymbolList::default(),
                         ShaderDiagnosticList {
                             diagnostics: vec![ShaderDiagnostic {
-                                file_path: Some(file_path.clone()),
-                                severity: ShaderDiagnosticSeverity::Error,
+                                severity: ShaderDiagnosticSeverity::Warning,
                                 error: message,
-                                line: range.start.line,
-                                pos: range.start.pos,
+                                range: range,
                             }],
                         },
                     )

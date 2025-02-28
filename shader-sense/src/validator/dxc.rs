@@ -8,6 +8,7 @@ use crate::{
     include::{Dependencies, IncludeHandler},
     shader::{HlslShaderModel, HlslVersion},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
+    symbols::symbols::{ShaderPosition, ShaderRange},
 };
 
 use super::validator::{ValidationParams, Validator};
@@ -79,7 +80,7 @@ impl Dxc {
     }
     fn parse_dxc_errors(
         errors: &String,
-        file: &Path,
+        file_path: &Path,
         includes: &Vec<String>,
         path_remapping: HashMap<PathBuf, PathBuf>,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
@@ -94,7 +95,7 @@ impl Dxc {
         }
         starts.push(errors.len());
         let internal_reg = regex::Regex::new(r"(?s)^(.*?):(\d+):(\d+): (.*?):(.*)")?;
-        let mut include_handler = IncludeHandler::new(file, includes.clone(), path_remapping);
+        let mut include_handler = IncludeHandler::new(file_path, includes.clone(), path_remapping);
         for start in 0..starts.len() - 1 {
             let first = starts[start];
             let length = starts[start + 1] - starts[start];
@@ -105,8 +106,10 @@ impl Dxc {
                 let pos = capture.get(3).map_or("", |m| m.as_str());
                 let level = capture.get(4).map_or("", |m| m.as_str());
                 let msg = capture.get(5).map_or("", |m| m.as_str());
+                let file_path = include_handler
+                    .search_path_in_includes(Path::new(relative_path))
+                    .unwrap_or(file_path.into());
                 shader_error_list.push(ShaderDiagnostic {
-                    file_path: include_handler.search_path_in_includes(Path::new(relative_path)),
                     severity: match level {
                         "error" => ShaderDiagnosticSeverity::Error,
                         "warning" => ShaderDiagnosticSeverity::Warning,
@@ -115,8 +118,18 @@ impl Dxc {
                         _ => ShaderDiagnosticSeverity::Error,
                     },
                     error: String::from(msg),
-                    line: line.parse::<u32>().unwrap_or(1) - 1,
-                    pos: pos.parse::<u32>().unwrap_or(0),
+                    range: ShaderRange::new(
+                        ShaderPosition::new(
+                            file_path.clone(),
+                            line.parse::<u32>().unwrap_or(1) - 1,
+                            pos.parse::<u32>().unwrap_or(0),
+                        ),
+                        ShaderPosition::new(
+                            file_path.clone(),
+                            line.parse::<u32>().unwrap_or(1) - 1,
+                            pos.parse::<u32>().unwrap_or(0),
+                        ),
+                    ),
                 });
             }
         }
@@ -143,15 +156,14 @@ impl Dxc {
                 &params.includes,
                 params.path_remapping.clone(),
             ),
-            HassleError::ValidationError(err) => {
-                Ok(ShaderDiagnosticList::from(ShaderDiagnostic {
-                    file_path: None, // None means main file.
-                    severity: ShaderDiagnosticSeverity::Error,
-                    error: err.to_string(),
-                    line: 0,
-                    pos: 0,
-                }))
-            }
+            HassleError::ValidationError(err) => Ok(ShaderDiagnosticList::from(ShaderDiagnostic {
+                severity: ShaderDiagnosticSeverity::Error,
+                error: err.to_string(),
+                range: ShaderRange::new(
+                    ShaderPosition::new(file_path.into(), 0, 0),
+                    ShaderPosition::new(file_path.into(), 0, 0),
+                ),
+            })),
             HassleError::LibLoadingError(err) => Err(ShaderError::InternalErr(err.to_string())),
             HassleError::LoadLibraryError { filename, inner } => {
                 Err(ShaderError::InternalErr(format!(

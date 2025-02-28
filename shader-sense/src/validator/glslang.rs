@@ -3,6 +3,7 @@ use crate::{
     include::{Dependencies, IncludeHandler},
     shader::{GlslSpirvVersion, GlslTargetClient, ShaderStage},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
+    symbols::symbols::{ShaderPosition, ShaderRange},
 };
 use glslang::{
     error::GlslangError,
@@ -171,17 +172,21 @@ impl Glslang {
                 let line = capture.get(3).map_or("", |m| m.as_str());
                 let pos = capture.get(4).map_or("", |m| m.as_str());
                 let msg = capture.get(5).map_or("", |m| m.as_str());
-                shader_error_list.push(ShaderDiagnostic {
-                    file_path: match relative_path.parse::<u32>() {
-                        Ok(_) => None, // Main file
-                        Err(_) => {
-                            if relative_path.is_empty() {
-                                None
-                            } else {
-                                include_handler.search_path_in_includes(Path::new(relative_path))
+                let file_path: PathBuf = match relative_path.parse::<u32>() {
+                    Ok(_) => file_path.into(), // Main file
+                    Err(_) => {
+                        if relative_path.is_empty() {
+                            file_path.into()
+                        } else {
+                            match include_handler.search_path_in_includes(Path::new(relative_path))
+                            {
+                                Some(value) => value,
+                                None => file_path.into(),
                             }
                         }
-                    },
+                    }
+                };
+                shader_error_list.push(ShaderDiagnostic {
                     severity: match level {
                         "ERROR" => ShaderDiagnosticSeverity::Error,
                         "WARNING" => ShaderDiagnosticSeverity::Warning,
@@ -190,8 +195,18 @@ impl Glslang {
                         _ => ShaderDiagnosticSeverity::Error,
                     },
                     error: String::from(msg),
-                    line: line.parse::<u32>().unwrap_or(1) - 1,
-                    pos: pos.parse::<u32>().unwrap_or(0),
+                    range: ShaderRange::new(
+                        ShaderPosition::new(
+                            file_path.clone(),
+                            line.parse::<u32>().unwrap_or(1) - 1,
+                            pos.parse::<u32>().unwrap_or(0),
+                        ),
+                        ShaderPosition::new(
+                            file_path.clone(),
+                            line.parse::<u32>().unwrap_or(1) - 1,
+                            pos.parse::<u32>().unwrap_or(0),
+                        ),
+                    ),
                 });
             } else {
                 return Err(ShaderError::InternalErr(format!(

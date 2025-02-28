@@ -71,19 +71,13 @@ impl ServerLanguage {
 
         let mut diagnostics: HashMap<Url, Vec<Diagnostic>> = HashMap::new();
         for diagnostic in &diagnostic_cache.diagnostics {
-            let uri = match &diagnostic.file_path {
-                Some(diagnostic_file_path) => Url::from_file_path(&diagnostic_file_path).unwrap(),
-                None => uri.clone(),
-            };
+            let uri = Url::from_file_path(&diagnostic.range.start.file_path).unwrap();
             if diagnostic
                 .severity
                 .is_required(ShaderDiagnosticSeverity::from(self.config.severity.clone()))
             {
                 let diagnostic = Diagnostic {
-                    range: lsp_types::Range::new(
-                        lsp_types::Position::new(diagnostic.line, diagnostic.pos),
-                        lsp_types::Position::new(diagnostic.line, diagnostic.pos),
-                    ),
+                    range: shader_range_to_lsp_range(&diagnostic.range),
                     severity: Some(match diagnostic.severity {
                         ShaderDiagnosticSeverity::Hint => lsp_types::DiagnosticSeverity::HINT,
                         ShaderDiagnosticSeverity::Information => {

@@ -1,9 +1,8 @@
 use core::fmt;
-use std::path::PathBuf;
 
 use crate::symbols::symbols::ShaderRange;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShaderDiagnosticSeverity {
     Error,
     Warning,
@@ -49,11 +48,9 @@ impl ShaderDiagnosticSeverity {
 
 #[derive(Debug, Clone)]
 pub struct ShaderDiagnostic {
-    pub file_path: Option<PathBuf>,
     pub severity: ShaderDiagnosticSeverity,
     pub error: String,
-    pub line: u32,
-    pub pos: u32,
+    pub range: ShaderRange,
 }
 #[derive(Debug, Default, Clone)]
 pub struct ShaderDiagnosticList {

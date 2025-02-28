@@ -151,8 +151,7 @@ mod tests {
             Ok(result) => {
                 let diags = result.0.diagnostics;
                 println!("Diagnostic should be empty: {:#?}", diags);
-                assert!(diags[0].file_path.is_some());
-                assert!(diags[0].file_path.as_ref().unwrap().exists());
+                assert!(diags[0].range.start.file_path.exists());
                 assert_eq!(diags[0].error, String::from(" '#include' : Could not process include directive for header name: ./level1.glsl\n"));
             }
             Err(err) => panic!("{}", err),
