@@ -702,8 +702,10 @@ impl ServerLanguageFileCache {
         }
         let mut flat_dependencies = HashMap::new();
         for (deps_uri, deps_cached_file) in &RefCell::borrow_mut(&cached_file).data.dependencies {
-            let flat_deps =
-                get_dependencies(&deps_uri, &deps_cached_file, uri, &mut HashSet::new());
+            // Add itself to deps.
+            let mut unique_deps = HashSet::new();
+            unique_deps.insert(uri.clone());
+            let flat_deps = get_dependencies(&deps_uri, &deps_cached_file, uri, &mut unique_deps);
             for (deps_deps_uri, deps_deps_cached_file) in flat_deps {
                 flat_dependencies.insert(deps_deps_uri, deps_deps_cached_file);
             }
