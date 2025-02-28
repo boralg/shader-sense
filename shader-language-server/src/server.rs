@@ -146,7 +146,7 @@ impl ServerLanguage {
                         token_modifiers: vec![],
                         token_types: vec![SemanticTokenType::MACRO],
                     },
-                    range: Some(true),
+                    range: None,
                     full: Some(SemanticTokensFullOptions::Bool(true)),
                 }),
             ),
@@ -510,7 +510,6 @@ impl ServerLanguage {
                     ));
                     return Ok(());
                 }
-                self.request_variants(&uri);
                 match ShadingLanguage::from_str(params.text_document.language_id.as_str()) {
                     Ok(shading_language) => {
                         let language_data = self.language_data.get_mut(&shading_language).unwrap();

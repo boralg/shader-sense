@@ -1,12 +1,8 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use log::debug;
-use lsp_types::{notification::Notification, request::Request, TextDocumentIdentifier, Url};
+use lsp_types::{notification::Notification, request::Request, TextDocumentIdentifier};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use shader_sense::shader::ShaderStage;
-
-use super::ServerLanguage;
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +31,7 @@ impl Notification for DidChangeShaderVariant {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum ShaderVariantRequest {}
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
@@ -56,7 +53,7 @@ impl Request for ShaderVariantRequest {
     const METHOD: &'static str = "textDocument/shaderVariant";
 }
 
-impl ServerLanguage {
+/*impl ServerLanguage {
     pub fn request_variants(&mut self, uri: &Url) {
         self.connection.send_request::<ShaderVariantRequest>(
             ShaderVariantParams {
@@ -67,15 +64,15 @@ impl ServerLanguage {
                 // This seems to be received after textDocument notification, this might be an issue...
                 debug!("Received variant {:?}", params);
 
-                /*match server.watched_files.get(&uri) {
+                match server.watched_files.get(&uri) {
                     Some(cached_file) => {
                     }
                     None => server.connection.send_notification_error(format!(
                         "Trying to visit file that is not watched : {}",
                         uri
                     )),
-                }*/
+                }
             },
         );
     }
-}
+}*/
