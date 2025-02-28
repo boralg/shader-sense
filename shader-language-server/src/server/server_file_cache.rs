@@ -299,7 +299,9 @@ impl ServerLanguageFileCache {
                 uri: &Url,
                 cached_file: &ServerFileCacheHandle,
                 included_diagnostics: &Vec<PathBuf>,
+                unique_deps: &mut HashSet<Url>,
             ) -> bool {
+                unique_deps.insert(uri.clone());
                 if included_diagnostics.contains(&uri.to_file_path().unwrap()) {
                     true
                 } else {
@@ -309,13 +311,16 @@ impl ServerLanguageFileCache {
                     {
                         Some(data) => {
                             for (deps_uri, deps_file) in &data.dependencies {
-                                if ascend_dependency_error(
-                                    includer_uri,
-                                    deps_uri,
-                                    deps_file,
-                                    included_diagnostics,
-                                ) {
-                                    return true;
+                                if !unique_deps.contains(&deps_uri) {
+                                    if ascend_dependency_error(
+                                        includer_uri,
+                                        deps_uri,
+                                        deps_file,
+                                        included_diagnostics,
+                                        unique_deps,
+                                    ) {
+                                        return true;
+                                    }
                                 }
                             }
                             false
@@ -344,6 +349,7 @@ impl ServerLanguageFileCache {
                                 &include_uri,
                                 &include_file,
                                 &included_diagnostics,
+                                &mut HashSet::new(),
                             ) {
                                 Some(ShaderDiagnostic {
                                     severity: ShaderDiagnosticSeverity::Error,
@@ -673,7 +679,7 @@ impl ServerLanguageFileCache {
                     for (deps_uri, deps_file) in &data.dependencies {
                         flat_dependencies.insert(deps_uri.clone(), Rc::clone(deps_file));
                         // Avoid stack overflow.
-                        if !unique_deps.contains(&uri) {
+                        if !unique_deps.contains(&deps_uri) {
                             let dependencies =
                                 get_dependencies(deps_uri, deps_file, includer_uri, unique_deps);
                             for (deps_deps_uri, deps_deps_file) in dependencies {
