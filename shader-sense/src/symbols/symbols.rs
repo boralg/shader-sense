@@ -91,7 +91,7 @@ impl ShaderPosition {
                 let pos = line.as_ptr() as usize - content.as_ptr() as usize;
                 pos + self.pos as usize
             }
-            None => 0, // Error
+            None => content.len(), // Line is out of bounds, assume its at the end.
         }
     }
 }
