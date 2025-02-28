@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
-    path::Path,
+    path::{Path, PathBuf},
     rc::Rc,
     time::Instant,
 };
@@ -292,6 +292,79 @@ impl ServerLanguageFileCache {
             diagnostic_list
                 .diagnostics
                 .retain(|e| e.severity.is_required(required_severity.clone()));
+
+            // If includes have issues, diagnose them.
+            fn ascend_dependency_error(
+                includer_uri: &Url,
+                uri: &Url,
+                cached_file: &ServerFileCacheHandle,
+                included_diagnostics: &Vec<PathBuf>,
+            ) -> bool {
+                if included_diagnostics.contains(&uri.to_file_path().unwrap()) {
+                    true
+                } else {
+                    match RefCell::borrow(&cached_file)
+                        .included_data
+                        .get(&includer_uri)
+                    {
+                        Some(data) => {
+                            for (deps_uri, deps_file) in &data.dependencies {
+                                if ascend_dependency_error(
+                                    includer_uri,
+                                    deps_uri,
+                                    deps_file,
+                                    included_diagnostics,
+                                ) {
+                                    return true;
+                                }
+                            }
+                            false
+                        }
+                        None => false,
+                    }
+                }
+            }
+            let included_diagnostics: Vec<PathBuf> = diagnostic_list
+                .diagnostics
+                .iter()
+                .filter(|diag| diag.severity == ShaderDiagnosticSeverity::Error)
+                .map(|diag| diag.range.start.file_path.clone())
+                .collect();
+            let mut ascended_diagnostics: Vec<ShaderDiagnostic> = RefCell::borrow(&cached_file)
+                .data
+                .preprocessor_cache
+                .includes
+                .iter()
+                .filter_map(|include| {
+                    let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
+                    match self.get_dependency(&include_uri) {
+                        Some(include_file) => {
+                            if ascend_dependency_error(
+                                &uri,
+                                &include_uri,
+                                &include_file,
+                                &included_diagnostics,
+                            ) {
+                                Some(ShaderDiagnostic {
+                                    severity: ShaderDiagnosticSeverity::Error,
+                                    error: format!("File {} has issues", include.relative_path),
+                                    range: include.range.clone(),
+                                })
+                            } else {
+                                None
+                            }
+                        }
+                        None => Some(ShaderDiagnostic {
+                            severity: ShaderDiagnosticSeverity::Error,
+                            error: format!("Failed to get dependency {}", include.relative_path),
+                            range: include.range.clone(),
+                        }),
+                    }
+                })
+                .collect();
+            diagnostic_list
+                .diagnostics
+                .append(&mut ascended_diagnostics);
 
             include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
                 data.diagnostic_cache
