@@ -666,13 +666,14 @@ impl ServerLanguageFileCache {
             includer_uri: &Url,
             unique_deps: &mut HashSet<Url>,
         ) -> HashMap<Url, ServerFileCacheHandle> {
+            unique_deps.insert(uri.clone());
             let mut flat_dependencies = HashMap::new();
             match RefCell::borrow(cached_file).included_data.get(includer_uri) {
                 Some(data) => {
                     for (deps_uri, deps_file) in &data.dependencies {
                         flat_dependencies.insert(deps_uri.clone(), Rc::clone(deps_file));
                         // Avoid stack overflow.
-                        if unique_deps.insert(uri.clone()) {
+                        if !unique_deps.contains(&uri) {
                             let dependencies =
                                 get_dependencies(deps_uri, deps_file, includer_uri, unique_deps);
                             for (deps_deps_uri, deps_deps_file) in dependencies {
