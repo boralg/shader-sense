@@ -45,7 +45,16 @@ void main() {
     float f = 1;
 #endif
 
+// unary defined expression
 #if !defined(CONDITION_DEFINED) && !defined(CONDITION_NOT_DEFINED)
-    float h = 1.0; //woops
+    float h = 1.0;
+#endif
+
+// region depending on region
+#if CONDITION_NOT_DEFINED
+	#define CONDITION_NOT_DEFINED 1
+#endif
+#ifdef CONDITION_NOT_DEFINED
+	#error "Should not be reached"
 #endif
 }
