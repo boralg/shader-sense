@@ -426,35 +426,6 @@ impl ShaderSymbolList {
         serde_json::from_str::<ShaderSymbolList>(&file_content)
             .expect("Failed to parse ShaderSymbolList")
     }
-    pub fn find_symbols_after(
-        &self,
-        label: String,
-        position: &ShaderPosition,
-    ) -> Vec<ShaderSymbol> {
-        self.iter()
-            .map(|e| {
-                e.0.iter()
-                    .filter_map(|e| {
-                        if e.label == label {
-                            match &e.range {
-                                Some(range) => {
-                                    if *position < range.start {
-                                        Some(e.clone())
-                                    } else {
-                                        None
-                                    }
-                                }
-                                None => Some(e.clone()),
-                            }
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<ShaderSymbol>>()
-            })
-            .collect::<Vec<Vec<ShaderSymbol>>>()
-            .concat()
-    }
     pub fn find_symbols_before(
         &self,
         label: String,
@@ -467,7 +438,9 @@ impl ShaderSymbolList {
                         if e.label == label {
                             match &e.range {
                                 Some(range) => {
-                                    if *position > range.start {
+                                    if *position > range.start
+                                        || range.start.file_path != position.file_path
+                                    {
                                         Some(e.clone())
                                     } else {
                                         None
