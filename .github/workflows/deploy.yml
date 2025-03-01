@@ -80,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy # Dont really need but keep to avoid issue on issues.
     # Skip pre-release because cargo dont support pre-release tag.
-    if: !github.event.release.prerelease
+    if: ${{ !github.event.release.prerelease }}
 
     steps:
       - uses: actions/checkout@v4 # Required for release upload
