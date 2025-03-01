@@ -102,7 +102,7 @@ impl IncludeHandler {
         // - path.exists(): approximatively 100us
         // - path.is_file(): approximatively 40us
         // - std::fs::exists(&path).unwrap_or(false): approximatively 40us but only stable with Rust>1.81
-        if relative_path.exists() {
+        if relative_path.is_file() {
             Some(PathBuf::from(relative_path))
         } else {
             // Check directory stack.
@@ -110,7 +110,7 @@ impl IncludeHandler {
                 let path = Path::new(directory_stack).join(&relative_path);
                 if path.is_file() {
                     if let Some(parent) = path.parent() {
-                        self.directory_stack.insert(PathBuf::from(parent));
+                        self.directory_stack.insert(canonicalize(parent).unwrap());
                     }
                     self.dependencies.add_dependency(path.clone());
                     return Some(path);
@@ -121,7 +121,7 @@ impl IncludeHandler {
                 let path = Path::new(include_path).join(&relative_path);
                 if path.is_file() {
                     if let Some(parent) = path.parent() {
-                        self.directory_stack.insert(PathBuf::from(parent));
+                        self.directory_stack.insert(canonicalize(parent).unwrap());
                     }
                     self.dependencies.add_dependency(path.clone());
                     return Some(path);
@@ -133,7 +133,7 @@ impl IncludeHandler {
             {
                 if target_path.is_file() {
                     if let Some(parent) = target_path.parent() {
-                        self.directory_stack.insert(PathBuf::from(parent));
+                        self.directory_stack.insert(canonicalize(parent).unwrap());
                     }
                     self.dependencies.add_dependency(target_path.clone());
                     return Some(target_path);

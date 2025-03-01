@@ -92,7 +92,7 @@ impl glslang::include::IncludeHandler for GlslangIncludeHandler<'_> {
         &mut self,
         _ty: IncludeType, // TODO: should use them ?
         header_name: &str,
-        includer_name: &str,
+        _includer_name: &str,
         _include_depth: usize,
     ) -> Option<IncludeResult> {
         if Path::new(header_name) == self.file_name {
@@ -106,18 +106,9 @@ impl glslang::include::IncludeHandler for GlslangIncludeHandler<'_> {
                 None => {}
             }
         }
-        let filename = if includer_name.is_empty() {
-            PathBuf::from(header_name)
-        } else {
-            if let Some(parent) = Path::new(includer_name).parent() {
-                parent.join(header_name)
-            } else {
-                PathBuf::from(header_name)
-            }
-        };
         match self
             .include_handler
-            .search_in_includes(filename.as_path(), self.include_callback)
+            .search_in_includes(Path::new(header_name), self.include_callback)
         {
             Some(data) => Some(IncludeResult {
                 name: String::from(header_name),
@@ -130,12 +121,13 @@ impl glslang::include::IncludeHandler for GlslangIncludeHandler<'_> {
 
 // GLSLang does not support linting header file, so to lint them,
 // We include them in a template file.
-const INCLUDE_RESOLVING: &str = r#"
+const INCLUDE_RESOLVING_GLSL: &str = r#"
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "{}"
-void main() {
-}
+"#;
+const INCLUDE_RESOLVING_HLSL: &str = r#"
+#include "{}"
 "#;
 
 impl Glslang {
@@ -287,10 +279,17 @@ impl Validator for Glslang {
                 // If we dont have a stage, treat it as an include by including it in template file.
                 // GLSLang requires to have stage for linting.
                 // This will prevent lint on typing to works though... except if we use callback
-                (
-                    ShaderStage::Fragment,
-                    INCLUDE_RESOLVING.replace("{}", file_path.to_string_lossy().borrow()),
-                )
+                if self.hlsl {
+                    (
+                        ShaderStage::Fragment,
+                        INCLUDE_RESOLVING_HLSL.replace("{}", file_path.to_string_lossy().borrow()),
+                    )
+                } else {
+                    (
+                        ShaderStage::Fragment,
+                        INCLUDE_RESOLVING_GLSL.replace("{}", file_path.to_string_lossy().borrow()),
+                    )
+                }
             };
 
         let source = ShaderSource::try_from(shader_source).expect("Failed to read from source");
@@ -351,7 +350,12 @@ impl Validator for Glslang {
                 },
                 messages: glslang::ShaderMessage::CASCADING_ERRORS
                     | glslang::ShaderMessage::DEBUG_INFO
-                    | glslang::ShaderMessage::DISPLAY_ERROR_COLUMN,
+                    | glslang::ShaderMessage::DISPLAY_ERROR_COLUMN
+                    | if self.hlsl && params.hlsl_enable16bit_types {
+                        glslang::ShaderMessage::HLSL_ENABLE_16BIT_TYPES
+                    } else {
+                        glslang::ShaderMessage::DEFAULT
+                    },
                 ..Default::default()
             },
             Some(&defines),
