@@ -13,6 +13,9 @@ This language server support a few options :
 - **Signature**: view the signatures of the current function.
 - **Hover**: view the declaration of an element by hovering it.
 - **Goto**: allow to go to declaration of an element.
+- **Document symbol**: Request symbols for document.
+- **Workspace symbol**: Request symbols for workspace.
+- **Inactive regions**: Detect inactive preprocessor regions and disable them.
 
 The server support HLSL, GLSL, WGSL diagnostics, but symbol requests are not implemented for WGSL yet.
 
