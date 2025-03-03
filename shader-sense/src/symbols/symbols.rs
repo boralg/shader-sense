@@ -76,13 +76,22 @@ impl ShaderPosition {
         }
     }
     pub fn from_byte_offset(content: &str, byte_offset: usize, file_path: &Path) -> ShaderPosition {
-        let line = content[..byte_offset].lines().count() - 1;
-        let pos = content[byte_offset..].as_ptr() as usize
-            - content[..byte_offset].lines().last().unwrap().as_ptr() as usize;
-        ShaderPosition {
-            line: line as u32,
-            pos: pos as u32,
-            file_path: PathBuf::from(file_path),
+        // else code panic if byte_offset is 0.
+        if byte_offset == 0 {
+            ShaderPosition {
+                line: 0,
+                pos: 0,
+                file_path: PathBuf::from(file_path),
+            }
+        } else {
+            let line = content[..byte_offset].lines().count() - 1;
+            let pos = content[byte_offset..].as_ptr() as usize
+                - content[..byte_offset].lines().last().unwrap().as_ptr() as usize;
+            ShaderPosition {
+                line: line as u32,
+                pos: pos as u32,
+                file_path: PathBuf::from(file_path),
+            }
         }
     }
     pub fn to_byte_offset(&self, content: &str) -> usize {
