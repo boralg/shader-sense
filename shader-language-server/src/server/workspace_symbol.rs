@@ -27,8 +27,8 @@ impl ServerLanguage {
                 symbols
                     .iter()
                     .filter(|(_, ty)| {
-                        // For workspace, only publish function & types
-                        *ty == ShaderSymbolType::Functions || *ty == ShaderSymbolType::Types
+                        // For workspace, only publish function, types & macros
+                        *ty == ShaderSymbolType::Functions || *ty == ShaderSymbolType::Types || *ty == ShaderSymbolType::Macros
                     })
                     .map(|(symbols, ty)| {
                         symbols
@@ -46,6 +46,7 @@ impl ServerLanguage {
                                     kind: match ty {
                                         ShaderSymbolType::Types => SymbolKind::TYPE_PARAMETER,
                                         ShaderSymbolType::Functions => SymbolKind::FUNCTION,
+                                        ShaderSymbolType::Macros => SymbolKind::CONSTANT,
                                         _ => unreachable!("Should be filtered out"),
                                     },
                                     tags: None,
