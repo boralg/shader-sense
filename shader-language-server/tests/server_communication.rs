@@ -1,7 +1,8 @@
 use std::{
     env,
     io::{BufReader, Read, Write},
-    process::{ChildStdin, Command, Stdio}, thread,
+    process::{ChildStdin, Command, Stdio},
+    thread,
 };
 
 use lsp_types::{

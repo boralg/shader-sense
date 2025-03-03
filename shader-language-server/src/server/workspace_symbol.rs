@@ -28,7 +28,9 @@ impl ServerLanguage {
                     .iter()
                     .filter(|(_, ty)| {
                         // For workspace, only publish function, types & macros
-                        *ty == ShaderSymbolType::Functions || *ty == ShaderSymbolType::Types || *ty == ShaderSymbolType::Macros
+                        *ty == ShaderSymbolType::Functions
+                            || *ty == ShaderSymbolType::Types
+                            || *ty == ShaderSymbolType::Macros
                     })
                     .map(|(symbols, ty)| {
                         symbols

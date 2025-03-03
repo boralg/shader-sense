@@ -1,7 +1,7 @@
 use crate::{
     shader_error::ShaderError,
     symbols::{
-        hlsl::{self, HlslSymbolRegionFinder},
+        hlsl::HlslSymbolRegionFinder,
         symbol_parser::SymbolRegionFinder,
         symbol_tree::SymbolTree,
         symbols::{ShaderPreprocessor, ShaderRegion},
