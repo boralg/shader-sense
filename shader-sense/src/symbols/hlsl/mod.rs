@@ -8,8 +8,10 @@ mod hlsl_word_chain;
 use hlsl_filter::get_hlsl_filters;
 use hlsl_parser::get_hlsl_parsers;
 use hlsl_preprocessor::get_hlsl_preprocessor_parser;
-use hlsl_regions::HlslSymbolRegionFinder;
 use tree_sitter::Parser;
+
+// For glsl
+pub use hlsl_regions::HlslSymbolRegionFinder;
 
 use crate::shader_error::ShaderError;
 
@@ -44,7 +46,7 @@ impl HlslSymbolProvider {
                 get_hlsl_parsers(),
                 get_hlsl_filters(),
                 get_hlsl_preprocessor_parser(),
-                Box::new(HlslSymbolRegionFinder::new()),
+                Box::new(HlslSymbolRegionFinder::new(lang.clone())),
             ),
             shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
                 "hlsl-intrinsics.json"
@@ -107,6 +109,7 @@ mod tests {
         shader::ShadingLanguage,
         symbols::{
             create_symbol_provider,
+            symbol_provider::SymbolProvider,
             symbol_tree::SymbolTree,
             symbols::{ShaderPosition, ShaderRange, ShaderRegion, ShaderSymbolParams},
         },
@@ -114,9 +117,16 @@ mod tests {
 
     #[test]
     fn test_hlsl_regions() {
+        test_regions(create_symbol_provider(ShadingLanguage::Hlsl));
+    }
+    #[test]
+    fn test_glsl_regions() {
+        test_regions(create_symbol_provider(ShadingLanguage::Glsl));
+    }
+
+    fn test_regions(mut symbol_provider: Box<dyn SymbolProvider>) {
         let file_path = Path::new("./test/hlsl/regions.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let mut symbol_provider = create_symbol_provider(ShadingLanguage::Hlsl);
         let symbol_tree =
             SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
         let preprocessor = symbol_provider

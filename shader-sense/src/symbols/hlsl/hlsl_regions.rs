@@ -121,9 +121,9 @@ pub struct HlslSymbolRegionFinder {
 }
 
 impl HlslSymbolRegionFinder {
-    pub fn new() -> Self {
+    pub fn new(lang: tree_sitter::Language) -> Self {
         let query_if = Query::new(
-            tree_sitter_hlsl::language(),
+            lang,
             r#"
         [
             (preproc_if)

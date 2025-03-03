@@ -8,7 +8,7 @@ mod glsl_word_chain;
 use glsl_filter::get_glsl_filters;
 use glsl_parser::get_glsl_parsers;
 use glsl_preprocessor::get_glsl_preprocessor_parser;
-use glsl_regions::GgslRegionFinder;
+use glsl_regions::GlslRegionFinder;
 use tree_sitter::Parser;
 
 use crate::shader_error::ShaderError;
@@ -41,7 +41,7 @@ impl GlslSymbolProvider {
                 get_glsl_parsers(),
                 get_glsl_filters(),
                 get_glsl_preprocessor_parser(),
-                Box::new(GgslRegionFinder {}),
+                Box::new(GlslRegionFinder::new()),
             ),
             shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
                 "glsl-intrinsics.json"
