@@ -13,7 +13,7 @@ use tree_sitter::Parser;
 // For glsl
 pub use hlsl_regions::HlslSymbolRegionFinder;
 
-use crate::shader_error::ShaderError;
+use crate::{include::IncludeHandler, shader_error::ShaderError};
 
 use super::{
     symbol_parser::SymbolParser,
@@ -67,14 +67,15 @@ impl SymbolProvider for HlslSymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
+        include_handler: &mut IncludeHandler,
     ) -> Result<ShaderPreprocessor, ShaderError> {
         self.symbol_parser
-            .query_file_preprocessor(symbol_tree, symbol_params)
+            .query_file_preprocessor(symbol_tree, symbol_params, include_handler)
     }
     fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
-        preprocessor: Option<&ShaderPreprocessor>,
+        preprocessor: &ShaderPreprocessor,
     ) -> Result<ShaderSymbolList, ShaderError> {
         self.symbol_parser
             .query_file_symbols(symbol_tree, preprocessor)
@@ -106,6 +107,7 @@ mod tests {
     use std::path::Path;
 
     use crate::{
+        include::IncludeHandler,
         shader::ShadingLanguage,
         symbols::{
             create_symbol_provider,
@@ -130,7 +132,11 @@ mod tests {
         let symbol_tree =
             SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
         let preprocessor = symbol_provider
-            .query_preprocessor(&symbol_tree, &ShaderSymbolParams::default())
+            .query_preprocessor(
+                &symbol_tree,
+                &ShaderSymbolParams::default(),
+                &mut IncludeHandler::default(file_path),
+            )
             .unwrap();
         //let symbols = symbol_provider.query_file_symbols(&symbol_tree, Some(&preprocessor));
         let set_region =

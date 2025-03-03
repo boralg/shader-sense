@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use shader_sense::{
+    include::IncludeHandler,
     shader::ShadingLanguage,
     symbols::{create_symbol_provider, symbol_tree::SymbolTree, symbols::ShaderSymbolParams},
     validator::{create_validator, validator::ValidationParams},
@@ -31,10 +32,14 @@ fn query_all_symbol(shading_language: ShadingLanguage, shader_path: &Path) {
     match SymbolTree::new(symbol_provider.as_mut(), shader_path, &shader_content) {
         Ok(symbol_tree) => {
             let preprocessor = symbol_provider
-                .query_preprocessor(&symbol_tree, &ShaderSymbolParams::default())
+                .query_preprocessor(
+                    &symbol_tree,
+                    &ShaderSymbolParams::default(),
+                    &mut IncludeHandler::default(shader_path),
+                )
                 .unwrap();
             let symbol_list = symbol_provider
-                .query_file_symbols(&symbol_tree, Some(&preprocessor))
+                .query_file_symbols(&symbol_tree, &preprocessor)
                 .unwrap();
             println!("Found symbols: {:#?}", symbol_list);
         }

@@ -6,7 +6,7 @@ use wgsl_filter::get_wgsl_filters;
 use wgsl_parser::get_wgsl_parsers;
 use wgsl_regions::WgslRegionFinder;
 
-use crate::shader_error::ShaderError;
+use crate::{include::IncludeHandler, shader_error::ShaderError};
 
 use super::{
     symbol_parser::SymbolParser,
@@ -60,15 +60,16 @@ impl SymbolProvider for WgslSymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
+        include_handler: &mut IncludeHandler,
     ) -> Result<ShaderPreprocessor, ShaderError> {
         self.symbol_parser
-            .query_file_preprocessor(symbol_tree, symbol_params)
+            .query_file_preprocessor(symbol_tree, symbol_params, include_handler)
     }
 
     fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
-        preprocessor: Option<&ShaderPreprocessor>,
+        preprocessor: &ShaderPreprocessor,
     ) -> Result<ShaderSymbolList, ShaderError> {
         self.symbol_parser
             .query_file_symbols(symbol_tree, preprocessor)

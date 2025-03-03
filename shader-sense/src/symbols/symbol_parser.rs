@@ -3,6 +3,7 @@ use std::path::Path;
 use tree_sitter::{Node, Query, QueryCursor, QueryMatch};
 
 use crate::{
+    include::IncludeHandler,
     shader_error::ShaderError,
     symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolList},
 };
@@ -129,6 +130,7 @@ pub trait SymbolTreePreprocessorParser {
         shader_content: &str,
         symbol_params: &ShaderSymbolParams,
         preprocessor: &mut ShaderPreprocessor,
+        include_handler: &mut IncludeHandler,
     );
 }
 
@@ -192,6 +194,7 @@ impl SymbolParser {
         &self,
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
+        include_handler: &mut IncludeHandler,
     ) -> Result<ShaderPreprocessor, ShaderError> {
         let mut preprocessor = ShaderPreprocessor::new(symbol_params);
         for parser in &self.preprocessor_parsers {
@@ -207,6 +210,7 @@ impl SymbolParser {
                     &symbol_tree.content,
                     symbol_params,
                     &mut preprocessor,
+                    include_handler,
                 );
             }
         }
@@ -235,14 +239,8 @@ impl SymbolParser {
     pub fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
-        preprocessor: Option<&ShaderPreprocessor>,
+        preprocessor: &ShaderPreprocessor,
     ) -> Result<ShaderSymbolList, ShaderError> {
-        let file_preprocessor = match preprocessor {
-            Some(preprocessor) => preprocessor.clone(),
-            // This will not include external preprocessor symbols
-            // (such as file included through another file, and having parent file preproc)
-            None => self.query_file_preprocessor(symbol_tree, &ShaderSymbolParams::default())?,
-        };
         // TODO: Should use something else than name...
         // Required for shader stage filtering...
         let file_name = symbol_tree
@@ -255,7 +253,7 @@ impl SymbolParser {
             // Filter inactive regions.
             let is_in_inactive_region = match &symbol.range {
                 Some(range) => {
-                    for region in &file_preprocessor.regions {
+                    for region in &preprocessor.regions {
                         if !region.is_active && region.range.contain_bounds(&range) {
                             return false; // Symbol is in inactive region. Remove it.
                         }

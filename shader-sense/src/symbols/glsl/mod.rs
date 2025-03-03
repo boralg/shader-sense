@@ -11,7 +11,7 @@ use glsl_preprocessor::get_glsl_preprocessor_parser;
 use glsl_regions::GlslRegionFinder;
 use tree_sitter::Parser;
 
-use crate::shader_error::ShaderError;
+use crate::{include::IncludeHandler, shader_error::ShaderError};
 
 use super::{
     symbol_parser::SymbolParser,
@@ -63,15 +63,16 @@ impl SymbolProvider for GlslSymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
+        include_handler: &mut IncludeHandler,
     ) -> Result<ShaderPreprocessor, ShaderError> {
         self.symbol_parser
-            .query_file_preprocessor(symbol_tree, symbol_params)
+            .query_file_preprocessor(symbol_tree, symbol_params, include_handler)
     }
 
     fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
-        preprocessor: Option<&ShaderPreprocessor>,
+        preprocessor: &ShaderPreprocessor,
     ) -> Result<ShaderSymbolList, ShaderError> {
         self.symbol_parser
             .query_file_symbols(symbol_tree, preprocessor)

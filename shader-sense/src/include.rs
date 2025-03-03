@@ -64,20 +64,21 @@ impl Dependencies {
 }
 
 impl IncludeHandler {
+    pub fn default(file: &Path) -> Self {
+        Self::new(file, Vec::new(), HashMap::new())
+    }
     pub fn new(
         file: &Path,
         includes: Vec<String>,
         path_remapping: HashMap<PathBuf, PathBuf>,
     ) -> Self {
-        // Add local path to include path
-        let mut includes_mut = includes;
+        // Add local path to directory stack
         let cwd = file.parent().unwrap();
-        let str = String::from(cwd.to_string_lossy());
-        // TODO: push cwd in first. Or move it elsewhere
-        includes_mut.push(str);
+        let mut stack = HashSet::new();
+        stack.insert(cwd.into());
         Self {
-            includes: includes_mut,
-            directory_stack: HashSet::new(),
+            includes: includes,
+            directory_stack: stack,
             dependencies: Dependencies::new(),
             path_remapping: path_remapping,
         }
@@ -132,9 +133,7 @@ impl IncludeHandler {
                 Self::resolve_virtual_path(relative_path, &self.path_remapping)
             {
                 if target_path.is_file() {
-                    if let Some(parent) = target_path.parent() {
-                        self.directory_stack.insert(canonicalize(parent).unwrap());
-                    }
+                    // Don't add virtual path to stack, as they are well defined already.
                     self.dependencies.add_dependency(target_path.clone());
                     return Some(target_path);
                 }

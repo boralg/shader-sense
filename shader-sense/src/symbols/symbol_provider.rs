@@ -2,7 +2,7 @@ use std::path::Path;
 
 use tree_sitter::Parser;
 
-use crate::shader_error::ShaderError;
+use crate::{include::IncludeHandler, shader_error::ShaderError};
 
 use super::{
     symbol_tree::SymbolTree,
@@ -20,12 +20,13 @@ pub trait SymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         symbol_params: &ShaderSymbolParams,
+        include_handler: &mut IncludeHandler,
     ) -> Result<ShaderPreprocessor, ShaderError>;
     // Query file symbol from file tree.
     fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
-        preprocessor: Option<&ShaderPreprocessor>,
+        preprocessor: &ShaderPreprocessor,
     ) -> Result<ShaderSymbolList, ShaderError>;
     // Create symbol tree from file.
     fn create_tree(

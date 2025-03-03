@@ -13,6 +13,7 @@ use crate::server::{
 use log::{debug, info, warn};
 use lsp_types::Url;
 use shader_sense::{
+    include::IncludeHandler,
     shader::ShadingLanguage,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
@@ -55,13 +56,23 @@ pub struct ServerLanguageFileCache {
 struct IncludeContext {
     includer_uri: Url,                  // The file from which this file is included.
     visited_dependencies: HashSet<Url>, // Already visited deps, needed for once.
+    include_handler: IncludeHandler,    // Handler for includes.
 }
 
 impl IncludeContext {
-    pub fn main(uri: &Url) -> Self {
+    pub fn main(
+        uri: &Url,
+        includes: Vec<String>,
+        path_remapping: HashMap<PathBuf, PathBuf>,
+    ) -> Self {
         Self {
             includer_uri: uri.clone(),
             visited_dependencies: HashSet::new(),
+            include_handler: IncludeHandler::new(
+                &uri.to_file_path().unwrap(),
+                includes,
+                path_remapping,
+            ),
         }
     }
     pub fn should_visit(&mut self, uri: &Url, _preprocessor: &ShaderPreprocessor) -> bool {
@@ -120,14 +131,14 @@ impl ServerLanguageFileCache {
         let shading_language = RefCell::borrow(cached_file).shading_language;
         // We are recomputing every deps symbols here, but not really required, isnt it ?
         let now_symbols = Instant::now();
-        let (preprocessor, symbol_list, diagnostics) = match symbol_provider
-            .query_preprocessor(&RefCell::borrow(cached_file).symbol_tree, symbol_params)
-        {
+        let (preprocessor, symbol_list, diagnostics) = match symbol_provider.query_preprocessor(
+            &RefCell::borrow(cached_file).symbol_tree,
+            symbol_params,
+            &mut include_context.include_handler,
+        ) {
             Ok(preprocessor) => {
-                let mut symbol_list = symbol_provider.query_file_symbols(
-                    &RefCell::borrow(cached_file).symbol_tree,
-                    Some(&preprocessor),
-                )?;
+                let mut symbol_list = symbol_provider
+                    .query_file_symbols(&RefCell::borrow(cached_file).symbol_tree, &preprocessor)?;
                 preprocessor.preprocess_symbols(&mut symbol_list);
                 (preprocessor, symbol_list, ShaderDiagnosticList::empty())
             }
@@ -201,7 +212,14 @@ impl ServerLanguageFileCache {
         shader_variant: Option<ShaderVariant>,
         config: &ServerConfig,
     ) -> Result<(), ShaderError> {
-        let mut include_context = IncludeContext::main(uri);
+        // TODO: remove include context & replace it by includeHandler.
+        // But it does not support uri though... Or include handler in include context.
+        let mut symbol_params = config.into_symbol_params();
+        let mut include_context = IncludeContext::main(
+            uri,
+            symbol_params.includes.clone(),
+            symbol_params.path_remapping.clone(),
+        );
         // Reset cache
         include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
             data.preprocessor_cache = ShaderPreprocessor::default();
@@ -210,7 +228,6 @@ impl ServerLanguageFileCache {
         });
         // Get symbols for main file.
         if config.symbols {
-            let mut symbol_params = config.into_symbol_params();
             // Add variant data if some.
             if let Some(variant) = &shader_variant {
                 for (variable, value) in &variant.defines {
@@ -791,7 +808,7 @@ impl ServerLanguageFileCache {
                 deps_uri,
                 deps_cached_file,
                 uri,
-                &mut IncludeContext::main(uri),
+                &mut IncludeContext::main(uri, Vec::new(), HashMap::new()),
             ));
         }
         // Add config symbols
