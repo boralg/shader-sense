@@ -14,6 +14,7 @@ pub fn get_glsl_parsers() -> Vec<Box<dyn SymbolTreeParser>> {
         Box::new(GlslFunctionTreeParser {}),
         Box::new(GlslStructTreeParser {}),
         Box::new(GlslVariableTreeParser {}),
+        Box::new(GlslUniformBlock {}),
     ]
 }
 
@@ -83,6 +84,94 @@ impl SymbolTreeParser for GlslFunctionTreeParser {
             range: Some(range),
             scope_stack: Some(scope_stack), // In GLSL, all function are global scope.
         });
+    }
+}
+
+struct GlslUniformBlock {}
+
+impl SymbolTreeParser for GlslUniformBlock {
+    fn get_query(&self) -> String {
+        r#"(declaration
+            (identifier) @uniform.identifier
+            (field_declaration_list
+                (field_declaration 
+                    type: (_) @uniform.param.type
+                    declarator: (_) @uniform.param.decl
+                )+
+            )
+            (identifier)? @uniform.name
+        )"#
+        .into()
+    }
+    fn process_match(
+        &self,
+        matches: tree_sitter::QueryMatch,
+        file_path: &Path,
+        shader_content: &str,
+        _scopes: &Vec<ShaderScope>,
+        symbols: &mut ShaderSymbolListBuilder,
+    ) {
+        let capture_count = matches.captures.len();
+        if capture_count % 2 == 0 {
+            // name
+            let identifier_node = matches.captures[0].node;
+            let identifier_range =
+                ShaderRange::from_range(identifier_node.range(), file_path.into());
+            symbols.add_type(ShaderSymbol {
+                label: get_name(shader_content, identifier_node).into(),
+                description: "".into(),
+                version: "".into(),
+                stages: vec![],
+                link: None,
+                data: ShaderSymbolData::Struct {
+                    members: matches.captures[1..capture_count - 1]
+                        .chunks(2)
+                        .map(|w| ShaderParameter {
+                            ty: get_name(shader_content, w[0].node).into(),
+                            label: get_name(shader_content, w[1].node).into(),
+                            description: "".into(),
+                        })
+                        .collect::<Vec<ShaderParameter>>(),
+                    methods: vec![],
+                },
+                range: Some(identifier_range),
+                scope_stack: None, // Uniform are global stack in GLSL.
+            });
+            // Add variable of type
+            let variable_node = matches.captures.last().unwrap().node;
+            let variable_range = ShaderRange::from_range(variable_node.range(), file_path.into());
+            symbols.add_variable(ShaderSymbol {
+                label: get_name(shader_content, variable_node).into(),
+                description: "".into(),
+                version: "".into(),
+                stages: vec![],
+                link: None,
+                data: ShaderSymbolData::Variables {
+                    ty: get_name(shader_content, identifier_node).into(),
+                },
+                range: Some(variable_range),
+                scope_stack: None, // Uniform are global stack in GLSL.
+            });
+        } else {
+            // no name, content global
+            let _identifier_node = matches.captures[0].node;
+            for uniform_value in matches.captures[1..].chunks(2) {
+                let label_node = uniform_value[1].node;
+                let range = ShaderRange::from_range(label_node.range(), file_path.into());
+                symbols.add_variable(ShaderSymbol {
+                    label: get_name(shader_content, uniform_value[1].node).into(),
+                    description: "".into(),
+                    version: "".into(),
+                    stages: vec![],
+                    link: None,
+                    data: ShaderSymbolData::Variables {
+                        ty: get_name(shader_content, uniform_value[0].node).into(),
+                    },
+                    range: Some(range),
+                    scope_stack: None, // Uniform are global stack in GLSL.
+                });
+            }
+        }
     }
 }
 

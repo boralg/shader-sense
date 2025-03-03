@@ -34,7 +34,7 @@ mod tests {
         include::IncludeHandler,
         shader::ShadingLanguage,
         shader_error::ShaderError,
-        symbols::symbols::{ShaderPosition, ShaderSymbolParams},
+        symbols::symbols::{ShaderPosition, ShaderSymbolData, ShaderSymbolParams},
     };
 
     use super::{
@@ -228,5 +228,48 @@ mod tests {
                 variable_not_visible
             );
         }
+    }
+    #[test]
+    fn uniform_glsl_ok() {
+        // Ensure parsing of symbols is OK
+        let file_path = Path::new("./test/glsl/uniforms.frag.glsl");
+        let shader_content = std::fs::read_to_string(file_path).unwrap();
+        let mut symbol_provider = create_symbol_provider(ShadingLanguage::Glsl);
+        let symbol_tree =
+            SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
+        let preprocessor = symbol_provider
+            .query_preprocessor(
+                &symbol_tree,
+                &ShaderSymbolParams::default(),
+                &mut IncludeHandler::default(file_path),
+            )
+            .unwrap();
+        let symbols = symbol_provider
+            .query_file_symbols(&symbol_tree, &preprocessor)
+            .unwrap();
+        assert!(symbols
+            .types
+            .iter()
+            .find(|e| e.label == "MatrixHidden")
+            .is_some());
+        assert!(symbols
+            .variables
+            .iter()
+            .find(|e| e.label == "u_accessor"
+                && match &e.data {
+                    ShaderSymbolData::Variables { ty } => ty == "MatrixHidden",
+                    _ => false,
+                })
+            .is_some());
+        assert!(symbols
+            .variables
+            .iter()
+            .find(|e| e.label == "u_modelviewGlobal")
+            .is_some());
+        assert!(symbols
+            .variables
+            .iter()
+            .find(|e| e.label == "u_modelviewHidden")
+            .is_none());
     }
 }
