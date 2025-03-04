@@ -1,5 +1,5 @@
 use log::info;
-use shader_language_server::server;
+mod server;
 
 fn get_version() -> &'static str {
     static VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -2,7 +2,6 @@ use std::{
     env,
     io::{BufReader, Read, Write},
     process::{ChildStdin, Command, Stdio},
-    thread,
 };
 
 use lsp_types::{
@@ -44,11 +43,36 @@ fn read_response<U: Read>(reader: &mut BufReader<U>) {
 }
 
 #[test]
-#[ignore] // Only usefull for WASI to test stability but does not support Command. Need to fix.
-fn test_server_runtime() {
-    let server_path = format!("{}{}", env!("CARGO_PKG_NAME"), std::env::consts::EXE_SUFFIX);
-    println!("Server path: {}", server_path);
-    let mut child = Command::new(server_path)
+// Run on PC only to test WASI through WASMTIME
+#[cfg(not(target_os = "wasi"))]
+fn test_server_wasi_runtime() {
+    use std::path::Path;
+
+    use shader_sense::include::canonicalize;
+    let server_path = canonicalize(Path::new(&format!(
+        "../target/wasm32-wasip1-threads/debug/{}.{}",
+        env!("CARGO_PKG_NAME").replace("_", "-"),
+        "wasm"
+    )))
+    .unwrap();
+    let test_folder = canonicalize(Path::new("../shader-sense/test")).unwrap();
+    println!("Server path: {}", server_path.display());
+    println!("Test folder: {}", test_folder.display());
+    // If wasm is not built, simply skip the test.
+    // On PC build workflow, no WASI available, too heavy to rebuild it, so skip instead.
+    if !server_path.is_file() {
+        println!("WASI server not built, skipping test.");
+        return;
+    }
+    assert!(test_folder.is_dir(), "Missing Test folder");
+    let mut child = Command::new("wasmtime")
+        .args([
+            "--wasi",
+            "threads=y",
+            "--dir",
+            format!("{}::/test", test_folder.display()).as_str(),
+            format!("{}", server_path.display()).as_str(),
+        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
