@@ -11,7 +11,6 @@ use glslang::{
     Compiler, CompilerOptions, ShaderInput, ShaderSource,
 };
 use std::{
-    borrow::Borrow,
     collections::HashMap,
     path::{Path, PathBuf},
 };
@@ -62,23 +61,18 @@ impl Glslang {
 
 struct GlslangIncludeHandler<'a> {
     include_handler: IncludeHandler,
-    content: Option<&'a String>,
-    file_name: &'a Path,
     include_callback: &'a mut dyn FnMut(&Path) -> Option<String>,
 }
 
 impl<'a> GlslangIncludeHandler<'a> {
     pub fn new(
-        file: &'a Path,
+        file_path: &'a Path,
         includes: Vec<String>,
-        content: Option<&'a String>,
         path_remapping: HashMap<PathBuf, PathBuf>,
         include_callback: &'a mut dyn FnMut(&Path) -> Option<String>,
     ) -> Self {
         Self {
-            include_handler: IncludeHandler::new(file, includes, path_remapping),
-            content: content,
-            file_name: file,
+            include_handler: IncludeHandler::new(file_path, includes, path_remapping),
             include_callback: include_callback,
         }
     }
@@ -95,17 +89,6 @@ impl glslang::include::IncludeHandler for GlslangIncludeHandler<'_> {
         _includer_name: &str,
         _include_depth: usize,
     ) -> Option<IncludeResult> {
-        if Path::new(header_name) == self.file_name {
-            match self.content {
-                Some(value) => {
-                    return Some(IncludeResult {
-                        name: String::from(header_name),
-                        data: value.clone(),
-                    })
-                }
-                None => {}
-            }
-        }
         match self
             .include_handler
             .search_in_includes(Path::new(header_name), self.include_callback)
@@ -119,23 +102,13 @@ impl glslang::include::IncludeHandler for GlslangIncludeHandler<'_> {
     }
 }
 
-// GLSLang does not support linting header file, so to lint them,
-// We include them in a template file.
-const INCLUDE_RESOLVING_GLSL: &str = r#"
-#version 450
-#extension GL_GOOGLE_include_directive : require
-#include "{}"
-"#;
-const INCLUDE_RESOLVING_HLSL: &str = r#"
-#include "{}"
-"#;
-
 impl Glslang {
     fn parse_errors(
         errors: &String,
         file_path: &Path,
         includes: &Vec<String>,
         path_remapping: HashMap<PathBuf, PathBuf>,
+        offset_first_line: bool,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         let mut shader_error_list = ShaderDiagnosticList::empty();
 
@@ -178,6 +151,12 @@ impl Glslang {
                         }
                     }
                 };
+                let line = if offset_first_line {
+                    line.parse::<u32>().unwrap_or(2) - 2
+                } else {
+                    line.parse::<u32>().unwrap_or(1) - 1
+                };
+                let pos = pos.parse::<u32>().unwrap_or(0);
                 shader_error_list.push(ShaderDiagnostic {
                     severity: match level {
                         "ERROR" => ShaderDiagnosticSeverity::Error,
@@ -188,16 +167,8 @@ impl Glslang {
                     },
                     error: String::from(msg),
                     range: ShaderRange::new(
-                        ShaderPosition::new(
-                            file_path.clone(),
-                            line.parse::<u32>().unwrap_or(1) - 1,
-                            pos.parse::<u32>().unwrap_or(0),
-                        ),
-                        ShaderPosition::new(
-                            file_path.clone(),
-                            line.parse::<u32>().unwrap_or(1) - 1,
-                            pos.parse::<u32>().unwrap_or(0),
-                        ),
+                        ShaderPosition::new(file_path.clone(), line, pos),
+                        ShaderPosition::new(file_path.clone(), line, pos),
                     ),
                 });
             } else {
@@ -222,6 +193,7 @@ impl Glslang {
         err: GlslangError,
         file_path: &Path,
         params: &ValidationParams,
+        offset_first_line: bool,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         match err {
             GlslangError::PreprocessError(error) => Glslang::parse_errors(
@@ -229,18 +201,21 @@ impl Glslang {
                 file_path,
                 &params.includes,
                 params.path_remapping.clone(),
+                offset_first_line,
             ),
             GlslangError::ParseError(error) => Glslang::parse_errors(
                 &error,
                 file_path,
                 &params.includes,
                 params.path_remapping.clone(),
+                offset_first_line,
             ),
             GlslangError::LinkError(error) => Glslang::parse_errors(
                 &error,
                 file_path,
                 &params.includes,
                 params.path_remapping.clone(),
+                offset_first_line,
             ),
             GlslangError::ShaderStageNotFound(stage) => Err(ShaderError::InternalErr(format!(
                 "Shader stage not found: {:#?}",
@@ -272,23 +247,28 @@ impl Validator for Glslang {
     ) -> Result<(ShaderDiagnosticList, Dependencies), ShaderError> {
         let file_name = self.get_file_name(file_path);
 
-        let (shader_stage, shader_source) =
+        let (shader_stage, shader_source, offset_first_line) =
             if let Some(shader_stage) = ShaderStage::from_file_name(&file_name) {
-                (shader_stage, content.clone())
+                (shader_stage, content.clone(), false)
             } else {
-                // If we dont have a stage, treat it as an include by including it in template file.
-                // GLSLang requires to have stage for linting.
-                // This will prevent lint on typing to works though... except if we use callback
+                // If we dont have a stage, might require some preprocess to avoid errors.
+                // glslang **REQUIRES** to have stage for linting.
+                let default_stage = ShaderStage::Fragment;
                 if self.hlsl {
-                    (
-                        ShaderStage::Fragment,
-                        INCLUDE_RESOLVING_HLSL.replace("{}", file_path.to_string_lossy().borrow()),
-                    )
+                    // HLSL does not require version, simply assume stage.
+                    (default_stage, content.clone(), false)
                 } else {
-                    (
-                        ShaderStage::Fragment,
-                        INCLUDE_RESOLVING_GLSL.replace("{}", file_path.to_string_lossy().borrow()),
-                    )
+                    // glslang does not support linting header file, so to lint them,
+                    // Assume Fragment & add default #version if missing
+                    if content.contains("#version ") {
+                        // Main file with missing stage.
+                        (default_stage, content.clone(), false)
+                    } else {
+                        // Header file with missing stage & missing version.
+                        // WARN: Assumed this string is one line offset only.
+                        let version_header = String::from("#version 450\n");
+                        (default_stage, version_header + content.as_str(), true)
+                    }
                 }
             };
 
@@ -302,7 +282,6 @@ impl Validator for Glslang {
         let mut include_handler = GlslangIncludeHandler::new(
             file_path,
             params.includes.clone(),
-            Some(&content),
             params.path_remapping.clone(),
             include_callback,
         );
@@ -361,7 +340,7 @@ impl Validator for Glslang {
             Some(&defines),
             Some(&mut include_handler),
         )
-        .map_err(|e| self.from_glslang_error(e, file_path, &params))
+        .map_err(|e| self.from_glslang_error(e, file_path, &params, offset_first_line))
         {
             Ok(value) => value,
             Err(error) => match error {
@@ -370,7 +349,7 @@ impl Validator for Glslang {
             },
         };
         let _shader = match glslang::Shader::new(&self.compiler, input)
-            .map_err(|e| self.from_glslang_error(e, file_path, &params))
+            .map_err(|e| self.from_glslang_error(e, file_path, &params, offset_first_line))
         {
             Ok(value) => value,
             Err(error) => match error {
