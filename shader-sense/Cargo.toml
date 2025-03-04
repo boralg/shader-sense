@@ -4,13 +4,15 @@ description = "Library for runtime shader validation and representation"
 repository = "https://github.com/antaalt/shader-sense"
 keywords = ["shader", "validate", "hlsl", "glsl", "wgsl"]
 categories = ["development-tools", "graphics"]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license-file = "../LICENSE"
 readme = "../README.md"
 
 [dependencies]
+env_logger = "0.11.6"
 glslang = "0.6.0"
+log = "0.4.26"
 naga = { version = "0.12.2", features = ["wgsl-in", "validate", "span"] }
 regex = "1.10.4"
 serde = { version = "1.0.199", features = ["derive"] }
