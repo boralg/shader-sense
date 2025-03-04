@@ -541,12 +541,13 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 };
                 // Now find alternative blocks & loop on it
                 let mut regions = Vec::new();
+                let mut previous_node = cursor.node();
                 while cursor.goto_next_sibling() {
                     match cursor.field_name() {
                         Some(field_name) => {
                             if field_name == "alternative" {
                                 let region_end = ShaderPosition::from_tree_sitter_point(
-                                    cursor.node().range().start_point,
+                                    previous_node.range().end_point,
                                     &symbol_tree.file_path,
                                 );
                                 let region_range = ShaderRange::new(region_start, region_end);
@@ -576,21 +577,36 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                 )?;
                                 regions.append(&mut next_region);
                                 return Ok(regions);
+                            } else {
+                                previous_node = cursor.node();
                             }
                         }
-                        None => {}
+                        None => {
+                            match cursor.node().kind() {
+                                // Don't store endif because we already reached the end.
+                                "#endif" => {}
+                                // Some node end their line too late vs their content bcs of new line node.
+                                // Read their content last node instead and skip new line.
+                                "preproc_call" | "preproc_def" => {
+                                    let mut internal_cursor = cursor.clone();
+                                    internal_cursor.goto_first_child();
+                                    previous_node = internal_cursor.node();
+                                    while internal_cursor.goto_next_sibling() {
+                                        if internal_cursor.node().kind() != "\n" {
+                                            previous_node = internal_cursor.node();
+                                        }
+                                    }
+                                }
+                                _ => previous_node = cursor.node(),
+                            }
+                        }
                     }
                 }
-                // We can reach here on else block or block with no alternative.
-                let end_point = if cursor.node().kind() == "#endif" {
-                    cursor.node().range().start_point
-                } else {
-                    cursor.node().range().end_point
-                };
-                let region_range = ShaderRange::new(
-                    region_start,
-                    ShaderPosition::from_tree_sitter_point(end_point, &symbol_tree.file_path),
+                let end_position = ShaderPosition::from_tree_sitter_point(
+                    previous_node.range().end_point,
+                    &symbol_tree.file_path,
                 );
+                let region_range = ShaderRange::new(region_start, end_position);
                 regions.push(ShaderRegion::new(
                     region_range.clone(),
                     is_active_region != 0,

@@ -110,12 +110,41 @@ impl SymbolTree {
         fn format_debug_cursor(cursor: &mut TreeCursor, depth: usize) -> String {
             let mut debug_tree = String::new();
             loop {
-                debug_tree.push_str(&format!(
-                    "{}\"{}\": \"{}\"\n",
-                    " ".repeat(depth * 2),
-                    cursor.field_name().unwrap_or("None"),
-                    cursor.node().kind()
-                ));
+                debug_tree.push_str(&match cursor.field_name() {
+                    Some(field_name) => format!(
+                        "{}{}: {} [{}, {}] - [{}, {}]\n",
+                        " ".repeat(depth * 2),
+                        field_name,
+                        cursor.node().kind(),
+                        cursor.node().range().start_point.row,
+                        cursor.node().range().start_point.column,
+                        cursor.node().range().end_point.row,
+                        cursor.node().range().end_point.column,
+                    ),
+                    None => {
+                        if cursor.node().is_named() {
+                            format!(
+                                "{}{} [{}, {}] - [{}, {}]\n",
+                                " ".repeat(depth * 2),
+                                cursor.node().kind(),
+                                cursor.node().range().start_point.row,
+                                cursor.node().range().start_point.column,
+                                cursor.node().range().end_point.row,
+                                cursor.node().range().end_point.column,
+                            )
+                        } else {
+                            format!(
+                                "{}{:?} [{}, {}] - [{}, {}]\n",
+                                " ".repeat(depth * 2),
+                                cursor.node().kind(),
+                                cursor.node().range().start_point.row,
+                                cursor.node().range().start_point.column,
+                                cursor.node().range().end_point.row,
+                                cursor.node().range().end_point.column,
+                            )
+                        }
+                    }
+                });
                 if cursor.goto_first_child() {
                     debug_tree.push_str(format_debug_cursor(cursor, depth + 1).as_str());
                     cursor.goto_parent();

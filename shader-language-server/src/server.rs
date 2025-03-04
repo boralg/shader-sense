@@ -38,11 +38,12 @@ use lsp_types::{
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentDiagnosticReportResult,
     DocumentSymbolOptions, DocumentSymbolParams, DocumentSymbolResponse, FoldingRange,
-    FoldingRangeKind, FoldingRangeParams, FullDocumentDiagnosticReport, GotoDefinitionParams,
-    HoverParams, HoverProviderCapability, OneOf, RelatedFullDocumentDiagnosticReport,
-    SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensParams, SemanticTokensServerCapabilities, ServerCapabilities,
-    SignatureHelpOptions, SignatureHelpParams, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
+    FoldingRangeKind, FoldingRangeParams, FoldingRangeProviderCapability,
+    FullDocumentDiagnosticReport, GotoDefinitionParams, HoverParams, HoverProviderCapability,
+    OneOf, RelatedFullDocumentDiagnosticReport, SemanticTokenType, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    SignatureHelpParams, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
     WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use shader_sense::shader::ShadingLanguage;
@@ -123,8 +124,7 @@ impl ServerLanguage {
             type_definition_provider: Some(lsp_types::TypeDefinitionProviderCapability::Simple(
                 false, // Disable as definition_provider is doing it.
             )),
-            // This seems to be done automatically by vscode, so not mandatory.
-            //folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
+            folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
             document_symbol_provider: Some(OneOf::Right(DocumentSymbolOptions {
                 label: None,
                 work_done_progress_options: WorkDoneProgressOptions {

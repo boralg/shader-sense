@@ -1,5 +1,8 @@
 #define CONDITION_DEFINED 1
 
+#define CUSTOM_MACRO 1
+#include "macro.hlsl"
+
 void main() {
 
 #if CONDITION_DEFINED
@@ -32,7 +35,7 @@ void main() {
 
 // paranthesized expression
 #if (CONDITION_DEFINED && (CONDITION_NOT_DEFINED))
-    float f = 1
+    float f = 1;
 #endif
 
 // Binary expression
@@ -47,14 +50,19 @@ void main() {
 
 // unary defined expression
 #if !defined(CONDITION_DEFINED) && !defined(CONDITION_NOT_DEFINED)
-    float h = 1.0;
+    float h = 1;
 #endif
 
 // region depending on region
 #if CONDITION_NOT_DEFINED
-	#define CONDITION_NOT_DEFINED 1
+    #define CONDITION_NOT_DEFINED 1
 #endif
 #ifdef CONDITION_NOT_DEFINED
-	#error "Should not be reached"
+    #error "Should not be reached"
+#endif
+
+// included macro
+#ifndef OTHER_CUSTOM_MACRO
+    #error "Should not be reached"
 #endif
 }
