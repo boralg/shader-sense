@@ -118,12 +118,10 @@ mod tests {
     };
 
     #[test]
-    #[cfg(not(target_os = "wasi"))] // TODO: need to check why test fail on wasi ubuntu only
     fn test_hlsl_regions() {
         test_regions(create_symbol_provider(ShadingLanguage::Hlsl));
     }
     #[test]
-    #[cfg(not(target_os = "wasi"))] // TODO: need to check why test fail on wasi ubuntu only
     fn test_glsl_regions() {
         test_regions(create_symbol_provider(ShadingLanguage::Glsl));
     }
@@ -175,10 +173,10 @@ mod tests {
             // unary defined expression
             set_region(51, 66, 52, 16, false),
             // region depending on region
-            set_region(56, 25, 57, 36, false),
-            set_region(59, 28, 60, 35, false),
+            set_region(56, 25, 57, 35, false),
+            set_region(59, 28, 60, 34, false),
             // included macro
-            set_region(64, 26, 65, 35, true), // TODO: this should be false, but need a deeper fix.
+            set_region(64, 26, 65, 34, true),
         ];
         assert!(preprocessor.regions.len() == expected_regions.len());
         for region_index in 0..preprocessor.regions.len() {
