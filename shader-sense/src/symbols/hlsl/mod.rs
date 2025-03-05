@@ -20,7 +20,8 @@ use super::{
     symbol_provider::SymbolProvider,
     symbol_tree::SymbolTree,
     symbols::{
-        ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderSymbolList, ShaderSymbolParams,
+        ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderScope, ShaderSymbolList,
+        ShaderSymbolParams,
     },
 };
 
@@ -37,12 +38,10 @@ impl HlslSymbolProvider {
         parser
             .set_language(lang.clone())
             .expect("Error loading HLSL grammar");
-        let scope_query = r#"(compound_statement) @scope"#;
         Self {
             parser,
             symbol_parser: SymbolParser::new(
                 lang.clone(),
-                scope_query,
                 get_hlsl_parsers(),
                 get_hlsl_filters(),
                 get_hlsl_preprocessor_parser(),
@@ -99,6 +98,9 @@ impl SymbolProvider for HlslSymbolProvider {
             symbol_tree.tree.root_node(),
             position,
         )
+    }
+    fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope> {
+        self.symbol_parser.query_file_scopes(symbol_tree)
     }
 }
 

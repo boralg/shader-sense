@@ -13,7 +13,8 @@ use super::{
     symbol_provider::SymbolProvider,
     symbol_tree::SymbolTree,
     symbols::{
-        ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderSymbolList, ShaderSymbolParams,
+        ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderScope, ShaderSymbolList,
+        ShaderSymbolParams,
     },
 };
 
@@ -34,7 +35,6 @@ impl WgslSymbolProvider {
             parser,
             symbol_parser: SymbolParser::new(
                 lang.clone(),
-                "",
                 get_wgsl_parsers(),
                 get_wgsl_filters(),
                 vec![],
@@ -89,5 +89,8 @@ impl SymbolProvider for WgslSymbolProvider {
         _position: ShaderPosition,
     ) -> Result<Vec<(String, ShaderRange)>, ShaderError> {
         Ok(vec![])
+    }
+    fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope> {
+        self.symbol_parser.query_file_scopes(symbol_tree)
     }
 }

@@ -366,7 +366,8 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get(&uri) {
                     Some(cached_file) => {
-                        let folding_ranges = RefCell::borrow(&cached_file)
+                        let cached_file = RefCell::borrow(&cached_file);
+                        let mut folding_ranges: Vec<FoldingRange> = cached_file
                             .data
                             .preprocessor_cache
                             .regions
@@ -380,7 +381,24 @@ impl ServerLanguage {
                                 collapsed_text: None,
                             })
                             .collect();
-                        // TODO: should add scopes aswell to request
+                        let symbol_provider = &self
+                            .language_data
+                            .get(&cached_file.shading_language)
+                            .unwrap()
+                            .symbol_provider;
+                        let scopes = symbol_provider.query_file_scopes(&cached_file.symbol_tree);
+                        let mut folded_scopes: Vec<FoldingRange> = scopes
+                            .iter()
+                            .map(|s| FoldingRange {
+                                start_line: s.start.line,
+                                start_character: Some(s.start.pos),
+                                end_line: s.end.line,
+                                end_character: Some(s.end.pos),
+                                kind: Some(FoldingRangeKind::Region),
+                                collapsed_text: None,
+                            })
+                            .collect();
+                        folding_ranges.append(&mut folded_scopes);
                         self.connection.send_response::<FoldingRangeRequest>(
                             req.id.clone(),
                             Some(folding_ranges),

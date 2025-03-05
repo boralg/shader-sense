@@ -7,7 +7,8 @@ use crate::{include::IncludeHandler, shader_error::ShaderError};
 use super::{
     symbol_tree::SymbolTree,
     symbols::{
-        ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderSymbolList, ShaderSymbolParams,
+        ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderScope, ShaderSymbolList,
+        ShaderSymbolParams,
     },
 };
 pub trait SymbolProvider {
@@ -36,6 +37,8 @@ pub trait SymbolProvider {
     ) -> Result<SymbolTree, ShaderError> {
         SymbolTree::new(self, file_path, shader_content)
     }
+    // Get all scopes in file
+    fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope>;
     // Get word at a given position.
     fn get_word_range_at_position(
         &self,

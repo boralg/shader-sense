@@ -17,7 +17,7 @@ use super::{
     symbol_parser::SymbolParser,
     symbol_provider::SymbolProvider,
     symbol_tree::SymbolTree,
-    symbols::{ShaderPreprocessor, ShaderSymbolList, ShaderSymbolParams},
+    symbols::{ShaderPreprocessor, ShaderScope, ShaderSymbolList, ShaderSymbolParams},
 };
 
 pub struct GlslSymbolProvider {
@@ -37,7 +37,6 @@ impl GlslSymbolProvider {
             parser,
             symbol_parser: SymbolParser::new(
                 lang.clone(),
-                r#"(compound_statement) @scope"#,
                 get_glsl_parsers(),
                 get_glsl_filters(),
                 get_glsl_preprocessor_parser(),
@@ -96,5 +95,8 @@ impl SymbolProvider for GlslSymbolProvider {
             symbol_tree.tree.root_node(),
             position,
         )
+    }
+    fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope> {
+        self.symbol_parser.query_file_scopes(symbol_tree)
     }
 }

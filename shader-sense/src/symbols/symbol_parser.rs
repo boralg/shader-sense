@@ -146,12 +146,15 @@ pub struct SymbolParser {
 impl SymbolParser {
     pub fn new(
         language: tree_sitter::Language,
-        scope_query: &str,
         parsers: Vec<Box<dyn SymbolTreeParser>>,
         filters: Vec<Box<dyn SymbolTreeFilter>>,
         preprocessor_parsers: Vec<Box<dyn SymbolTreePreprocessorParser>>,
         region_finder: Box<dyn SymbolRegionFinder>,
     ) -> Self {
+        let scope_query = r#"(compound_statement
+            "{"? @scope.start
+            "}"? @scope.end
+        ) @scope"#;
         Self {
             symbol_parsers: parsers
                 .into_iter()
@@ -174,8 +177,14 @@ impl SymbolParser {
             region_finder: region_finder,
         }
     }
-    fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope> {
-        // TODO: look for namespace aswell
+    pub fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope> {
+        // TODO: look for namespace aswell.
+        // Should be per lang instead.
+        fn join_scope(mut lhs: ShaderRange, rhs: ShaderRange) -> ShaderScope {
+            lhs.start = std::cmp::min(lhs.start, rhs.start);
+            lhs.end = std::cmp::min(lhs.end, rhs.end);
+            lhs
+        }
         let mut query_cursor = QueryCursor::new();
         let mut scopes = Vec::new();
         for matche in query_cursor.matches(
@@ -183,10 +192,38 @@ impl SymbolParser {
             symbol_tree.tree.root_node(),
             symbol_tree.content.as_bytes(),
         ) {
-            scopes.push(ShaderScope::from_range(
-                matche.captures[0].node.range(),
-                &symbol_tree.file_path,
-            ));
+            scopes.push(match matche.captures.len() {
+                // one body
+                1 => {
+                    ShaderScope::from_range(matche.captures[0].node.range(), &symbol_tree.file_path)
+                }
+                // a bit weird, a body and single curly brace ? mergin them to be safe.
+                2 => join_scope(
+                    ShaderScope::from_range(
+                        matche.captures[0].node.range(),
+                        &symbol_tree.file_path,
+                    ),
+                    ShaderScope::from_range(
+                        matche.captures[1].node.range(),
+                        &symbol_tree.file_path,
+                    ),
+                ),
+                // Remove curly braces from scope.
+                3 => {
+                    let curly_start = matche.captures[1].node.range();
+                    let curly_end = matche.captures[2].node.range();
+                    ShaderScope::from_range(
+                        tree_sitter::Range {
+                            start_byte: curly_start.end_byte,
+                            end_byte: curly_end.start_byte,
+                            start_point: curly_start.end_point,
+                            end_point: curly_end.start_point,
+                        },
+                        &symbol_tree.file_path,
+                    )
+                }
+                _ => unreachable!("Query should not return more than 3 match."),
+            });
         }
         scopes
     }
