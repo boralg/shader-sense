@@ -87,14 +87,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      # Cherry pick which crate to publish.
+      # Publish workspace (sense+server), intrinsics parser is marked as private
       - uses: katyo/publish-crates@v2
         with:
-          path: '${{ github.workspace }}/shader-sense'
-          ignore-unpublished-changes: true
-          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      - uses: katyo/publish-crates@v2
-        with:
-          path: '${{ github.workspace }}/shader-language-server'
           ignore-unpublished-changes: true
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
