@@ -1,0 +1,4 @@
+# For test files & position comparison, we dont want /r/n where /r count in tree sitter offsets.
+*.hlsl text eol=lf
+*.glsl text eol=lf
+*.wgsl text eol=lf

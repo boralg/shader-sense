@@ -3,8 +3,8 @@
 #define CUSTOM_MACRO 1
 #include "macro.hlsl"
 
+// File with /n line ending
 void main() {
-
 #if CONDITION_DEFINED
     float a = 0;
 #elif defined(CONDITION_DEFINED)
