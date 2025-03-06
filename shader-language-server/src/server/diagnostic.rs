@@ -64,10 +64,8 @@ impl ServerLanguage {
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
     ) -> Result<HashMap<Url, Vec<Diagnostic>>, ShaderError> {
-        let file_path = uri.to_file_path().unwrap();
         // Diagnostic for included file stored in main cache.
         let diagnostic_cache = &RefCell::borrow(&cached_file).data.diagnostic_cache;
-        debug!("Validating file {}", file_path.display());
 
         let mut diagnostics: HashMap<Url, Vec<Diagnostic>> = HashMap::new();
         for diagnostic in &diagnostic_cache.diagnostics {

@@ -6,9 +6,12 @@ use std::{
     time::Instant,
 };
 
-use crate::server::{
-    clean_url,
-    common::{lsp_range_to_shader_range, read_string_lossy},
+use crate::{
+    profile_scope,
+    server::{
+        clean_url,
+        common::{lsp_range_to_shader_range, read_string_lossy},
+    },
 };
 use log::{debug, info, warn};
 use lsp_types::Url;
@@ -162,7 +165,7 @@ impl ServerLanguageFileCache {
             }
         };
         debug!(
-            "{}:timing:symbols:ast          {}ms",
+            "{}:timing:symbols:query        {}ms",
             file_path.display(),
             now_symbols.elapsed().as_millis()
         );
@@ -228,6 +231,7 @@ impl ServerLanguageFileCache {
         });
         // Get symbols for main file.
         if config.symbols {
+            profile_scope!("Parsing symbols for file {}", uri);
             // Add variant data if some.
             if let Some(variant) = &shader_variant {
                 for (variable, value) in &variant.defines {
@@ -246,6 +250,7 @@ impl ServerLanguageFileCache {
         }
         // Get diagnostics
         if config.validate {
+            profile_scope!("Validating file {}", uri);
             let shading_language = RefCell::borrow(cached_file).shading_language;
             let mut validation_params = config.into_validation_params();
             if let Some(variant) = &shader_variant {
@@ -559,7 +564,7 @@ impl ServerLanguageFileCache {
             now_update_ast.elapsed().as_millis()
         );
 
-        let now_get_all_symbol = std::time::Instant::now();
+        let now_cache_data = std::time::Instant::now();
         self.cache_file_data(
             uri,
             cached_file,
@@ -569,9 +574,9 @@ impl ServerLanguageFileCache {
             config,
         )?;
         debug!(
-            "{}:timing:update:get_all_symbol{}ms",
+            "{}:timing:update:cache_data    {}ms",
             file_path.display(),
-            now_get_all_symbol.elapsed().as_millis()
+            now_cache_data.elapsed().as_millis()
         );
         debug!(
             "{}:timing:update:              {}ms",

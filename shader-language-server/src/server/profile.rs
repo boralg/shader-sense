@@ -5,7 +5,9 @@ use log::debug;
 #[macro_export]
 macro_rules! profile_scope {
     ($($arg:tt)+) => {
-        crate::server::profile::Profiler::new(format!($($arg)+))
+        // Need a variable to avoid dropping immediately.
+        // https://github.com/rust-lang/rust/issues/40096
+        let _guard = crate::server::profile::Profiler::new(format!($($arg)+));
     };
 }
 
