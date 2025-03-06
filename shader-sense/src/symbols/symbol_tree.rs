@@ -52,16 +52,14 @@ impl SymbolTree {
         new_text: &String,
     ) -> Result<(), ShaderError> {
         let mut new_shader_content = self.content.clone();
-        new_shader_content.replace_range(
-            old_range.start.to_byte_offset(&self.content)
-                ..old_range.end.to_byte_offset(&self.content),
-            &new_text,
-        );
+        let old_start_byte_offset = old_range.start.to_byte_offset(&self.content)?;
+        let old_end_byte_offset = old_range.end.to_byte_offset(&self.content)?;
+        new_shader_content.replace_range(old_start_byte_offset..old_end_byte_offset, &new_text);
 
         let line_count = new_text.lines().count();
         let tree_sitter_range = tree_sitter::Range {
-            start_byte: old_range.start.to_byte_offset(&self.content),
-            end_byte: old_range.end.to_byte_offset(&self.content),
+            start_byte: old_start_byte_offset,
+            end_byte: old_end_byte_offset,
             start_point: tree_sitter::Point {
                 row: old_range.start.line as usize,
                 column: old_range.start.pos as usize,

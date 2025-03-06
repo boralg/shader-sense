@@ -259,17 +259,19 @@ impl SymbolParser {
             &mut preprocessor,
         )?;
         // Mark this shader as once if pragma once is set.
-        if let Some(once_position) = symbol_tree.content.find("#pragma once") {
-            let position = ShaderPosition::from_byte_offset(
+        if let Some(once_byte_offset) = symbol_tree.content.find("#pragma once") {
+            preprocessor.once = match ShaderPosition::from_byte_offset(
                 &symbol_tree.content,
-                once_position,
+                once_byte_offset,
                 &symbol_tree.file_path,
-            );
-            preprocessor.once = preprocessor
-                .regions
-                .iter()
-                .find(|region| !region.is_active && region.range.contain(&position))
-                .is_none();
+            ) {
+                Ok(position) => preprocessor
+                    .regions
+                    .iter()
+                    .find(|region| !region.is_active && region.range.contain(&position))
+                    .is_none(),
+                Err(_err) => false,
+            };
         }
         Ok(preprocessor)
     }

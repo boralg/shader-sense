@@ -75,32 +75,96 @@ impl ShaderPosition {
             pos,
         }
     }
-    pub fn from_byte_offset(content: &str, byte_offset: usize, file_path: &Path) -> ShaderPosition {
-        // else code panic if byte_offset is 0.
+
+    pub fn from_byte_offset(
+        content: &str,
+        byte_offset: usize,
+        file_path: &Path,
+    ) -> std::io::Result<ShaderPosition> {
+        // https://en.wikipedia.org/wiki/UTF-8
         if byte_offset == 0 {
-            ShaderPosition {
+            Ok(ShaderPosition {
                 line: 0,
                 pos: 0,
                 file_path: PathBuf::from(file_path),
-            }
+            })
+        } else if content.len() == 0 {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Content is empty.",
+            ))
+        } else if byte_offset >= content.len() {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "byte_offset is out of bounds.",
+            ))
         } else {
             let line = content[..byte_offset].lines().count() - 1;
-            let pos = content[byte_offset..].as_ptr() as usize
-                - content[..byte_offset].lines().last().unwrap().as_ptr() as usize;
-            ShaderPosition {
-                line: line as u32,
-                pos: pos as u32,
-                file_path: PathBuf::from(file_path),
+            let line_start = content[..byte_offset]
+                .lines()
+                .last()
+                .expect("No last line available.");
+            let pos = content[byte_offset..].as_ptr() as usize - line_start.as_ptr() as usize;
+            if line_start.is_char_boundary(pos) {
+                Ok(ShaderPosition {
+                    line: line as u32,
+                    pos: pos as u32,
+                    file_path: PathBuf::from(file_path),
+                })
+            } else {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Pos in line is not at UTF8 char boundary.",
+                ))
             }
         }
     }
-    pub fn to_byte_offset(&self, content: &str) -> usize {
+    pub fn to_byte_offset(&self, content: &str) -> std::io::Result<usize> {
+        // https://en.wikipedia.org/wiki/UTF-8
         match content.lines().nth(self.line as usize) {
             Some(line) => {
-                let pos = line.as_ptr() as usize - content.as_ptr() as usize;
-                pos + self.pos as usize
+                // This pointer operation is safe to operate because lines iterator should start at char boundary.
+                let line_byte_offset = line.as_ptr() as usize - content.as_ptr() as usize;
+                assert!(
+                    content.is_char_boundary(line_byte_offset),
+                    "Start of line is not char boundary."
+                );
+                // We have line offset, find pos offset.
+                match content[line_byte_offset..]
+                    .char_indices()
+                    .nth(self.pos as usize)
+                {
+                    Some((byte_offset, _)) => {
+                        let global_offset = line_byte_offset + byte_offset;
+                        if content.len() <= global_offset {
+                            Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                "Byte offset is not in content range.",
+                            ))
+                        } else if !content.is_char_boundary(global_offset) {
+                            Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                "Position is not at UTF8 char boundary.",
+                            ))
+                        } else {
+                            Ok(global_offset)
+                        }
+                    }
+                    None => {
+                        if self.pos as usize == line.chars().count() {
+                            assert!(content.is_char_boundary(line_byte_offset + line.len()));
+                            Ok(line_byte_offset + line.len())
+                        } else {
+                            Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidInput,
+                                format!("Position is not in range of line"),
+                            ))
+                        }
+                    }
+                }
             }
-            None => content.len(), // Line is out of bounds, assume its at the end.
+            // Last line in line iterator is skipped if its empty.
+            None => Ok(content.len()), // Line is out of bounds, assume its at the end.
         }
     }
 }

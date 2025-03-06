@@ -29,10 +29,10 @@ impl ServerLanguage {
             .macros
             .iter()
             .map(|symbol| {
-                let offset_start = match &symbol.range {
+                let byte_offset_start = match &symbol.range {
                     Some(range) => {
                         if range.start.file_path == file_path {
-                            range.start.to_byte_offset(content)
+                            range.start.to_byte_offset(content).unwrap()
                         } else {
                             // TODO: should check where include is to get offset.
                             0 // Included from another file.
@@ -44,25 +44,28 @@ impl ServerLanguage {
                 // Looking for preproc_arg & identifier might be enough.
                 // Need to check for regions too...
                 let reg = regex::Regex::new(format!("\\b({})\\b", symbol.label).as_str()).unwrap();
-                let word_offsets: Vec<usize> = reg
+                let word_byte_offsets: Vec<usize> = reg
                     .captures_iter(&content)
                     .map(|e| e.get(0).unwrap().range().start)
                     .collect();
-                word_offsets
+                word_byte_offsets
                     .iter()
-                    .filter_map(|offset| {
-                        let position =
-                            ShaderPosition::from_byte_offset(&content, *offset, &file_path);
-                        if offset_start > *offset {
-                            None
-                        } else {
-                            Some(SemanticToken {
-                                delta_line: position.line,
-                                delta_start: position.pos,
-                                length: symbol.label.len() as u32,
-                                token_type: 0, // SemanticTokenType::MACRO, view registration
-                                token_modifiers_bitset: 0,
-                            })
+                    .filter_map(|byte_offset| {
+                        match ShaderPosition::from_byte_offset(&content, *byte_offset, &file_path) {
+                            Ok(position) => {
+                                if byte_offset_start > *byte_offset {
+                                    None
+                                } else {
+                                    Some(SemanticToken {
+                                        delta_line: position.line,
+                                        delta_start: position.pos,
+                                        length: symbol.label.len() as u32,
+                                        token_type: 0, // SemanticTokenType::MACRO, view registration
+                                        token_modifiers_bitset: 0,
+                                    })
+                                }
+                            }
+                            Err(_) => None,
                         }
                     })
                     .collect()
