@@ -84,7 +84,11 @@ impl ServerLanguage {
                         ShaderDiagnosticSeverity::Warning => lsp_types::DiagnosticSeverity::WARNING,
                         ShaderDiagnosticSeverity::Error => lsp_types::DiagnosticSeverity::ERROR,
                     }),
-                    message: diagnostic.error.clone(),
+                    message: if diagnostic.error.is_empty() {
+                        "No message.".into() // vscode extension send error when empty message.
+                    } else {
+                        diagnostic.error.clone()
+                    },
                     source: Some("shader-validator".to_string()),
                     ..Default::default()
                 };
