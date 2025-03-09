@@ -48,6 +48,14 @@ impl<'a> DxcIncludeHandler<'a> {
 
 impl hassle_rs::wrapper::DxcIncludeHandler for DxcIncludeHandler<'_> {
     fn load_source(&mut self, filename: String) -> Option<String> {
+        // DXC include handler kinda bad.
+        // First path are already preprocessed by dxc before calling this
+        // (adding ./ in front of relative path & convert slash to backslash)
+        // Tricky to solve virtual path. Done in include handler.
+        // Second, we dont have any knowledge about the parent includer here.
+        // And its not something they are going to solve:
+        // https://github.com/microsoft/DirectXShaderCompiler/issues/6093
+        // So includes can behave weirdly with dxc if too many subfolders.
         let path = Path::new(filename.as_str());
         self.include_handler
             .search_in_includes(&path, self.include_callback)
