@@ -3,7 +3,6 @@ use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     rc::Rc,
-    time::Instant,
 };
 
 use crate::{
@@ -130,18 +129,19 @@ impl ServerLanguageFileCache {
         symbol_provider: &mut dyn SymbolProvider,
         include_context: &mut IncludeContext,
     ) -> Result<(), ShaderError> {
-        let file_path = uri.to_file_path().unwrap();
+        profile_scope!("Recursing symbols for file {}", uri);
         let shading_language = RefCell::borrow(cached_file).shading_language;
         // We are recomputing every deps symbols here, but not really required, isnt it ?
-        let now_symbols = Instant::now();
         let (preprocessor, symbol_list, diagnostics) = match symbol_provider.query_preprocessor(
             &RefCell::borrow(cached_file).symbol_tree,
             symbol_params,
             &mut include_context.include_handler,
         ) {
             Ok(preprocessor) => {
+                profile_scope!("Query symbols for file {}", uri);
                 let mut symbol_list = symbol_provider
                     .query_file_symbols(&RefCell::borrow(cached_file).symbol_tree, &preprocessor)?;
+                profile_scope!("Preprocess symbols for file {}", uri);
                 preprocessor.preprocess_symbols(&mut symbol_list);
                 (preprocessor, symbol_list, ShaderDiagnosticList::empty())
             }
@@ -164,11 +164,6 @@ impl ServerLanguageFileCache {
                 }
             }
         };
-        debug!(
-            "{}:timing:symbols:query        {}ms",
-            file_path.display(),
-            now_symbols.elapsed().as_millis()
-        );
         // Add context macro for next includes.
         for define in &preprocessor.defines {
             symbol_params.defines.insert(
@@ -260,52 +255,55 @@ impl ServerLanguageFileCache {
                         .insert(variable.clone(), value.clone());
                 }
             }
-            let (mut diagnostic_list, _dependencies) = validator.validate_shader(
-                &RefCell::borrow(cached_file).symbol_tree.content,
-                RefCell::borrow(cached_file).symbol_tree.file_path.as_path(),
-                &validation_params,
-                &mut |deps_path: &Path| -> Option<String> {
-                    let deps_uri = Url::from_file_path(deps_path).unwrap();
-                    let deps_file = match self.get_dependency(&deps_uri) {
-                        Some(deps_file) => deps_file,
-                        None => {
-                            if config.symbols {
-                                warn!(
-                                    "Should only get there if symbols did not add deps: {} from {}.",
-                                    deps_uri,
-                                    uri
-                                );
-                            }
-                            // If include does not exist, add it to watched files.
-                            // Issue here: They will be considered as direct deps, while its not necessarly true, might break symbols.
-                            match self.watch_dependency(
-                                &deps_uri,
-                                shading_language,
-                                symbol_provider,
-                            ) {
-                                Ok(deps_file) => deps_file,
-                                Err(err) => {
-                                    warn!("Failed to watch deps {}", err);
-                                    return None;
+            let (mut diagnostic_list, _dependencies) = {
+                profile_scope!("Raw validation");
+                validator.validate_shader(
+                    &RefCell::borrow(cached_file).symbol_tree.content,
+                    RefCell::borrow(cached_file).symbol_tree.file_path.as_path(),
+                    &validation_params,
+                    &mut |deps_path: &Path| -> Option<String> {
+                        let deps_uri = Url::from_file_path(deps_path).unwrap();
+                        let deps_file = match self.get_dependency(&deps_uri) {
+                            Some(deps_file) => deps_file,
+                            None => {
+                                if config.symbols {
+                                    warn!(
+                                        "Should only get there if symbols did not add deps: {} from {}.",
+                                        deps_uri,
+                                        uri
+                                    );
+                                }
+                                // If include does not exist, add it to watched files.
+                                // Issue here: They will be considered as direct deps, while its not necessarly true, might break symbols.
+                                match self.watch_dependency(
+                                    &deps_uri,
+                                    shading_language,
+                                    symbol_provider,
+                                ) {
+                                    Ok(deps_file) => deps_file,
+                                    Err(err) => {
+                                        warn!("Failed to watch deps {}", err);
+                                        return None;
+                                    }
                                 }
                             }
+                        };
+                        let content = RefCell::borrow(&deps_file).symbol_tree.content.clone();
+                        // Add deps as direct deps if they werent added by symbols.
+                        if !config.symbols {
+                            include_context.visit_data(
+                                uri,
+                                cached_file,
+                                |data: &mut ServerFileCacheData| {
+                                    data.dependencies
+                                        .insert(Url::from_file_path(&deps_path).unwrap(), deps_file);
+                                },
+                            );
                         }
-                    };
-                    let content = RefCell::borrow(&deps_file).symbol_tree.content.clone();
-                    // Add deps as direct deps if they werent added by symbols.
-                    if !config.symbols {
-                        include_context.visit_data(
-                            uri,
-                            cached_file,
-                            |data: &mut ServerFileCacheData| {
-                                data.dependencies
-                                    .insert(Url::from_file_path(&deps_path).unwrap(), deps_file);
-                            },
-                        );
-                    }
-                    Some(content)
-                },
-            )?;
+                        Some(content)
+                    },
+                )?
+            };
             // Clear diagnostic if no errors.
             // TODO: Should add empty for main file & deps if none to clear them.
 
@@ -542,8 +540,7 @@ impl ServerLanguageFileCache {
         range: Option<lsp_types::Range>,
         partial_content: Option<&String>,
     ) -> Result<(), ShaderError> {
-        let now_start = std::time::Instant::now();
-        let now_update_ast = std::time::Instant::now();
+        profile_scope!("Updating file {}", uri);
         // Update abstract syntax tree
         let file_path = uri.to_file_path().unwrap();
         if let (Some(range), Some(partial_content)) = (range, partial_content) {
@@ -558,13 +555,7 @@ impl ServerLanguageFileCache {
         } else {
             // No update on content to perform.
         }
-        debug!(
-            "{}:timing:update:ast           {}ms",
-            file_path.display(),
-            now_update_ast.elapsed().as_millis()
-        );
 
-        let now_cache_data = std::time::Instant::now();
         self.cache_file_data(
             uri,
             cached_file,
@@ -573,16 +564,6 @@ impl ServerLanguageFileCache {
             self.variants.get(&uri).cloned(),
             config,
         )?;
-        debug!(
-            "{}:timing:update:cache_data    {}ms",
-            file_path.display(),
-            now_cache_data.elapsed().as_millis()
-        );
-        debug!(
-            "{}:timing:update:              {}ms",
-            file_path.display(),
-            now_start.elapsed().as_millis()
-        );
         Ok(())
     }
     pub fn get(&self, uri: &Url) -> Option<ServerFileCacheHandle> {
