@@ -79,22 +79,18 @@ impl ServerLanguage {
         // Compute delta from position
         let mut delta_line = 0;
         let mut delta_pos = 0;
-        tokens = tokens
-            .iter_mut()
-            .map(|token| {
-                // Reset pos on new line.
-                if token.delta_line != delta_line {
-                    delta_pos = 0;
-                }
-                let line = token.delta_line;
-                let pos = token.delta_start;
-                token.delta_line = line - delta_line;
-                token.delta_start = pos - delta_pos;
-                delta_line = line;
-                delta_pos = pos;
-                token.clone() // TODO: should not need clone here.
-            })
-            .collect();
+        for token in &mut tokens {
+            // Reset pos on new line.
+            if token.delta_line != delta_line {
+                delta_pos = 0;
+            }
+            let line = token.delta_line;
+            let pos = token.delta_start;
+            token.delta_line = line - delta_line;
+            token.delta_start = pos - delta_pos;
+            delta_line = line;
+            delta_pos = pos;
+        }
         Ok(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
             data: tokens,

@@ -201,7 +201,7 @@ impl ServerLanguageFileCache {
         });
         Ok(())
     }
-    fn cache_file_data(
+    pub fn cache_file_data(
         &mut self,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
@@ -535,12 +535,15 @@ impl ServerLanguageFileCache {
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
         symbol_provider: &mut dyn SymbolProvider,
-        validator: &mut dyn Validator,
-        config: &ServerConfig,
         range: Option<lsp_types::Range>,
         partial_content: Option<&String>,
     ) -> Result<(), ShaderError> {
-        profile_scope!("Updating file {}", uri);
+        profile_scope!(
+            "Updating file {} (Content {:?} at {:?})",
+            uri,
+            partial_content,
+            range
+        );
         // Update abstract syntax tree
         let file_path = uri.to_file_path().unwrap();
         if let (Some(range), Some(partial_content)) = (range, partial_content) {
@@ -555,15 +558,6 @@ impl ServerLanguageFileCache {
         } else {
             // No update on content to perform.
         }
-
-        self.cache_file_data(
-            uri,
-            cached_file,
-            validator,
-            symbol_provider,
-            self.variants.get(&uri).cloned(),
-            config,
-        )?;
         Ok(())
     }
     pub fn get(&self, uri: &Url) -> Option<ServerFileCacheHandle> {

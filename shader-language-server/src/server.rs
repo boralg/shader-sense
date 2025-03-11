@@ -587,17 +587,29 @@ impl ServerLanguage {
                                         &uri,
                                         &cached_file,
                                         language_data.symbol_provider.as_mut(),
-                                        language_data.validator.as_mut(),
-                                        &self.config,
                                         None,
                                         None,
                                     ) {
-                                        Ok(_) => {}
+                                        // Cache once all changes have been applied.
+                                        Ok(_) => match self.watched_files.cache_file_data(
+                                            &uri,
+                                            &cached_file,
+                                            language_data.validator.as_mut(),
+                                            language_data.symbol_provider.as_mut(),
+                                            self.watched_files.variants.get(&uri).cloned(),
+                                            &self.config,
+                                        ) {
+                                            Ok(_) => {
+                                                self.publish_diagnostic(&uri, &cached_file, None)
+                                            }
+                                            Err(err) => self
+                                                .connection
+                                                .send_notification_error(format!("{}", err)),
+                                        },
                                         Err(err) => self
                                             .connection
                                             .send_notification_error(format!("{}", err)),
                                     };
-                                    self.publish_diagnostic(&uri, &cached_file, None);
                                 }
                             }
                             None => {}
@@ -632,13 +644,12 @@ impl ServerLanguage {
                     Some(cached_file) => {
                         let shading_language = RefCell::borrow_mut(&cached_file).shading_language;
                         let language_data = self.language_data.get_mut(&shading_language).unwrap();
+                        // Update all content before caching data.
                         for content in &params.content_changes {
                             match self.watched_files.update_file(
                                 &uri,
                                 &cached_file,
                                 language_data.symbol_provider.as_mut(),
-                                language_data.validator.as_mut(),
-                                &self.config,
                                 content.range,
                                 Some(&content.text),
                             ) {
@@ -648,11 +659,22 @@ impl ServerLanguage {
                                 }
                             };
                         }
-                        self.publish_diagnostic(
+                        // Cache once all changes have been applied.
+                        match self.watched_files.cache_file_data(
                             &uri,
                             &cached_file,
-                            Some(params.text_document.version),
-                        );
+                            language_data.validator.as_mut(),
+                            language_data.symbol_provider.as_mut(),
+                            self.watched_files.variants.get(&uri).cloned(),
+                            &self.config,
+                        ) {
+                            Ok(_) => self.publish_diagnostic(
+                                &uri,
+                                &cached_file,
+                                Some(params.text_document.version),
+                            ),
+                            Err(err) => self.connection.send_notification_error(format!("{}", err)),
+                        }
                     }
                     None => self.connection.send_notification_error(format!(
                         "Trying to visit file that is not watched : {}",
@@ -687,20 +709,29 @@ impl ServerLanguage {
                             &uri,
                             &cached_file,
                             language_data.symbol_provider.as_mut(),
-                            language_data.validator.as_mut(),
-                            &self.config,
                             None,
                             None,
                         ) {
-                            Ok(()) => {}
+                            // Cache once all changes have been applied.
+                            Ok(()) => match self.watched_files.cache_file_data(
+                                &uri,
+                                &cached_file,
+                                language_data.validator.as_mut(),
+                                language_data.symbol_provider.as_mut(),
+                                self.watched_files.variants.get(&uri).cloned(),
+                                &self.config,
+                            ) {
+                                // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
+                                Ok(_) => self.publish_diagnostic(&uri, &cached_file, None),
+                                Err(err) => {
+                                    self.connection.send_notification_error(format!("{}", err))
+                                }
+                            },
                             Err(err) => self.connection.send_notification_error(format!(
                                 "Failed to update file {} after changing variant : {}",
                                 uri, err
                             )),
                         };
-                        // Republish diagnostics.
-                        self.publish_diagnostic(&uri, &cached_file, None);
-                        // TODO: symbols should republished here aswell as they might change but there is no way to do so...
                     }
                     None => {} // Not watched, no need to update.
                 }
@@ -743,12 +774,28 @@ impl ServerLanguage {
                         &url,
                         &cached_file,
                         language_data.symbol_provider.as_mut(),
-                        language_data.validator.as_mut(),
-                        &server.config,
                         None,
                         None,
                     ) {
-                        Ok(_) => file_to_republish.push((url.clone(), Rc::clone(&cached_file))),
+                        Ok(_) =>
+                        // Cache once all changes have been applied.
+                        {
+                            match server.watched_files.cache_file_data(
+                                &url,
+                                &cached_file,
+                                language_data.validator.as_mut(),
+                                language_data.symbol_provider.as_mut(),
+                                server.watched_files.variants.get(&url).cloned(),
+                                &server.config,
+                            ) {
+                                Ok(_) => {
+                                    file_to_republish.push((url.clone(), Rc::clone(&cached_file)))
+                                }
+                                Err(err) => server
+                                    .connection
+                                    .send_notification_error(format!("{}", err)),
+                            }
+                        }
                         Err(err) => server
                             .connection
                             .send_notification_error(format!("{}", err)),
