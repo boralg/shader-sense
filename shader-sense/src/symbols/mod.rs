@@ -83,7 +83,7 @@ mod tests {
     ) -> Result<ShaderSymbolList, ShaderError> {
         let mut include_handler = IncludeHandler::new(&file_path, vec![], HashMap::new());
         let deps = find_dependencies(&mut include_handler, &shader_content);
-        let mut symbols = symbol_provider.get_intrinsics_symbol().clone();
+        let mut all_symbols = symbol_provider.get_intrinsics_symbol().clone();
         let symbol_tree = SymbolTree::new(symbol_provider, file_path, shader_content).unwrap();
         let preprocessor = symbol_provider
             .query_preprocessor(
@@ -92,7 +92,9 @@ mod tests {
                 &mut IncludeHandler::default(file_path),
             )
             .unwrap();
-        symbols.append(symbol_provider.query_file_symbols(&symbol_tree, &preprocessor)?);
+        let mut symbols = symbol_provider.query_file_symbols(&symbol_tree)?;
+        preprocessor.preprocess_symbols(&mut symbols);
+        all_symbols.append(symbols);
         for dep in deps {
             let symbol_tree = SymbolTree::new(symbol_provider, &dep.1, &dep.0).unwrap();
             let preprocessor = symbol_provider
@@ -102,9 +104,11 @@ mod tests {
                     &mut IncludeHandler::default(file_path),
                 )
                 .unwrap();
-            symbols.append(symbol_provider.query_file_symbols(&symbol_tree, &preprocessor)?);
+            let mut symbols = symbol_provider.query_file_symbols(&symbol_tree)?;
+            preprocessor.preprocess_symbols(&mut symbols);
+            all_symbols.append(symbols);
         }
-        Ok(symbols)
+        Ok(all_symbols)
     }
 
     #[test]
@@ -143,9 +147,8 @@ mod tests {
                 &mut IncludeHandler::default(file_path),
             )
             .unwrap();
-        let symbols = symbol_provider
-            .query_file_symbols(&symbol_tree, &preprocessor)
-            .unwrap();
+        let mut symbols = symbol_provider.query_file_symbols(&symbol_tree).unwrap();
+        preprocessor.preprocess_symbols(&mut symbols);
         assert!(!symbols.functions.is_empty());
     }
     #[test]
@@ -163,9 +166,8 @@ mod tests {
                 &mut IncludeHandler::default(file_path),
             )
             .unwrap();
-        let symbols = symbol_provider
-            .query_file_symbols(&symbol_tree, &preprocessor)
-            .unwrap();
+        let mut symbols = symbol_provider.query_file_symbols(&symbol_tree).unwrap();
+        preprocessor.preprocess_symbols(&mut symbols);
         assert!(!symbols.functions.is_empty());
     }
     #[test]
@@ -183,9 +185,8 @@ mod tests {
                 &mut IncludeHandler::default(file_path),
             )
             .unwrap();
-        let symbols = symbol_provider
-            .query_file_symbols(&symbol_tree, &preprocessor)
-            .unwrap();
+        let mut symbols = symbol_provider.query_file_symbols(&symbol_tree).unwrap();
+        preprocessor.preprocess_symbols(&mut symbols);
         assert!(symbols.functions.is_empty());
     }
     #[test]
@@ -244,9 +245,8 @@ mod tests {
                 &mut IncludeHandler::default(file_path),
             )
             .unwrap();
-        let symbols = symbol_provider
-            .query_file_symbols(&symbol_tree, &preprocessor)
-            .unwrap();
+        let mut symbols = symbol_provider.query_file_symbols(&symbol_tree).unwrap();
+        preprocessor.preprocess_symbols(&mut symbols);
         assert!(symbols
             .types
             .iter()

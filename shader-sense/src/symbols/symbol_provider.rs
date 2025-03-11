@@ -24,11 +24,8 @@ pub trait SymbolProvider {
         include_handler: &mut IncludeHandler,
     ) -> Result<ShaderPreprocessor, ShaderError>;
     // Query file symbol from file tree.
-    fn query_file_symbols(
-        &self,
-        symbol_tree: &SymbolTree,
-        preprocessor: &ShaderPreprocessor,
-    ) -> Result<ShaderSymbolList, ShaderError>;
+    fn query_file_symbols(&self, symbol_tree: &SymbolTree)
+        -> Result<ShaderSymbolList, ShaderError>;
     // Create symbol tree from file.
     fn create_tree(
         &mut self,

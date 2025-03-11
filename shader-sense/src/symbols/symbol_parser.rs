@@ -278,7 +278,6 @@ impl SymbolParser {
     pub fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
-        preprocessor: &ShaderPreprocessor,
     ) -> Result<ShaderSymbolList, ShaderError> {
         // TODO: Should use something else than name...
         // Required for shader stage filtering...
@@ -289,23 +288,12 @@ impl SymbolParser {
             .to_string_lossy()
             .to_string();
         let filter_symbol = |symbol: &ShaderSymbol| -> bool {
-            // Filter inactive regions.
-            let is_in_inactive_region = match &symbol.range {
-                Some(range) => {
-                    for region in &preprocessor.regions {
-                        if !region.is_active && region.range.contain_bounds(&range) {
-                            return false; // Symbol is in inactive region. Remove it.
-                        }
-                    }
-                    true
-                }
-                None => true, // keep
-            };
-            let mut is_filtered = !is_in_inactive_region;
+            // Dont filter inactive regions here on parsing, to avoid recomputing all symbols on regions update.
+            let mut is_retained = true;
             for filter in &self.symbol_filters {
-                is_filtered = is_filtered | filter.filter_symbol(symbol, &file_name);
+                is_retained = is_retained & filter.filter_symbol(symbol, &file_name);
             }
-            is_filtered
+            is_retained
         };
         let mut symbol_list_builder = ShaderSymbolListBuilder::new(&filter_symbol);
         let scopes = self.query_file_scopes(symbol_tree);

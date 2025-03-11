@@ -15,7 +15,7 @@ impl ServerLanguage {
     ) -> Result<Vec<SymbolInformation>, ShaderError> {
         let symbols = RefCell::borrow(&cached_file)
             .data
-            .symbol_cache
+            .get_symbols()
             .iter()
             .map(|(symbols, ty)| {
                 symbols

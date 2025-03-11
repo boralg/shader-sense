@@ -36,7 +36,7 @@ pub type ServerFileCacheHandle = Rc<RefCell<ServerFileCache>>;
 #[derive(Debug, Clone, Default)]
 pub struct ServerFileCacheData {
     pub preprocessor_cache: ShaderPreprocessor, // Store preprocessor to avoid computing them at every change.
-    pub symbol_cache: ShaderSymbolList, // Store symbol to avoid computing them at every change.
+    symbol_cache: ShaderSymbolList, // Store symbol to avoid computing them at every change.
     pub diagnostic_cache: ShaderDiagnosticList, // Cached diagnostic
     pub dependencies: HashMap<Url, ServerFileCacheHandle>, // Store all direct dependencies of this file.
 }
@@ -47,6 +47,14 @@ pub struct ServerFileCache {
     pub symbol_tree: SymbolTree, // Store content on change as its not on disk.
     pub data: ServerFileCacheData, // Data for file opened and edited.
     pub included_data: HashMap<Url, ServerFileCacheData>, // Data per entry point for context, data might change depending on it, and file might be included multiple times.
+}
+
+impl ServerFileCacheData {
+    pub fn get_symbols(&self) -> ShaderSymbolList {
+        let mut symbols = self.symbol_cache.clone();
+        self.preprocessor_cache.preprocess_symbols(&mut symbols);
+        symbols
+    }
 }
 
 pub struct ServerLanguageFileCache {
@@ -132,18 +140,39 @@ impl ServerLanguageFileCache {
         profile_scope!("Recursing symbols for file {}", uri);
         let shading_language = RefCell::borrow(cached_file).shading_language;
         // We are recomputing every deps symbols here, but not really required, isnt it ?
-        let (preprocessor, symbol_list, diagnostics) = match symbol_provider.query_preprocessor(
-            &RefCell::borrow(cached_file).symbol_tree,
-            symbol_params,
-            &mut include_context.include_handler,
-        ) {
-            Ok(preprocessor) => {
-                profile_scope!("Query symbols for file {}", uri);
-                let mut symbol_list = symbol_provider
-                    .query_file_symbols(&RefCell::borrow(cached_file).symbol_tree, &preprocessor)?;
-                profile_scope!("Preprocess symbols for file {}", uri);
-                preprocessor.preprocess_symbols(&mut symbol_list);
-                (preprocessor, symbol_list, ShaderDiagnosticList::empty())
+        let (preprocessor_cache, symbol_cache, diagnostic_cache) = match symbol_provider
+            .query_preprocessor(
+                &RefCell::borrow(cached_file).symbol_tree,
+                symbol_params,
+                &mut include_context.include_handler,
+            ) {
+            Ok(preprocessor_cache) => {
+                // Might not have included data if first visit.
+                let symbol_cache = match RefCell::borrow(cached_file).included_data.get(&uri) {
+                    // Only query new symbols for dirty files (main files).
+                    // Deps do not need update as they are not edited.
+                    // But preprocessor changes in main file might impact deps.
+                    Some(data) => {
+                        if *uri != include_context.includer_uri {
+                            profile_scope!("Cloning symbols for file {}", uri);
+                            data.symbol_cache.clone()
+                        } else {
+                            profile_scope!("Query symbols for file {}", uri);
+                            symbol_provider
+                                .query_file_symbols(&RefCell::borrow(cached_file).symbol_tree)?
+                        }
+                    }
+                    None => {
+                        profile_scope!("Query symbols for empty file {}", uri);
+                        symbol_provider
+                            .query_file_symbols(&RefCell::borrow(cached_file).symbol_tree)?
+                    }
+                };
+                (
+                    preprocessor_cache,
+                    symbol_cache,
+                    ShaderDiagnosticList::empty(),
+                )
             }
             Err(error) => {
                 // Return this error & store it to display it as a diagnostic & dont prevent linting.
@@ -165,19 +194,19 @@ impl ServerLanguageFileCache {
             }
         };
         // Add context macro for next includes.
-        for define in &preprocessor.defines {
+        for define in &preprocessor_cache.defines {
             symbol_params.defines.insert(
                 define.name.clone(),
                 define.value.clone().unwrap_or_default(),
             );
         }
         // Recurse dependencies.
-        for include in &preprocessor.includes {
+        for include in &preprocessor_cache.includes {
             let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
             let included_file =
                 self.watch_dependency(&include_uri, shading_language, symbol_provider)?;
             // Skip already visited deps if once.
-            if include_context.should_visit(&include_uri, &preprocessor) {
+            if include_context.should_visit(&include_uri, &preprocessor_cache) {
                 self.recurse_file_symbol(
                     &include_uri,
                     &included_file,
@@ -186,7 +215,8 @@ impl ServerLanguageFileCache {
                     include_context,
                 )?;
             }
-            include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
+            // Add deps to current file
+            include_context.visit_data(&uri, &cached_file, |data: &mut ServerFileCacheData| {
                 data.dependencies.insert(
                     Url::from_file_path(&include.absolute_path).unwrap(),
                     included_file,
@@ -195,9 +225,9 @@ impl ServerLanguageFileCache {
         }
         // Store symbol cache.
         include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
-            data.preprocessor_cache = preprocessor;
-            data.symbol_cache = symbol_list;
-            data.diagnostic_cache = diagnostics;
+            data.preprocessor_cache = preprocessor_cache;
+            data.symbol_cache = symbol_cache;
+            data.diagnostic_cache = diagnostic_cache;
         });
         Ok(())
     }
@@ -751,6 +781,10 @@ impl ServerLanguageFileCache {
         let cached_file = RefCell::borrow(&cached_file);
         // Add main file symbols
         let mut symbol_cache = cached_file.data.symbol_cache.clone();
+        cached_file
+            .data
+            .preprocessor_cache
+            .preprocess_symbols(&mut symbol_cache);
         // Add deps symbols
         fn get_deps(
             uri: &Url,
@@ -762,6 +796,8 @@ impl ServerLanguageFileCache {
             match cached_file.included_data.get(includer_uri) {
                 Some(data) => {
                     let mut symbol_cache = data.symbol_cache.clone();
+                    data.preprocessor_cache
+                        .preprocess_symbols(&mut symbol_cache);
                     for (deps_uri, deps_cached_file) in &data.dependencies {
                         if include_context.should_visit(deps_uri, &data.preprocessor_cache) {
                             symbol_cache.append(get_deps(

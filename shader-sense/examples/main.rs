@@ -38,9 +38,8 @@ fn query_all_symbol(shading_language: ShadingLanguage, shader_path: &Path) {
                     &mut IncludeHandler::default(shader_path),
                 )
                 .unwrap();
-            let symbol_list = symbol_provider
-                .query_file_symbols(&symbol_tree, &preprocessor)
-                .unwrap();
+            let mut symbol_list = symbol_provider.query_file_symbols(&symbol_tree).unwrap();
+            preprocessor.preprocess_symbols(&mut symbol_list);
             println!("Found symbols: {:#?}", symbol_list);
         }
         Err(err) => println!("Failed to create ast: {:#?}", err),

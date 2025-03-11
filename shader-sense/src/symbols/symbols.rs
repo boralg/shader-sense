@@ -316,7 +316,7 @@ impl ShaderPreprocessor {
     }
     pub fn preprocess_symbols(&self, shader_symbols: &mut ShaderSymbolList) {
         // Filter inactive regions symbols
-        shader_symbols.filter(|symbol| {
+        shader_symbols.retain(|symbol| {
             let is_in_inactive_region = match &symbol.range {
                 Some(range) => {
                     for region in &self.regions {

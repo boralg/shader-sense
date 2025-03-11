@@ -74,10 +74,8 @@ impl SymbolProvider for HlslSymbolProvider {
     fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
-        preprocessor: &ShaderPreprocessor,
     ) -> Result<ShaderSymbolList, ShaderError> {
-        self.symbol_parser
-            .query_file_symbols(symbol_tree, preprocessor)
+        self.symbol_parser.query_file_symbols(symbol_tree)
     }
     // Get word at a given position.
     fn get_word_range_at_position(
