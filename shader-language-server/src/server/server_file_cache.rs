@@ -349,7 +349,6 @@ impl ServerLanguageFileCache {
     ) -> Result<(), ShaderError> {
         // TODO: remove include context & replace it by includeHandler.
         // But it does not support uri though... Or include handler in include context.
-        let mut symbol_params = config.into_symbol_params();
         let mut include_context = IncludeContext::main(
             uri,
             config.includes.clone(),
@@ -368,7 +367,7 @@ impl ServerLanguageFileCache {
             // Add variant data if some.
             if let Some(variant) = &shader_variant {
                 for (variable, value) in &variant.defines {
-                    symbol_params
+                    include_context
                         .defines
                         .insert(variable.clone(), value.clone());
                 }

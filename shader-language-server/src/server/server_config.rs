@@ -53,11 +53,6 @@ impl ServerConfig {
             glsl_spirv: self.glsl.spirv_version,
         }
     }
-    pub fn into_symbol_params(&self) -> ShaderSymbolParams {
-        ShaderSymbolParams {
-            defines: self.defines.clone(),
-        }
-    }
 }
 
 impl Default for ServerConfig {

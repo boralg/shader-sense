@@ -11,7 +11,7 @@ mod document_symbol;
 mod goto;
 mod hover;
 mod semantic_token;
-mod shader_variant;
+pub mod shader_variant; // pub for test.
 mod signature;
 mod workspace_symbol;
 
