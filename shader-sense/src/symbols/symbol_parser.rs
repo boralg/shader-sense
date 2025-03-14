@@ -4,7 +4,7 @@ use tree_sitter::{Node, Query, QueryCursor, QueryMatch};
 
 use crate::{
     include::IncludeHandler,
-    shader_error::ShaderError,
+    shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
     symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolList},
 };
 
@@ -140,6 +140,7 @@ pub struct SymbolParser {
     symbol_parsers: Vec<(Box<dyn SymbolTreeParser>, tree_sitter::Query)>,
     symbol_filters: Vec<Box<dyn SymbolTreeFilter>>,
     scope_query: Query,
+    error_query: Query,
 
     preprocessor_parsers: Vec<(Box<dyn SymbolTreePreprocessorParser>, tree_sitter::Query)>,
     region_finder: Box<dyn SymbolRegionFinder>,
@@ -157,6 +158,7 @@ impl SymbolParser {
             "{"? @scope.start
             "}"? @scope.end
         ) @scope"#;
+        let error_query = r#"(ERROR) @error"#;
         Self {
             symbol_parsers: parsers
                 .into_iter()
@@ -168,6 +170,7 @@ impl SymbolParser {
                 .collect(),
             symbol_filters: filters,
             scope_query: tree_sitter::Query::new(language.clone(), scope_query).unwrap(),
+            error_query: tree_sitter::Query::new(language.clone(), error_query).unwrap(),
             preprocessor_parsers: preprocessor_parsers
                 .into_iter()
                 .map(|e| {
@@ -275,6 +278,23 @@ impl SymbolParser {
                     .is_none(),
                 Err(_err) => false,
             };
+        }
+        // Add errors
+        let mut query_error_cursor = QueryCursor::new();
+        for matches in query_error_cursor.matches(
+            &self.error_query,
+            symbol_tree.tree.root_node(),
+            symbol_tree.content.as_bytes(),
+        ) {
+            preprocessor.diagnostics.push(ShaderDiagnostic {
+                severity: ShaderDiagnosticSeverity::Warning,
+                error: "Failed to parse this code. Some symbols might be missing from providers."
+                    .into(),
+                range: ShaderRange::from_range(
+                    matches.captures[0].node.range(),
+                    &symbol_tree.file_path,
+                ),
+            });
         }
         Ok(preprocessor)
     }
