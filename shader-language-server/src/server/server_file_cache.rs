@@ -56,6 +56,59 @@ impl ServerFileCacheData {
         self.preprocessor_cache.preprocess_symbols(&mut symbols);
         symbols
     }
+    fn dump_dependency_node(
+        &self,
+        uri: &Url,
+        cached_file: &ServerFileCacheHandle,
+        includer_uri: &Url,
+        header: String,
+        is_last: bool,
+    ) -> String {
+        let mut dependency_tree =
+            format!("{}{} {}\n", header, if is_last { "└─" } else { "├─" }, uri);
+        let childs_header = format!("{}{}", header, if is_last { "  " } else { "|  " });
+        match RefCell::borrow(&cached_file)
+            .included_data
+            .get(includer_uri)
+        {
+            Some(data) => {
+                let mut deps_iter = data.dependencies.iter().peekable();
+                while let Some((deps_url, deps_file)) = deps_iter.next() {
+                    dependency_tree.push_str(
+                        self.dump_dependency_node(
+                            deps_url,
+                            deps_file,
+                            includer_uri,
+                            childs_header.clone(),
+                            deps_iter.peek().is_none(),
+                        )
+                        .as_str(),
+                    );
+                }
+            }
+            None => dependency_tree
+                .push_str(format!("{}└─ Missing included_data\n", childs_header).as_str()),
+        }
+        dependency_tree
+    }
+    pub fn dump_dependency_tree(&self, uri: &Url) -> String {
+        let mut dependency_tree = format!("{}\n", uri);
+
+        let mut deps_iter = self.dependencies.iter().peekable();
+        while let Some((deps_url, deps_file)) = deps_iter.next() {
+            dependency_tree.push_str(
+                self.dump_dependency_node(
+                    deps_url,
+                    deps_file,
+                    uri,
+                    "   ".into(),
+                    deps_iter.peek().is_none(),
+                )
+                .as_str(),
+            );
+        }
+        dependency_tree
+    }
 }
 
 pub struct ServerLanguageFileCache {

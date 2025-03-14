@@ -21,7 +21,7 @@ mod server_connection;
 mod server_file_cache;
 mod server_language_data;
 
-use debug::{DumpAstParams, DumpAstRequest};
+use debug::{DumpAstParams, DumpAstRequest, DumpDependencyParams, DumpDependencyRequest};
 use log::{debug, error, info, warn};
 use lsp_types::notification::{
     DidChangeConfiguration, DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument,
@@ -465,6 +465,30 @@ impl ServerLanguage {
                         let ast = RefCell::borrow(&cached_file).symbol_tree.dump_ast();
                         self.connection
                             .send_response::<DumpAstRequest>(req.id.clone(), Some(ast));
+                    }
+                    None => self.connection.send_notification_error(format!(
+                        "Trying to visit file that is not watched : {}",
+                        uri
+                    )),
+                }
+            }
+            DumpDependencyRequest::METHOD => {
+                let params: DumpDependencyParams = serde_json::from_value(req.params)?;
+                profile_scope!(
+                    "Received dump dependency request #{}: {:#?}",
+                    req.id,
+                    params
+                );
+                let uri = clean_url(&params.text_document.uri);
+                match self.watched_files.get(&uri) {
+                    Some(cached_file) => {
+                        let deps_tree = RefCell::borrow(&cached_file)
+                            .data
+                            .dump_dependency_tree(&uri);
+                        self.connection.send_response::<DumpDependencyRequest>(
+                            req.id.clone(),
+                            Some(deps_tree),
+                        );
                     }
                     None => self.connection.send_notification_error(format!(
                         "Trying to visit file that is not watched : {}",
