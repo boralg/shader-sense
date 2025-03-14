@@ -2,6 +2,7 @@ use std::path::Path;
 
 use crate::{
     include::IncludeHandler,
+    shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity},
     symbols::{
         symbol_parser::{get_name, SymbolTreePreprocessorParser},
         symbols::{
@@ -55,7 +56,17 @@ impl SymbolTreePreprocessorParser for HlslIncludeTreePreprocessorParser {
                     range,
                 ));
             }
-            None => {}
+            None => {
+                preprocessor.diagnostics.push(ShaderDiagnostic {
+                    severity: ShaderDiagnosticSeverity::Warning,
+                    error: format!(
+                        "Failed to find include {} in file {}. Symbol provider might be impacted.",
+                        relative_path,
+                        file_path.display()
+                    ),
+                    range,
+                });
+            }
         }
     }
 }

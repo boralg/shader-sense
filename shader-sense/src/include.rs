@@ -133,7 +133,11 @@ impl IncludeHandler {
                 Self::resolve_virtual_path(relative_path, &self.path_remapping)
             {
                 if target_path.is_file() {
-                    // Don't add virtual path to stack, as they are well defined already.
+                    // We should not add virtual path to stack, as they are well defined already.
+                    // But we expect a correct directory stack.
+                    if let Some(parent) = target_path.parent() {
+                        self.directory_stack.insert(canonicalize(parent).unwrap());
+                    }
                     self.dependencies.add_dependency(target_path.clone());
                     return Some(target_path);
                 }
