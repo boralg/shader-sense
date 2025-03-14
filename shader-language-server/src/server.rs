@@ -651,9 +651,9 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 profile_scope!("got did close text document: {:#?}", uri);
                 match self.watched_files.remove_file(&uri) {
-                    Ok(was_removed) => {
-                        if was_removed {
-                            self.clear_diagnostic(&self.connection, &uri);
+                    Ok(removed_urls) => {
+                        for removed_url in removed_urls {
+                            self.clear_diagnostic(&self.connection, &removed_url);
                         }
                     }
                     Err(err) => self.connection.send_notification_error(format!("{}", err)),

@@ -63,7 +63,9 @@ impl ServerFileCacheData {
         includer_uri: &Url,
         header: String,
         is_last: bool,
+        unique_deps: &mut HashSet<Url>,
     ) -> String {
+        unique_deps.insert(uri.clone());
         let mut dependency_tree =
             format!("{}{} {}\n", header, if is_last { "└─" } else { "├─" }, uri);
         let childs_header = format!("{}{}", header, if is_last { "  " } else { "|  " });
@@ -74,16 +76,24 @@ impl ServerFileCacheData {
             Some(data) => {
                 let mut deps_iter = data.dependencies.iter().peekable();
                 while let Some((deps_url, deps_file)) = deps_iter.next() {
-                    dependency_tree.push_str(
-                        self.dump_dependency_node(
-                            deps_url,
-                            deps_file,
-                            includer_uri,
-                            childs_header.clone(),
-                            deps_iter.peek().is_none(),
-                        )
-                        .as_str(),
-                    );
+                    if !unique_deps.contains(deps_url) {
+                        dependency_tree.push_str(
+                            self.dump_dependency_node(
+                                deps_url,
+                                deps_file,
+                                includer_uri,
+                                childs_header.clone(),
+                                deps_iter.peek().is_none(),
+                                unique_deps,
+                            )
+                            .as_str(),
+                        );
+                    } else {
+                        dependency_tree
+                            .push_str(format!("{}└─ {}\n", childs_header, deps_url).as_str());
+                        dependency_tree
+                            .push_str(format!("{}  └─ [...cyclic...]\n", childs_header).as_str());
+                    }
                 }
             }
             None => dependency_tree
@@ -103,6 +113,7 @@ impl ServerFileCacheData {
                     uri,
                     "   ".into(),
                     deps_iter.peek().is_none(),
+                    &mut HashSet::new(),
                 )
                 .as_str(),
             );
@@ -145,7 +156,7 @@ impl IncludeContext {
             defines,
         }
     }
-    pub fn should_visit(&mut self, uri: &Url, _preprocessor: &ShaderPreprocessor) -> bool {
+    pub fn should_visit(&mut self, uri: &Url) -> bool {
         // For now, every include is included once, should cover 99% of case.
         if self.visited_dependencies.insert(uri.clone()) {
             true
@@ -290,15 +301,27 @@ impl ServerLanguageFileCache {
                 }
             }
         };
-        let mut context_preprocessor_define = preprocessor_cache.defines.clone();
+        let mut context_define = preprocessor_cache.defines.clone();
+        let includes = preprocessor_cache.includes.clone();
+        // Store symbol cache.
+        include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
+            data.preprocessor_cache = preprocessor_cache;
+            data.symbol_cache = symbol_cache;
+            data.diagnostic_cache = diagnostic_cache;
+        });
         // Recurse dependencies.
-        for include in &preprocessor_cache.includes {
+        for include in &includes {
             let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
             let included_file =
                 self.watch_dependency(&include_uri, shading_language, symbol_provider)?;
             // Skip already visited deps if once.
-            if include_context.should_visit(&include_uri, &preprocessor_cache) {
-                include_context.add_context_for_include(include, &mut context_preprocessor_define);
+            // If we skip this, we will need to fill data before.
+            if include_context.should_visit(&include_uri) {
+                include_context.add_context_for_include(include, &mut context_define);
+                RefCell::borrow_mut(&included_file).included_data.insert(
+                    include_context.includer_uri.clone(),
+                    ServerFileCacheData::default(),
+                );
                 self.recurse_file_symbol(
                     &include_uri,
                     &included_file,
@@ -307,21 +330,12 @@ impl ServerLanguageFileCache {
                 )?;
             }
             // Add deps to current file
-            include_context.visit_data(&uri, &cached_file, |data: &mut ServerFileCacheData| {
-                data.dependencies.insert(
-                    Url::from_file_path(&include.absolute_path).unwrap(),
-                    included_file,
-                );
+            include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
+                data.dependencies.insert(include_uri.clone(), included_file);
             });
         }
         // Add remaining context
-        include_context.add_context(context_preprocessor_define);
-        // Store symbol cache.
-        include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
-            data.preprocessor_cache = preprocessor_cache;
-            data.symbol_cache = symbol_cache;
-            data.diagnostic_cache = diagnostic_cache;
-        });
+        include_context.add_context(context_define);
         Ok(())
     }
     pub fn cache_file_data(
@@ -692,11 +706,14 @@ impl ServerLanguageFileCache {
             None => None,
         }
     }
-    pub fn remove_dependency(&mut self, uri: &Url, includer_uri: &Url) -> Result<(), ShaderError> {
+    pub fn remove_file(&mut self, uri: &Url) -> Result<Vec<Url>, ShaderError> {
         fn list_all_dependencies_count(
+            uri: &Url,
             cached_file: &ServerFileCacheHandle,
             includer_uri: &Url,
+            unique_deps: &mut HashSet<Url>,
         ) -> HashMap<Url, usize> {
+            unique_deps.insert(uri.clone());
             let mut list = HashMap::new();
             match RefCell::borrow(cached_file).included_data.get(includer_uri) {
                 Some(data) => {
@@ -709,150 +726,130 @@ impl ServerLanguageFileCache {
                                 list.insert(deps_uri.clone(), 1);
                             }
                         }
-                        let deps = list_all_dependencies_count(&deps_cached_file, includer_uri);
-                        for (uri, _) in deps {
-                            match list.get_mut(&uri) {
-                                Some(count) => {
-                                    *count += 1;
+                        // Avoid stack overflow
+                        if !unique_deps.contains(deps_uri) {
+                            debug!("Recurse {}", deps_uri);
+                            let deps = list_all_dependencies_count(
+                                deps_uri,
+                                deps_cached_file,
+                                includer_uri,
+                                unique_deps,
+                            );
+                            for (deps_deps_uri, deps_deps_count) in deps {
+                                match list.get_mut(&deps_deps_uri) {
+                                    Some(count) => {
+                                        *count += deps_deps_count;
+                                    }
+                                    None => {
+                                        list.insert(deps_deps_uri.clone(), deps_deps_count);
+                                    }
                                 }
-                                None => {
-                                    list.insert(uri.clone(), 1);
-                                }
-                            }
-                        }
-                    }
-                }
-                None => {
-                    warn!("Deps has no data for includer {}", includer_uri);
-                }
-            }
-            list
-        }
-        match self.dependencies.get(uri) {
-            Some(cached_file) => {
-                // Check if strong_count are not reference to itself within deps.
-                let dependencies_count = list_all_dependencies_count(cached_file, includer_uri);
-                let is_last_ref = match dependencies_count.get(&uri) {
-                    Some(count) => {
-                        let ref_count = Rc::strong_count(cached_file);
-                        debug!("Found {} deps count with {} strong count", count, ref_count);
-                        *count + 1 >= ref_count
-                    }
-                    None => Rc::strong_count(cached_file) == 1,
-                };
-                if is_last_ref {
-                    // Remove dependency.
-                    let cached_file = self.dependencies.remove(uri).unwrap();
-                    drop(cached_file);
-                    debug!(
-                        "Removing dependency file at {}. {} deps in cache.",
-                        uri,
-                        self.dependencies.len(),
-                    );
-                    // Remove every dangling deps
-                    for (dependency_url, dependency_count) in dependencies_count {
-                        match self.dependencies.get(&dependency_url) {
-                            Some(dependency_file) => {
-                                if dependency_count >= Rc::strong_count(dependency_file) {
-                                    self.dependencies.remove(&dependency_url).unwrap();
-                                    debug!(
-                                        "Removed dangling dependency file at {}. {} deps in cache.",
-                                        dependency_url,
-                                        self.dependencies.len(),
-                                    );
-                                }
-                            }
-                            None => {
-                                return Err(ShaderError::InternalErr(format!(
-                                    "Could not find dependency file {}",
-                                    dependency_url
-                                )))
-                            }
-                        }
-                    }
-                }
-                Ok(())
-            }
-            None => Err(ShaderError::InternalErr(format!(
-                "Trying to remove dependency file {} that is not watched",
-                uri.path()
-            ))),
-        }
-    }
-    fn flatten_dependencies(
-        &self,
-        uri: &Url,
-        cached_file: &ServerFileCacheHandle,
-    ) -> HashMap<Url, ServerFileCacheHandle> {
-        fn get_dependencies(
-            uri: &Url,
-            cached_file: &ServerFileCacheHandle,
-            includer_uri: &Url,
-            unique_deps: &mut HashSet<Url>,
-        ) -> HashMap<Url, ServerFileCacheHandle> {
-            unique_deps.insert(uri.clone());
-            let mut flat_dependencies = HashMap::new();
-            match RefCell::borrow(cached_file).included_data.get(includer_uri) {
-                Some(data) => {
-                    for (deps_uri, deps_file) in &data.dependencies {
-                        flat_dependencies.insert(deps_uri.clone(), Rc::clone(deps_file));
-                        // Avoid stack overflow.
-                        if !unique_deps.contains(&deps_uri) {
-                            let dependencies =
-                                get_dependencies(deps_uri, deps_file, includer_uri, unique_deps);
-                            for (deps_deps_uri, deps_deps_file) in dependencies {
-                                flat_dependencies.insert(deps_deps_uri.clone(), deps_deps_file);
                             }
                         }
                     }
                 }
                 None => {
                     warn!(
-                        "Deps {} flatten has no data for includer {}",
+                        "Dependency {} has no data for includer {}",
                         uri, includer_uri
-                    );
+                    )
                 }
             }
-            flat_dependencies
+            list
         }
-        let mut flat_dependencies = HashMap::new();
-        for (deps_uri, deps_cached_file) in &RefCell::borrow_mut(&cached_file).data.dependencies {
-            // Add itself to deps.
-            let mut unique_deps = HashSet::new();
-            unique_deps.insert(uri.clone());
-            let flat_deps = get_dependencies(&deps_uri, &deps_cached_file, uri, &mut unique_deps);
-            for (deps_deps_uri, deps_deps_cached_file) in flat_deps {
-                flat_dependencies.insert(deps_deps_uri, deps_deps_cached_file);
-            }
-        }
-        flat_dependencies
-    }
-    pub fn remove_file(&mut self, uri: &Url) -> Result<bool, ShaderError> {
         match self.files.remove(uri) {
             Some(cached_file) => {
-                // Gather all dependencies.
-                let flat_dependencies = self.flatten_dependencies(&uri, &cached_file);
-                // Remove all file included_data referencing this uri
-                // TODO: should clear their diagnostic aswell...
-                for (_, deps_cached_file) in &self.dependencies {
-                    RefCell::borrow_mut(&deps_cached_file)
-                        .included_data
-                        .remove(uri);
+                debug!(
+                    "Dependency tree:\n{}",
+                    RefCell::borrow(&cached_file).data.dump_dependency_tree(uri)
+                );
+                let mut dependency_list = HashMap::new();
+                for (dependency_url, dependency_file) in
+                    &RefCell::borrow(&cached_file).data.dependencies
+                {
+                    match dependency_list.get_mut(dependency_url) {
+                        Some(count) => {
+                            *count += 1;
+                        }
+                        None => {
+                            dependency_list.insert(dependency_url.clone(), 1);
+                        }
+                    }
+                    let list = list_all_dependencies_count(
+                        dependency_url,
+                        dependency_file,
+                        uri,
+                        &mut HashSet::new(),
+                    );
+                    for (deps_uri, deps_count) in list {
+                        match dependency_list.get_mut(&deps_uri) {
+                            Some(count) => {
+                                *count += deps_count;
+                            }
+                            None => {
+                                dependency_list.insert(deps_uri, deps_count);
+                            }
+                        }
+                    }
                 }
-                // Drop Rc, might still have dangling ref in deps though...
+                // Drop Rc to decrease refcount
                 drop(cached_file);
                 debug!(
                     "Removing main file at {}. {} files in cache.",
-                    uri.to_file_path().unwrap().display(),
+                    uri,
                     self.files.len(),
                 );
-                // Remove all flatten dependencies
-                for (dependency_uri, dependency_file) in flat_dependencies {
-                    drop(dependency_file); // Decrease ref count.
-                    let _removed = self.remove_dependency(&dependency_uri, uri)?;
+                let mut deleted_files = Vec::new();
+                for (dependency_uri, dependency_count) in dependency_list {
+                    match self.dependencies.get(&dependency_uri) {
+                        Some(dependency_file) => {
+                            // Dont forget ref in self.files & self.dependencies
+                            let deps_ref_count = 1;
+                            let file_ref_count = self.files.contains_key(&dependency_uri) as usize;
+                            if Rc::strong_count(dependency_file)
+                                <= dependency_count + file_ref_count + deps_ref_count
+                            {
+                                // Remove dependency.
+                                debug!(
+                                    "Removing dependency file at {}. {} deps in cache.",
+                                    dependency_uri,
+                                    self.dependencies.len()
+                                );
+                                let dependency_file =
+                                    self.dependencies.remove(&dependency_uri).unwrap();
+                                drop(dependency_file);
+                                deleted_files.push(dependency_uri.clone());
+                            }
+                        }
+                        None => {
+                            return Err(ShaderError::InternalErr(format!(
+                                "Trying to remove dependency file {} that is not watched",
+                                dependency_uri
+                            )))
+                        }
+                    }
                 }
-                // Check if it was destroyed or we still have it in deps.
-                Ok(self.dependencies.get(&uri).is_none())
+                // Clear leaking dependencies
+                // This means there is issues with them.
+                let mut leaking_deps = Vec::new();
+                for (dependency_url, dependency_file) in &self.dependencies {
+                    if Rc::strong_count(dependency_file) == 1 {
+                        warn!("Dependency {} is leaking.", dependency_url);
+                        leaking_deps.push(dependency_url.clone());
+                    }
+                }
+                for leaking_deps in &leaking_deps {
+                    self.dependencies.remove(leaking_deps);
+                    deleted_files.push(leaking_deps.clone());
+                }
+                // Check removed file still used as deps.
+                match self.dependencies.get(uri) {
+                    Some(_) => Ok(deleted_files),
+                    None => {
+                        deleted_files.push(uri.clone());
+                        Ok(deleted_files)
+                    }
+                }
             }
             None => Err(ShaderError::InternalErr(format!(
                 "Trying to remove main file {} that is not watched",
@@ -887,7 +884,7 @@ impl ServerLanguageFileCache {
                     data.preprocessor_cache
                         .preprocess_symbols(&mut symbol_cache);
                     for (deps_uri, deps_cached_file) in &data.dependencies {
-                        if include_context.should_visit(deps_uri, &data.preprocessor_cache) {
+                        if include_context.should_visit(deps_uri) {
                             // Dont need to add_context_for_include here, bcz we only care about should_visit.
                             symbol_cache.append(get_deps(
                                 deps_uri,
