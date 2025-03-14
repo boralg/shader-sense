@@ -6,7 +6,6 @@ use crate::{
         symbol_parser::{get_name, SymbolTreePreprocessorParser},
         symbols::{
             ShaderPreprocessor, ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderRange,
-            ShaderSymbolParams,
         },
     },
 };
@@ -39,7 +38,6 @@ impl SymbolTreePreprocessorParser for HlslIncludeTreePreprocessorParser {
         matches: tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
-        _symbol_params: &ShaderSymbolParams,
         preprocessor: &mut ShaderPreprocessor,
         include_handler: &mut IncludeHandler,
     ) {
@@ -77,7 +75,6 @@ impl SymbolTreePreprocessorParser for HlslDefineTreePreprocessorParser {
         matches: tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
-        _symbol_params: &ShaderSymbolParams,
         symbols: &mut ShaderPreprocessor,
         _include_handler: &mut IncludeHandler,
     ) {

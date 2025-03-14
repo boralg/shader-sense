@@ -215,8 +215,6 @@ impl ShaderRange {
 #[derive(Debug, Default, Clone)]
 pub struct ShaderSymbolParams {
     pub defines: HashMap<String, String>,
-    pub includes: Vec<String>,
-    pub path_remapping: HashMap<PathBuf, PathBuf>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -302,11 +300,9 @@ impl ShaderPreprocessorInclude {
 }
 
 impl ShaderPreprocessor {
-    pub fn new(symbol_params: &ShaderSymbolParams) -> Self {
+    pub fn new(context: ShaderPreprocessorContext) -> Self {
         Self {
-            context: ShaderPreprocessorContext {
-                defines: symbol_params.defines.clone(),
-            },
+            context: context,
             includes: Vec::new(),
             defines: Vec::new(),
             regions: Vec::new(),

@@ -10,7 +10,10 @@ use crate::{
 
 use super::{
     symbol_tree::SymbolTree,
-    symbols::{ShaderPreprocessor, ShaderRegion, ShaderScope, ShaderSymbol, ShaderSymbolParams},
+    symbols::{
+        ShaderPreprocessor, ShaderPreprocessorContext, ShaderRegion, ShaderScope, ShaderSymbol,
+        ShaderSymbolParams,
+    },
 };
 
 pub(super) fn get_name<'a>(shader_content: &'a str, node: Node) -> &'a str {
@@ -128,7 +131,6 @@ pub trait SymbolTreePreprocessorParser {
         matches: QueryMatch,
         file_path: &Path,
         shader_content: &str,
-        symbol_params: &ShaderSymbolParams,
         preprocessor: &mut ShaderPreprocessor,
         include_handler: &mut IncludeHandler,
     );
@@ -233,7 +235,9 @@ impl SymbolParser {
         symbol_params: &ShaderSymbolParams,
         include_handler: &mut IncludeHandler,
     ) -> Result<ShaderPreprocessor, ShaderError> {
-        let mut preprocessor = ShaderPreprocessor::new(symbol_params);
+        let mut preprocessor = ShaderPreprocessor::new(ShaderPreprocessorContext {
+            defines: symbol_params.defines.clone(),
+        });
         for parser in &self.preprocessor_parsers {
             let mut query_cursor = QueryCursor::new();
             for matches in query_cursor.matches(
@@ -245,7 +249,6 @@ impl SymbolParser {
                     matches,
                     &symbol_tree.file_path,
                     &symbol_tree.content,
-                    symbol_params,
                     &mut preprocessor,
                     include_handler,
                 );

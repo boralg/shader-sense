@@ -56,12 +56,6 @@ impl ServerConfig {
     pub fn into_symbol_params(&self) -> ShaderSymbolParams {
         ShaderSymbolParams {
             defines: self.defines.clone(),
-            includes: self.includes.clone(),
-            path_remapping: self
-                .path_remapping
-                .iter()
-                .map(|(vp, p)| (vp.into(), p.into()))
-                .collect(),
         }
     }
 }

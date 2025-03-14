@@ -22,8 +22,9 @@ use shader_sense::{
         symbol_provider::SymbolProvider,
         symbol_tree::SymbolTree,
         symbols::{
-            ShaderPreprocessor, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
-            ShaderSymbolParams,
+            ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext,
+            ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderSymbol, ShaderSymbolData,
+            ShaderSymbolList, ShaderSymbolParams,
         },
     },
     validator::validator::Validator,
@@ -67,13 +68,15 @@ struct IncludeContext {
     includer_uri: Url,                  // The file from which this file is included.
     visited_dependencies: HashSet<Url>, // Already visited deps, needed for once.
     include_handler: IncludeHandler,    // Handler for includes.
+    defines: HashMap<String, String>,   // Preprocessor macros defined in context.
 }
 
 impl IncludeContext {
     pub fn main(
         uri: &Url,
         includes: Vec<String>,
-        path_remapping: HashMap<PathBuf, PathBuf>,
+        defines: HashMap<String, String>,
+        path_remapping: HashMap<String, String>,
     ) -> Self {
         Self {
             includer_uri: uri.clone(),
@@ -81,8 +84,12 @@ impl IncludeContext {
             include_handler: IncludeHandler::new(
                 &uri.to_file_path().unwrap(),
                 includes,
-                path_remapping,
+                path_remapping
+                    .iter()
+                    .map(|(vp, p)| (vp.into(), p.into()))
+                    .collect(),
             ),
+            defines,
         }
     }
     pub fn should_visit(&mut self, uri: &Url, _preprocessor: &ShaderPreprocessor) -> bool {
@@ -91,6 +98,39 @@ impl IncludeContext {
             true
         } else {
             false // !preprocessor.once
+        }
+    }
+    pub fn add_context_for_include(
+        &mut self,
+        include: &ShaderPreprocessorInclude,
+        context_preprocessor_define: &mut Vec<ShaderPreprocessorDefine>,
+    ) {
+        let is_defined_before_include =
+            |include_position: &ShaderPosition, define: &ShaderPreprocessorDefine| -> bool {
+                match &define.range {
+                    // Check define is before include position.
+                    Some(range) => range.start < *include_position,
+                    None => false, // Should not happen with local symbols...
+                }
+            };
+        // Get context defined before include & add them to current context.
+        let include_define_context: Vec<&ShaderPreprocessorDefine> = context_preprocessor_define
+            .iter()
+            .filter(|define| is_defined_before_include(&include.range.start, define))
+            .collect();
+        for define in include_define_context {
+            self.defines.insert(
+                define.name.clone(),
+                define.value.clone().unwrap_or("".into()),
+            );
+        }
+        context_preprocessor_define
+            .retain(|define| !is_defined_before_include(&include.range.start, define));
+    }
+    pub fn add_context(&mut self, context_preprocessor_define: Vec<ShaderPreprocessorDefine>) {
+        for define in context_preprocessor_define {
+            self.defines
+                .insert(define.name, define.value.unwrap_or("".into()));
         }
     }
     pub fn visit_data<F: FnOnce(&mut ServerFileCacheData)>(
@@ -133,17 +173,19 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
-        symbol_params: &mut ShaderSymbolParams, // TODO: replace symbol params to include context
         symbol_provider: &mut dyn SymbolProvider,
         include_context: &mut IncludeContext,
     ) -> Result<(), ShaderError> {
         profile_scope!("Recursing symbols for file {}", uri);
         let shading_language = RefCell::borrow(cached_file).shading_language;
+        let context_symbol_params = ShaderSymbolParams {
+            defines: include_context.defines.clone(),
+        };
         // We are recomputing every deps symbols here, but not really required, isnt it ?
         let (preprocessor_cache, symbol_cache, diagnostic_cache) = match symbol_provider
             .query_preprocessor(
                 &RefCell::borrow(cached_file).symbol_tree,
-                symbol_params,
+                &context_symbol_params,
                 &mut include_context.include_handler,
             ) {
             Ok(preprocessor_cache) => {
@@ -178,7 +220,9 @@ impl ServerLanguageFileCache {
                 // Return this error & store it to display it as a diagnostic & dont prevent linting.
                 if let ShaderError::SymbolQueryError(message, range) = error {
                     (
-                        ShaderPreprocessor::new(symbol_params),
+                        ShaderPreprocessor::new(ShaderPreprocessorContext {
+                            defines: include_context.defines.clone(),
+                        }),
                         ShaderSymbolList::default(),
                         ShaderDiagnosticList {
                             diagnostics: vec![ShaderDiagnostic {
@@ -193,13 +237,7 @@ impl ServerLanguageFileCache {
                 }
             }
         };
-        // Add context macro for next includes.
-        for define in &preprocessor_cache.defines {
-            symbol_params.defines.insert(
-                define.name.clone(),
-                define.value.clone().unwrap_or_default(),
-            );
-        }
+        let mut context_preprocessor_define = preprocessor_cache.defines.clone();
         // Recurse dependencies.
         for include in &preprocessor_cache.includes {
             let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
@@ -207,10 +245,10 @@ impl ServerLanguageFileCache {
                 self.watch_dependency(&include_uri, shading_language, symbol_provider)?;
             // Skip already visited deps if once.
             if include_context.should_visit(&include_uri, &preprocessor_cache) {
+                include_context.add_context_for_include(include, &mut context_preprocessor_define);
                 self.recurse_file_symbol(
                     &include_uri,
                     &included_file,
-                    symbol_params,
                     symbol_provider,
                     include_context,
                 )?;
@@ -223,6 +261,8 @@ impl ServerLanguageFileCache {
                 );
             });
         }
+        // Add remaining context
+        include_context.add_context(context_preprocessor_define);
         // Store symbol cache.
         include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
             data.preprocessor_cache = preprocessor_cache;
@@ -245,8 +285,9 @@ impl ServerLanguageFileCache {
         let mut symbol_params = config.into_symbol_params();
         let mut include_context = IncludeContext::main(
             uri,
-            symbol_params.includes.clone(),
-            symbol_params.path_remapping.clone(),
+            config.includes.clone(),
+            config.defines.clone(),
+            config.path_remapping.clone(),
         );
         // Reset cache
         include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
@@ -265,13 +306,7 @@ impl ServerLanguageFileCache {
                         .insert(variable.clone(), value.clone());
                 }
             }
-            self.recurse_file_symbol(
-                uri,
-                cached_file,
-                &mut symbol_params,
-                symbol_provider,
-                &mut include_context,
-            )?;
+            self.recurse_file_symbol(uri, cached_file, symbol_provider, &mut include_context)?;
         }
         // Get diagnostics
         if config.validate {
@@ -298,9 +333,9 @@ impl ServerLanguageFileCache {
                             None => {
                                 if config.symbols {
                                     warn!(
-                                        "Should only get there if symbols did not add deps: {} from {}.",
+                                        "Should only get there if symbols did not add deps: {} from includer {}.",
                                         deps_uri,
-                                        uri
+                                        uri, // This is includer as we dont recurse here.
                                     );
                                 }
                                 // If include does not exist, add it to watched files.
@@ -800,6 +835,7 @@ impl ServerLanguageFileCache {
                         .preprocess_symbols(&mut symbol_cache);
                     for (deps_uri, deps_cached_file) in &data.dependencies {
                         if include_context.should_visit(deps_uri, &data.preprocessor_cache) {
+                            // Dont need to add_context_for_include here, bcz we only care about should_visit.
                             symbol_cache.append(get_deps(
                                 deps_uri,
                                 deps_cached_file,
@@ -824,7 +860,7 @@ impl ServerLanguageFileCache {
                 deps_uri,
                 deps_cached_file,
                 uri,
-                &mut IncludeContext::main(uri, Vec::new(), HashMap::new()),
+                &mut IncludeContext::main(uri, Vec::new(), HashMap::new(), HashMap::new()),
             ));
         }
         // Add config symbols
