@@ -28,7 +28,6 @@ impl GlslSymbolProvider {
                 // type_identifier = struct name, class name...
                 // primitive_type = float, uint...
                 // string_content = include, should check preproc_include as parent.
-                // TODO: should depend on language...
                 "identifier" | "type_identifier" | "primitive_type" => {
                     return Ok((
                         get_name(&symbol_tree.content, node).into(),
@@ -36,7 +35,7 @@ impl GlslSymbolProvider {
                     ))
                 }
                 // TODO: should use string_content instead
-                "string_literal" => {
+                "string_literal" | "system_lib_string" => {
                     let path = get_name(&symbol_tree.content, node);
                     return Ok((
                         path[1..path.len() - 1].into(),

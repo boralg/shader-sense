@@ -30,7 +30,7 @@ impl SymbolTreePreprocessorParser for HlslIncludeTreePreprocessorParser {
         )"#*/
         r#"(preproc_include
             (#include)
-            path: (string_literal) @include
+            path: [(string_literal)(system_lib_string)] @include
         )"#
         .into()
     }
