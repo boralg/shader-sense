@@ -27,14 +27,12 @@ impl ServerLanguage {
             line: position.line as u32,
             pos: position.character as u32,
         };
-        let all_symbol_list = self.watched_files.get_all_symbols(
-            uri,
-            &cached_file,
-            language_data.symbol_provider.as_ref(),
-        );
+        let all_symbol_list =
+            self.watched_files
+                .get_all_symbols(uri, &cached_file, &language_data.language);
         match language_data
             .symbol_provider
-            .get_word_range_at_position(&cached_file_borrowed.symbol_tree, shader_position.clone())
+            .get_word_range_at_position(&cached_file_borrowed.symbol_tree, &shader_position)
         {
             Ok((word, word_range)) => {
                 let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);

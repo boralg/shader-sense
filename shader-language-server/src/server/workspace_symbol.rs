@@ -18,11 +18,7 @@ impl ServerLanguage {
                 let symbols = self.watched_files.get_all_symbols(
                     uri,
                     cached_file,
-                    self.language_data
-                        .get(&shading_language)
-                        .unwrap()
-                        .symbol_provider
-                        .as_ref(),
+                    &self.language_data.get(&shading_language).unwrap().language,
                 );
                 symbols
                     .iter()

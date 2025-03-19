@@ -26,7 +26,7 @@ impl ServerLanguage {
             .unwrap();
         match language_data
             .symbol_provider
-            .get_word_range_at_position(&cached_file.symbol_tree, shader_position.clone())
+            .get_word_range_at_position(&cached_file.symbol_tree, &shader_position)
         {
             // word_range should be the same as symbol range
             Ok((word, _word_range)) => match self.watched_files.get(uri) {
@@ -34,7 +34,7 @@ impl ServerLanguage {
                     let all_symbol_list = self.watched_files.get_all_symbols(
                         uri,
                         &target_cached_file,
-                        language_data.symbol_provider.as_ref(),
+                        &language_data.language,
                     );
                     let target_cached_file = target_cached_file.borrow();
                     let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);

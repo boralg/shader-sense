@@ -9,92 +9,19 @@ use glsl_filter::get_glsl_filters;
 use glsl_parser::get_glsl_parsers;
 use glsl_preprocessor::get_glsl_preprocessor_parser;
 use glsl_regions::GlslRegionFinder;
-use tree_sitter::Parser;
+use glsl_word::GlslSymbolLabelProvider;
+use glsl_word_chain::GlslSymbolLabelChainProvider;
 
-use crate::{include::IncludeHandler, shader_error::ShaderError};
+use super::symbol_provider::SymbolProvider;
 
-use super::{
-    symbol_parser::SymbolParser,
-    symbol_provider::SymbolProvider,
-    symbol_tree::SymbolTree,
-    symbols::{ShaderPreprocessor, ShaderScope, ShaderSymbolList, ShaderSymbolParams},
-};
-
-pub struct GlslSymbolProvider {
-    parser: Parser,
-    symbol_parser: SymbolParser,
-    shader_intrinsics: ShaderSymbolList,
-}
-
-impl GlslSymbolProvider {
-    pub fn new() -> Self {
-        let lang = tree_sitter_glsl::language();
-        let mut parser = Parser::new();
-        parser
-            .set_language(lang.clone())
-            .expect("Error loading GLSL grammar");
-        Self {
-            parser,
-            symbol_parser: SymbolParser::new(
-                lang.clone(),
-                get_glsl_parsers(),
-                get_glsl_filters(),
-                get_glsl_preprocessor_parser(),
-                Box::new(GlslRegionFinder::new()),
-            ),
-            shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
-                "glsl-intrinsics.json"
-            ))),
-        }
-    }
-}
-
-impl SymbolProvider for GlslSymbolProvider {
-    fn get_parser(&mut self) -> &mut Parser {
-        &mut self.parser
-    }
-
-    fn get_intrinsics_symbol(&self) -> &ShaderSymbolList {
-        &self.shader_intrinsics
-    }
-
-    fn query_preprocessor(
-        &self,
-        symbol_tree: &SymbolTree,
-        symbol_params: &ShaderSymbolParams,
-        include_handler: &mut IncludeHandler,
-    ) -> Result<ShaderPreprocessor, ShaderError> {
-        self.symbol_parser
-            .query_file_preprocessor(symbol_tree, symbol_params, include_handler)
-    }
-
-    fn query_file_symbols(
-        &self,
-        symbol_tree: &SymbolTree,
-    ) -> Result<ShaderSymbolList, ShaderError> {
-        self.symbol_parser.query_file_symbols(symbol_tree)
-    }
-
-    fn get_word_range_at_position(
-        &self,
-        symbol_tree: &super::symbol_tree::SymbolTree,
-        position: super::symbols::ShaderPosition,
-    ) -> Result<(String, super::symbols::ShaderRange), crate::shader_error::ShaderError> {
-        self.find_label_at_position_in_node(symbol_tree, symbol_tree.tree.root_node(), position)
-    }
-
-    fn get_word_chain_range_at_position(
-        &mut self,
-        symbol_tree: &super::symbol_tree::SymbolTree,
-        position: super::symbols::ShaderPosition,
-    ) -> Result<Vec<(String, super::symbols::ShaderRange)>, crate::shader_error::ShaderError> {
-        self.find_label_chain_at_position_in_node(
-            symbol_tree,
-            symbol_tree.tree.root_node(),
-            position,
-        )
-    }
-    fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope> {
-        self.symbol_parser.query_file_scopes(symbol_tree)
-    }
+pub fn create_glsl_symbol_provider(tree_sitter_language: tree_sitter::Language) -> SymbolProvider {
+    SymbolProvider::new(
+        tree_sitter_language.clone(),
+        get_glsl_parsers(),
+        get_glsl_filters(),
+        get_glsl_preprocessor_parser(),
+        Box::new(GlslRegionFinder::new()),
+        Box::new(GlslSymbolLabelChainProvider {}),
+        Box::new(GlslSymbolLabelProvider {}),
+    )
 }

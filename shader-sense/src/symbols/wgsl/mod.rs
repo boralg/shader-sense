@@ -1,94 +1,53 @@
 mod wgsl_filter;
 mod wgsl_parser;
 mod wgsl_regions;
-use tree_sitter::Parser;
 use wgsl_filter::get_wgsl_filters;
 use wgsl_parser::get_wgsl_parsers;
 use wgsl_regions::WgslRegionFinder;
 
-use crate::{include::IncludeHandler, shader_error::ShaderError};
+use crate::shader_error::ShaderError;
 
 use super::{
-    symbol_parser::SymbolParser,
+    symbol_parser::{SymbolLabelChainProvider, SymbolLabelProvider},
     symbol_provider::SymbolProvider,
     symbol_tree::SymbolTree,
-    symbols::{
-        ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderScope, ShaderSymbolList,
-        ShaderSymbolParams,
-    },
+    symbols::{ShaderPosition, ShaderRange},
 };
 
-pub struct WgslSymbolProvider {
-    parser: Parser,
-    symbol_parser: SymbolParser,
-    shader_intrinsics: ShaderSymbolList,
-}
+struct WgslSymbolLabelChainProvider {}
 
-impl WgslSymbolProvider {
-    pub fn new() -> Self {
-        let lang = tree_sitter_wgsl_bevy::language();
-        let mut parser = Parser::new();
-        parser
-            .set_language(lang.clone())
-            .expect("Error loading WGSL grammar");
-        Self {
-            parser,
-            symbol_parser: SymbolParser::new(
-                lang.clone(),
-                get_wgsl_parsers(),
-                get_wgsl_filters(),
-                vec![],
-                Box::new(WgslRegionFinder {}),
-            ),
-            shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
-                "wgsl-intrinsics.json"
-            ))),
-        }
-    }
-}
-
-impl SymbolProvider for WgslSymbolProvider {
-    fn get_parser(&mut self) -> &mut Parser {
-        &mut self.parser
-    }
-
-    fn get_intrinsics_symbol(&self) -> &ShaderSymbolList {
-        &self.shader_intrinsics
-    }
-
-    fn query_preprocessor(
-        &self,
-        symbol_tree: &SymbolTree,
-        symbol_params: &ShaderSymbolParams,
-        include_handler: &mut IncludeHandler,
-    ) -> Result<ShaderPreprocessor, ShaderError> {
-        self.symbol_parser
-            .query_file_preprocessor(symbol_tree, symbol_params, include_handler)
-    }
-
-    fn query_file_symbols(
-        &self,
-        symbol_tree: &SymbolTree,
-    ) -> Result<ShaderSymbolList, ShaderError> {
-        self.symbol_parser.query_file_symbols(symbol_tree)
-    }
-
-    fn get_word_range_at_position(
+impl SymbolLabelChainProvider for WgslSymbolLabelChainProvider {
+    fn find_label_chain_at_position_in_node(
         &self,
         _symbol_tree: &SymbolTree,
-        _position: ShaderPosition,
-    ) -> Result<(String, ShaderRange), ShaderError> {
-        Err(ShaderError::NoSymbol)
-    }
-
-    fn get_word_chain_range_at_position(
-        &mut self,
-        _symbol_tree: &SymbolTree,
-        _position: ShaderPosition,
+        _node: tree_sitter::Node,
+        _position: &ShaderPosition,
     ) -> Result<Vec<(String, ShaderRange)>, ShaderError> {
-        Ok(vec![])
+        return Err(ShaderError::NoSymbol);
     }
-    fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope> {
-        self.symbol_parser.query_file_scopes(symbol_tree)
+}
+
+struct WgslSymbolLabelProvider {}
+
+impl SymbolLabelProvider for WgslSymbolLabelProvider {
+    fn find_label_at_position_in_node(
+        &self,
+        _symbol_tree: &SymbolTree,
+        _node: tree_sitter::Node,
+        _position: &ShaderPosition,
+    ) -> Result<(String, ShaderRange), ShaderError> {
+        return Err(ShaderError::NoSymbol);
     }
+}
+
+pub fn create_wgsl_symbol_provider(tree_sitter_language: tree_sitter::Language) -> SymbolProvider {
+    SymbolProvider::new(
+        tree_sitter_language.clone(),
+        get_wgsl_parsers(),
+        get_wgsl_filters(),
+        vec![],
+        Box::new(WgslRegionFinder {}),
+        Box::new(WgslSymbolLabelChainProvider {}),
+        Box::new(WgslSymbolLabelProvider {}),
+    )
 }

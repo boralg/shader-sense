@@ -3,7 +3,7 @@ use std::path::Path;
 use shader_sense::{
     include::IncludeHandler,
     shader::ShadingLanguage,
-    symbols::{create_symbol_provider, symbol_tree::SymbolTree, symbols::ShaderSymbolParams},
+    symbols::{shader_language::ShaderLanguage, symbols::ShaderSymbolParams},
     validator::{create_validator, validator::ValidationParams},
 };
 
@@ -27,9 +27,10 @@ fn validate_file(shading_language: ShadingLanguage, shader_path: &Path) {
 
 fn query_all_symbol(shading_language: ShadingLanguage, shader_path: &Path) {
     // SymbolProvider intended to gather file symbol at runtime by inspecting the AST.
-    let mut symbol_provider = create_symbol_provider(shading_language);
+    let mut language = ShaderLanguage::new(shading_language);
+    let symbol_provider = language.create_symbol_provider();
     let shader_content = std::fs::read_to_string(shader_path).unwrap();
-    match SymbolTree::new(symbol_provider.as_mut(), shader_path, &shader_content) {
+    match language.create_module(shader_path, &shader_content) {
         Ok(symbol_tree) => {
             let preprocessor = symbol_provider
                 .query_preprocessor(

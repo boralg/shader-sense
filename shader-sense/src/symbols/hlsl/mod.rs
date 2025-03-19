@@ -8,98 +8,22 @@ mod hlsl_word_chain;
 use hlsl_filter::get_hlsl_filters;
 use hlsl_parser::get_hlsl_parsers;
 use hlsl_preprocessor::get_hlsl_preprocessor_parser;
-use tree_sitter::Parser;
 
 // For glsl
 pub use hlsl_regions::HlslSymbolRegionFinder;
 
-use crate::{include::IncludeHandler, shader_error::ShaderError};
+use super::symbol_provider::SymbolProvider;
 
-use super::{
-    symbol_parser::SymbolParser,
-    symbol_provider::SymbolProvider,
-    symbol_tree::SymbolTree,
-    symbols::{
-        ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderScope, ShaderSymbolList,
-        ShaderSymbolParams,
-    },
-};
-
-pub struct HlslSymbolProvider {
-    parser: Parser,
-    symbol_parser: SymbolParser,
-    shader_intrinsics: ShaderSymbolList,
-}
-
-impl HlslSymbolProvider {
-    pub fn new() -> Self {
-        let lang = tree_sitter_hlsl::language();
-        let mut parser = Parser::new();
-        parser
-            .set_language(lang.clone())
-            .expect("Error loading HLSL grammar");
-        Self {
-            parser,
-            symbol_parser: SymbolParser::new(
-                lang.clone(),
-                get_hlsl_parsers(),
-                get_hlsl_filters(),
-                get_hlsl_preprocessor_parser(),
-                Box::new(HlslSymbolRegionFinder::new(lang.clone())),
-            ),
-            shader_intrinsics: ShaderSymbolList::parse_from_json(String::from(include_str!(
-                "hlsl-intrinsics.json"
-            ))),
-        }
-    }
-}
-
-impl SymbolProvider for HlslSymbolProvider {
-    // Get intrinsic symbols from language
-    fn get_intrinsics_symbol(&self) -> &ShaderSymbolList {
-        &self.shader_intrinsics
-    }
-    fn get_parser(&mut self) -> &mut Parser {
-        &mut self.parser
-    }
-    fn query_preprocessor(
-        &self,
-        symbol_tree: &SymbolTree,
-        symbol_params: &ShaderSymbolParams,
-        include_handler: &mut IncludeHandler,
-    ) -> Result<ShaderPreprocessor, ShaderError> {
-        self.symbol_parser
-            .query_file_preprocessor(symbol_tree, symbol_params, include_handler)
-    }
-    fn query_file_symbols(
-        &self,
-        symbol_tree: &SymbolTree,
-    ) -> Result<ShaderSymbolList, ShaderError> {
-        self.symbol_parser.query_file_symbols(symbol_tree)
-    }
-    // Get word at a given position.
-    fn get_word_range_at_position(
-        &self,
-        symbol_tree: &SymbolTree,
-        position: ShaderPosition,
-    ) -> Result<(String, ShaderRange), ShaderError> {
-        self.find_label_at_position_in_node(symbol_tree, symbol_tree.tree.root_node(), position)
-    }
-    // Get a struct word chain at a given position
-    fn get_word_chain_range_at_position(
-        &mut self,
-        symbol_tree: &SymbolTree,
-        position: ShaderPosition,
-    ) -> Result<Vec<(String, ShaderRange)>, ShaderError> {
-        self.find_label_chain_at_position_in_node(
-            symbol_tree,
-            symbol_tree.tree.root_node(),
-            position,
-        )
-    }
-    fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope> {
-        self.symbol_parser.query_file_scopes(symbol_tree)
-    }
+pub fn create_hlsl_symbol_provider(tree_sitter_language: tree_sitter::Language) -> SymbolProvider {
+    SymbolProvider::new(
+        tree_sitter_language.clone(),
+        get_hlsl_parsers(),
+        get_hlsl_filters(),
+        get_hlsl_preprocessor_parser(),
+        Box::new(HlslSymbolRegionFinder::new(tree_sitter_language.clone())),
+        Box::new(hlsl_word_chain::HlslSymbolLabelChainProvider {}),
+        Box::new(hlsl_word::HlslSymbolLabelProvider {}),
+    )
 }
 
 #[cfg(test)]
@@ -110,27 +34,29 @@ mod tests {
         include::IncludeHandler,
         shader::ShadingLanguage,
         symbols::{
-            create_symbol_provider,
+            shader_language::ShaderLanguage,
             symbol_provider::SymbolProvider,
-            symbol_tree::SymbolTree,
             symbols::{ShaderPosition, ShaderRange, ShaderRegion, ShaderSymbolParams},
         },
     };
 
     #[test]
     fn test_hlsl_regions() {
-        test_regions(create_symbol_provider(ShadingLanguage::Hlsl));
+        let language = ShaderLanguage::new(ShadingLanguage::Hlsl);
+        let symbol_provider = language.create_symbol_provider();
+        test_regions(language, symbol_provider);
     }
     #[test]
     fn test_glsl_regions() {
-        test_regions(create_symbol_provider(ShadingLanguage::Glsl));
+        let language = ShaderLanguage::new(ShadingLanguage::Glsl);
+        let symbol_provider = language.create_symbol_provider();
+        test_regions(language, symbol_provider);
     }
 
-    fn test_regions(mut symbol_provider: Box<dyn SymbolProvider>) {
+    fn test_regions(mut language: ShaderLanguage, symbol_provider: SymbolProvider) {
         let file_path = Path::new("./test/hlsl/regions.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let symbol_tree =
-            SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
+        let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
         let preprocessor = symbol_provider
             .query_preprocessor(
                 &symbol_tree,

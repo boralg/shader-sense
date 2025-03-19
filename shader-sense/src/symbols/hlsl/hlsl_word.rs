@@ -3,20 +3,20 @@ use tree_sitter::Node;
 use crate::{
     shader_error::ShaderError,
     symbols::{
-        symbol_parser::get_name,
+        symbol_parser::{get_name, SymbolLabelProvider},
         symbol_tree::SymbolTree,
         symbols::{ShaderPosition, ShaderRange},
     },
 };
 
-use super::HlslSymbolProvider;
+pub struct HlslSymbolLabelProvider {}
 
-impl HlslSymbolProvider {
-    pub fn find_label_at_position_in_node(
+impl SymbolLabelProvider for HlslSymbolLabelProvider {
+    fn find_label_at_position_in_node(
         &self,
         symbol_tree: &SymbolTree,
         node: Node,
-        position: ShaderPosition,
+        position: &ShaderPosition,
     ) -> Result<(String, ShaderRange), ShaderError> {
         fn range_contain(including_range: tree_sitter::Range, position: ShaderPosition) -> bool {
             let including_range = ShaderRange::from_range(including_range, &position.file_path);
@@ -45,11 +45,7 @@ impl HlslSymbolProvider {
                 }
                 _ => {
                     for child in node.children(&mut node.walk()) {
-                        match self.find_label_at_position_in_node(
-                            symbol_tree,
-                            child,
-                            position.clone(),
-                        ) {
+                        match self.find_label_at_position_in_node(symbol_tree, child, position) {
                             Ok(label) => return Ok(label),
                             Err(err) => {
                                 if let ShaderError::NoSymbol = err {

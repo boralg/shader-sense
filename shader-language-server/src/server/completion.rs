@@ -40,11 +40,9 @@ impl ServerLanguage {
             .get_mut(&cached_file_borrowed.shading_language)
             .unwrap();
         let file_path = uri.to_file_path().unwrap();
-        let symbol_list = self.watched_files.get_all_symbols(
-            uri,
-            &cached_file,
-            language_data.symbol_provider.as_ref(),
-        );
+        let symbol_list =
+            self.watched_files
+                .get_all_symbols(uri, &cached_file, &language_data.language);
         let shader_position = ShaderPosition {
             file_path: file_path.clone(),
             line: position.line as u32,
@@ -62,7 +60,7 @@ impl ServerLanguage {
                     .symbol_provider
                     .get_word_chain_range_at_position(
                         &cached_file_borrowed.symbol_tree,
-                        shader_position.clone(),
+                        &shader_position,
                     ) {
                     Ok(chain) => {
                         let mut chain_list = chain.iter().rev();

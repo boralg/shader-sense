@@ -1,25 +1,11 @@
 mod glsl;
 mod hlsl;
+pub mod shader_language;
 mod symbol_parser;
 pub mod symbol_provider;
 pub mod symbol_tree;
 pub mod symbols;
 mod wgsl;
-
-pub use glsl::GlslSymbolProvider;
-pub use hlsl::HlslSymbolProvider;
-use symbol_provider::SymbolProvider;
-pub use wgsl::WgslSymbolProvider;
-
-use crate::shader::ShadingLanguage;
-
-pub fn create_symbol_provider(shading_language: ShadingLanguage) -> Box<dyn SymbolProvider> {
-    match shading_language {
-        ShadingLanguage::Wgsl => Box::new(WgslSymbolProvider::new()),
-        ShadingLanguage::Hlsl => Box::new(HlslSymbolProvider::new()),
-        ShadingLanguage::Glsl => Box::new(GlslSymbolProvider::new()),
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -34,13 +20,13 @@ mod tests {
         include::IncludeHandler,
         shader::ShadingLanguage,
         shader_error::ShaderError,
-        symbols::symbols::{ShaderPosition, ShaderSymbolData, ShaderSymbolParams},
+        symbols::{
+            shader_language::ShaderLanguage,
+            symbols::{ShaderPosition, ShaderSymbolData, ShaderSymbolParams},
+        },
     };
 
-    use super::{
-        create_symbol_provider, symbol_provider::SymbolProvider, symbol_tree::SymbolTree,
-        symbols::ShaderSymbolList,
-    };
+    use super::{symbol_provider::SymbolProvider, symbols::ShaderSymbolList};
 
     pub fn find_file_dependencies(
         include_handler: &mut IncludeHandler,
@@ -77,14 +63,15 @@ mod tests {
     }
 
     fn get_all_symbols(
-        symbol_provider: &mut dyn SymbolProvider,
+        language: &mut ShaderLanguage,
+        symbol_provider: &SymbolProvider,
         file_path: &Path,
         shader_content: &String,
     ) -> Result<ShaderSymbolList, ShaderError> {
         let mut include_handler = IncludeHandler::new(&file_path, vec![], HashMap::new());
         let deps = find_dependencies(&mut include_handler, &shader_content);
-        let mut all_symbols = symbol_provider.get_intrinsics_symbol().clone();
-        let symbol_tree = SymbolTree::new(symbol_provider, file_path, shader_content).unwrap();
+        let mut all_symbols = language.get_intrinsics_symbol().clone();
+        let symbol_tree = language.create_module(file_path, shader_content).unwrap();
         let preprocessor = symbol_provider
             .query_preprocessor(
                 &symbol_tree,
@@ -96,7 +83,7 @@ mod tests {
         preprocessor.preprocess_symbols(&mut symbols);
         all_symbols.append(symbols);
         for dep in deps {
-            let symbol_tree = SymbolTree::new(symbol_provider, &dep.1, &dep.0).unwrap();
+            let symbol_tree = language.create_module(&dep.1, &dep.0).unwrap();
             let preprocessor = symbol_provider
                 .query_preprocessor(
                     &symbol_tree,
@@ -137,9 +124,9 @@ mod tests {
         // Ensure parsing of symbols is OK
         let file_path = Path::new("./test/glsl/include-level.comp.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let mut symbol_provider = create_symbol_provider(ShadingLanguage::Glsl);
-        let symbol_tree =
-            SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
+        let mut language = ShaderLanguage::new(ShadingLanguage::Glsl);
+        let symbol_provider = language.create_symbol_provider();
+        let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
         let preprocessor = symbol_provider
             .query_preprocessor(
                 &symbol_tree,
@@ -156,9 +143,9 @@ mod tests {
         // Ensure parsing of symbols is OK
         let file_path = Path::new("./test/hlsl/include-level.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let mut symbol_provider = create_symbol_provider(ShadingLanguage::Hlsl);
-        let symbol_tree =
-            SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
+        let mut language = ShaderLanguage::new(ShadingLanguage::Hlsl);
+        let symbol_provider = language.create_symbol_provider();
+        let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
         let preprocessor = symbol_provider
             .query_preprocessor(
                 &symbol_tree,
@@ -175,9 +162,9 @@ mod tests {
         // Ensure parsing of symbols is OK
         let file_path = Path::new("./test/wgsl/ok.wgsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let mut symbol_provider = create_symbol_provider(ShadingLanguage::Wgsl);
-        let symbol_tree =
-            SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
+        let mut language = ShaderLanguage::new(ShadingLanguage::Wgsl);
+        let symbol_provider = language.create_symbol_provider();
+        let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
         let preprocessor = symbol_provider
             .query_preprocessor(
                 &symbol_tree,
@@ -193,8 +180,9 @@ mod tests {
     fn symbol_scope_glsl_ok() {
         let file_path = Path::new("./test/glsl/scopes.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let mut symbol_provider = create_symbol_provider(ShadingLanguage::Glsl);
-        let symbols = get_all_symbols(symbol_provider.as_mut(), file_path, &shader_content)
+        let mut language = ShaderLanguage::new(ShadingLanguage::Glsl);
+        let symbol_provider = language.create_symbol_provider();
+        let symbols = get_all_symbols(&mut language, &symbol_provider, file_path, &shader_content)
             .unwrap()
             .filter_scoped_symbol(&ShaderPosition {
                 file_path: PathBuf::from(file_path),
@@ -235,9 +223,9 @@ mod tests {
         // Ensure parsing of symbols is OK
         let file_path = Path::new("./test/glsl/uniforms.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let mut symbol_provider = create_symbol_provider(ShadingLanguage::Glsl);
-        let symbol_tree =
-            SymbolTree::new(symbol_provider.as_mut(), file_path, &shader_content).unwrap();
+        let mut language = ShaderLanguage::new(ShadingLanguage::Glsl);
+        let symbol_provider = language.create_symbol_provider();
+        let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
         let preprocessor = symbol_provider
             .query_preprocessor(
                 &symbol_tree,

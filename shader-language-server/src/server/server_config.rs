@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use shader_sense::{
     shader::{GlslSpirvVersion, GlslTargetClient, HlslShaderModel, HlslVersion},
     shader_error::ShaderDiagnosticSeverity,
-    symbols::symbols::ShaderSymbolParams,
     validator::validator::ValidationParams,
 };
 

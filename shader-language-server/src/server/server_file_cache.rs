@@ -19,6 +19,7 @@ use shader_sense::{
     shader::ShadingLanguage,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
+        shader_language::ShaderLanguage,
         symbol_provider::SymbolProvider,
         symbol_tree::SymbolTree,
         symbols::{
@@ -237,7 +238,8 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
-        symbol_provider: &mut dyn SymbolProvider,
+        shader_language: &mut ShaderLanguage,
+        symbol_provider: &SymbolProvider,
         include_context: &mut IncludeContext,
     ) -> Result<(), ShaderError> {
         profile_scope!("Recursing symbols for file {}", uri);
@@ -313,7 +315,7 @@ impl ServerLanguageFileCache {
         for include in &includes {
             let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
             let included_file =
-                self.watch_dependency(&include_uri, shading_language, symbol_provider)?;
+                self.watch_dependency(&include_uri, shading_language, shader_language)?;
             // Skip already visited deps if once.
             // If we skip this, we will need to fill data before.
             if include_context.should_visit(&include_uri) {
@@ -325,6 +327,7 @@ impl ServerLanguageFileCache {
                 self.recurse_file_symbol(
                     &include_uri,
                     &included_file,
+                    shader_language,
                     symbol_provider,
                     include_context,
                 )?;
@@ -343,7 +346,8 @@ impl ServerLanguageFileCache {
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
         validator: &mut dyn Validator,
-        symbol_provider: &mut dyn SymbolProvider,
+        shader_language: &mut ShaderLanguage,
+        symbol_provider: &SymbolProvider,
         shader_variant: Option<ShaderVariant>,
         config: &ServerConfig,
     ) -> Result<(), ShaderError> {
@@ -372,7 +376,13 @@ impl ServerLanguageFileCache {
                         .insert(variable.clone(), value.clone());
                 }
             }
-            self.recurse_file_symbol(uri, cached_file, symbol_provider, &mut include_context)?;
+            self.recurse_file_symbol(
+                uri,
+                cached_file,
+                shader_language,
+                symbol_provider,
+                &mut include_context,
+            )?;
         }
         // Get diagnostics
         if config.validate {
@@ -409,7 +419,7 @@ impl ServerLanguageFileCache {
                                 match self.watch_dependency(
                                     &deps_uri,
                                     shading_language,
-                                    symbol_provider,
+                                    shader_language,
                                 ) {
                                     Ok(deps_file) => deps_file,
                                     Err(err) => {
@@ -539,7 +549,8 @@ impl ServerLanguageFileCache {
         uri: &Url,
         lang: ShadingLanguage,
         text: &String,
-        symbol_provider: &mut dyn SymbolProvider,
+        shader_language: &mut ShaderLanguage,
+        symbol_provider: &SymbolProvider,
         validator: &mut dyn Validator,
         config: &ServerConfig,
     ) -> Result<ServerFileCacheHandle, ShaderError> {
@@ -556,7 +567,7 @@ impl ServerLanguageFileCache {
             }
             None => {
                 assert!(self.files.get(&uri).is_none());
-                let symbol_tree = SymbolTree::new(symbol_provider, &file_path, &text)?;
+                let symbol_tree = shader_language.create_module(&file_path, &text)?;
                 let cached_file = Rc::new(RefCell::new(ServerFileCache {
                     shading_language: lang,
                     symbol_tree: symbol_tree,
@@ -573,6 +584,7 @@ impl ServerLanguageFileCache {
             uri,
             &cached_file,
             validator,
+            shader_language,
             symbol_provider,
             self.variants.get(&uri).cloned(),
             config,
@@ -589,7 +601,7 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         lang: ShadingLanguage,
-        symbol_provider: &mut dyn SymbolProvider,
+        shader_language: &mut ShaderLanguage,
     ) -> Result<ServerFileCacheHandle, ShaderError> {
         assert!(*uri == clean_url(&uri));
         let file_path = uri.to_file_path().unwrap();
@@ -633,7 +645,7 @@ impl ServerLanguageFileCache {
                 }
                 None => {
                     let text = read_string_lossy(&file_path).unwrap();
-                    let symbol_tree = SymbolTree::new(symbol_provider, &file_path, &text)?;
+                    let symbol_tree = shader_language.create_module(&file_path, &text)?;
                     let cached_file = Rc::new(RefCell::new(ServerFileCache {
                         shading_language: lang,
                         symbol_tree: symbol_tree,
@@ -665,7 +677,7 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
-        symbol_provider: &mut dyn SymbolProvider,
+        shader_language: &mut ShaderLanguage,
         range: Option<lsp_types::Range>,
         partial_content: Option<&String>,
     ) -> Result<(), ShaderError> {
@@ -679,13 +691,16 @@ impl ServerLanguageFileCache {
         let file_path = uri.to_file_path().unwrap();
         if let (Some(range), Some(partial_content)) = (range, partial_content) {
             let shader_range = lsp_range_to_shader_range(&range, &file_path);
-            RefCell::borrow_mut(cached_file)
-                .symbol_tree
-                .update_partial(symbol_provider, &shader_range, &partial_content)?;
+            shader_language.update_module_partial(
+                &mut RefCell::borrow_mut(cached_file).symbol_tree,
+                &shader_range,
+                &partial_content,
+            )?;
         } else if let Some(whole_content) = partial_content {
-            RefCell::borrow_mut(cached_file)
-                .symbol_tree
-                .update(symbol_provider, &whole_content)?;
+            shader_language.update_module(
+                &mut RefCell::borrow_mut(cached_file).symbol_tree,
+                &whole_content,
+            )?;
         } else {
             // No update on content to perform.
         }
@@ -860,7 +875,7 @@ impl ServerLanguageFileCache {
         &self,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
-        symbol_provider: &dyn SymbolProvider,
+        shader_language: &ShaderLanguage,
     ) -> ShaderSymbolList {
         let cached_file = RefCell::borrow(&cached_file);
         // Add main file symbols
@@ -931,7 +946,7 @@ impl ServerLanguageFileCache {
             });
         }
         // Add intrinsics symbols
-        symbol_cache.append(symbol_provider.get_intrinsics_symbol().clone());
+        symbol_cache.append(shader_language.get_intrinsics_symbol().clone());
         symbol_cache
     }
 }

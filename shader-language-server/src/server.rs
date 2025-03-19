@@ -559,7 +559,8 @@ impl ServerLanguage {
                             &uri,
                             shading_language.clone(),
                             &params.text_document.text,
-                            language_data.symbol_provider.as_mut(),
+                            &mut language_data.language,
+                            &language_data.symbol_provider,
                             language_data.validator.as_mut(),
                             &self.config,
                         ) {
@@ -610,7 +611,7 @@ impl ServerLanguage {
                                     match self.watched_files.update_file(
                                         &uri,
                                         &cached_file,
-                                        language_data.symbol_provider.as_mut(),
+                                        &mut language_data.language,
                                         None,
                                         None,
                                     ) {
@@ -619,7 +620,8 @@ impl ServerLanguage {
                                             &uri,
                                             &cached_file,
                                             language_data.validator.as_mut(),
-                                            language_data.symbol_provider.as_mut(),
+                                            &mut language_data.language,
+                                            &language_data.symbol_provider,
                                             self.watched_files.variants.get(&uri).cloned(),
                                             &self.config,
                                         ) {
@@ -673,7 +675,7 @@ impl ServerLanguage {
                             match self.watched_files.update_file(
                                 &uri,
                                 &cached_file,
-                                language_data.symbol_provider.as_mut(),
+                                &mut language_data.language,
                                 content.range,
                                 Some(&content.text),
                             ) {
@@ -688,7 +690,8 @@ impl ServerLanguage {
                             &uri,
                             &cached_file,
                             language_data.validator.as_mut(),
-                            language_data.symbol_provider.as_mut(),
+                            &mut language_data.language,
+                            &language_data.symbol_provider,
                             self.watched_files.variants.get(&uri).cloned(),
                             &self.config,
                         ) {
@@ -732,7 +735,7 @@ impl ServerLanguage {
                         match self.watched_files.update_file(
                             &uri,
                             &cached_file,
-                            language_data.symbol_provider.as_mut(),
+                            &mut language_data.language,
                             None,
                             None,
                         ) {
@@ -741,7 +744,8 @@ impl ServerLanguage {
                                 &uri,
                                 &cached_file,
                                 language_data.validator.as_mut(),
-                                language_data.symbol_provider.as_mut(),
+                                &mut language_data.language,
+                                &language_data.symbol_provider,
                                 self.watched_files.variants.get(&uri).cloned(),
                                 &self.config,
                             ) {
@@ -797,7 +801,7 @@ impl ServerLanguage {
                     match server.watched_files.update_file(
                         &url,
                         &cached_file,
-                        language_data.symbol_provider.as_mut(),
+                        &mut language_data.language,
                         None,
                         None,
                     ) {
@@ -808,7 +812,8 @@ impl ServerLanguage {
                                 &url,
                                 &cached_file,
                                 language_data.validator.as_mut(),
-                                language_data.symbol_provider.as_mut(),
+                                &mut language_data.language,
+                                &language_data.symbol_provider,
                                 server.watched_files.variants.get(&url).cloned(),
                                 &server.config,
                             ) {
