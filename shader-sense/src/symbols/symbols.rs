@@ -236,6 +236,23 @@ pub struct ShaderPreprocessorContext {
 }
 
 impl ShaderPreprocessorContext {
+    pub fn from_defines(defines: Vec<ShaderPreprocessorDefine>) -> Self {
+        Self {
+            defines: defines
+                .into_iter()
+                .map(|define| (define.name, define.value.unwrap_or("".into())))
+                .collect(),
+        }
+    }
+    pub fn append(&mut self, context: ShaderPreprocessorContext) {
+        self.defines.extend(context.defines);
+    }
+    pub fn append_defines(&mut self, defines: Vec<ShaderPreprocessorDefine>) {
+        for define in defines {
+            self.defines
+                .insert(define.name, define.value.unwrap_or("".into()));
+        }
+    }
     pub fn is_dirty(&self, symbol_params: &ShaderSymbolParams) -> bool {
         // Compare defines to get if context is different.
         if symbol_params.defines.len() == self.defines.len() {
@@ -272,7 +289,7 @@ pub struct ShaderPreprocessorDefine {
 
 #[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessor {
-    pub context: ShaderPreprocessorContext,
+    pub context: ShaderPreprocessorContext, // Defines from includer files when included, or config.
 
     pub includes: Vec<ShaderPreprocessorInclude>,
     pub defines: Vec<ShaderPreprocessorDefine>,

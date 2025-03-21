@@ -102,6 +102,28 @@ impl ToString for ShadingLanguage {
     }
 }
 
+pub trait ShadingLanguageTag {
+    fn get_language() -> ShadingLanguage;
+}
+pub struct HlslShadingLanguageTag {}
+impl ShadingLanguageTag for HlslShadingLanguageTag {
+    fn get_language() -> ShadingLanguage {
+        ShadingLanguage::Hlsl
+    }
+}
+pub struct GlslShadingLanguageTag {}
+impl ShadingLanguageTag for GlslShadingLanguageTag {
+    fn get_language() -> ShadingLanguage {
+        ShadingLanguage::Glsl
+    }
+}
+pub struct WgslShadingLanguageTag {}
+impl ShadingLanguageTag for WgslShadingLanguageTag {
+    fn get_language() -> ShadingLanguage {
+        ShadingLanguage::Wgsl
+    }
+}
+
 // DXC only support shader model up to 6.0
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub enum HlslShaderModel {

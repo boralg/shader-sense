@@ -2,8 +2,11 @@ use std::path::Path;
 
 use shader_sense::{
     include::IncludeHandler,
-    shader::ShadingLanguage,
-    symbols::{shader_language::ShaderLanguage, symbols::ShaderSymbolParams},
+    shader::{GlslShadingLanguageTag, ShadingLanguage, ShadingLanguageTag},
+    symbols::{
+        shader_language::ShaderLanguage, symbol_provider::default_include_callback,
+        symbols::ShaderPreprocessorContext,
+    },
     validator::{create_validator, validator::ValidationParams},
 };
 
@@ -25,9 +28,9 @@ fn validate_file(shading_language: ShadingLanguage, shader_path: &Path) {
     }
 }
 
-fn query_all_symbol(shading_language: ShadingLanguage, shader_path: &Path) {
+fn query_all_symbol<T: ShadingLanguageTag>(shader_path: &Path) {
     // SymbolProvider intended to gather file symbol at runtime by inspecting the AST.
-    let mut language = ShaderLanguage::new(shading_language);
+    let mut language = ShaderLanguage::new(T::get_language());
     let symbol_provider = language.create_symbol_provider();
     let shader_content = std::fs::read_to_string(shader_path).unwrap();
     match language.create_module(shader_path, &shader_content) {
@@ -35,8 +38,9 @@ fn query_all_symbol(shading_language: ShadingLanguage, shader_path: &Path) {
             let preprocessor = symbol_provider
                 .query_preprocessor(
                     &symbol_tree,
-                    &ShaderSymbolParams::default(),
+                    &mut ShaderPreprocessorContext::default(),
                     &mut IncludeHandler::default(shader_path),
+                    &mut default_include_callback::<T>,
                 )
                 .unwrap();
             let mut symbol_list = symbol_provider.query_file_symbols(&symbol_tree).unwrap();
@@ -50,5 +54,5 @@ fn query_all_symbol(shading_language: ShadingLanguage, shader_path: &Path) {
 fn main() {
     let shader_path = Path::new("./test/glsl/ok.frag.glsl");
     validate_file(ShadingLanguage::Glsl, shader_path);
-    query_all_symbol(ShadingLanguage::Glsl, shader_path);
+    query_all_symbol::<GlslShadingLanguageTag>(shader_path);
 }

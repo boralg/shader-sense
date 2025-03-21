@@ -1,13 +1,18 @@
-use std::num::ParseIntError;
+use std::{collections::HashSet, num::ParseIntError, path::PathBuf};
 
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
+    include::IncludeHandler,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
         symbol_parser::{get_name, SymbolRegionFinder},
+        symbol_provider::SymbolIncludeCallback,
         symbol_tree::SymbolTree,
-        symbols::{ShaderPosition, ShaderPreprocessor, ShaderRange, ShaderRegion},
+        symbols::{
+            ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext,
+            ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderRange, ShaderRegion,
+        },
     },
 };
 
@@ -134,39 +139,12 @@ impl HlslSymbolRegionFinder {
         .unwrap();
         Self { query_if }
     }
-    fn get_define_value(
-        preprocessor: &ShaderPreprocessor,
-        name: &str,
-        position: &ShaderPosition,
-    ) -> Option<String> {
-        let context = preprocessor
-            .context
+    fn get_define_value(context: &ShaderPreprocessorContext, name: &str) -> Option<String> {
+        context
             .defines
             .iter()
             .find(|(key, _)| *key == name)
-            .map(|(_, value)| value.clone());
-        if let Some(value) = context {
-            return Some(value);
-        }
-        let local = preprocessor
-            .defines
-            .iter()
-            .find(|define| {
-                let same_name = define.name == name;
-                let has_range = define.range.is_some(); // None, mean global define.
-                let same_file = has_range
-                    && define.range.as_ref().unwrap().start.file_path == position.file_path;
-                // Check position
-                let defined_before =
-                    (same_file && define.range.as_ref().unwrap().start < *position) || !same_file;
-                same_name && defined_before
-            })
-            .map(|e| e.value.clone());
-        if let Some(value) = local {
-            return value;
-        } else {
-            return None;
-        }
+            .map(|(_, value)| value.clone())
     }
     fn parse_number(number: &str) -> Result<i32, ParseIntError> {
         if number.starts_with("0x") && number.len() > 2 {
@@ -182,7 +160,7 @@ impl HlslSymbolRegionFinder {
         }
     }
     fn get_define_as_i32_depth(
-        preprocessor: &ShaderPreprocessor,
+        context: &ShaderPreprocessorContext,
         name: &str,
         position: &ShaderPosition,
         depth: u32,
@@ -202,47 +180,40 @@ impl HlslSymbolRegionFinder {
         } else {
             // Here we recurse define value cuz a define might just be an alias for another define.
             // If we dont manage to parse it as a number, parse it as another define.
-            match Self::get_define_value(preprocessor, name, position) {
+            match Self::get_define_value(context, name) {
                 Some(value) => match Self::parse_number(value.as_str()) {
                     Ok(parsed_value) => Ok(parsed_value),
-                    Err(_) => Self::get_define_as_i32_depth(
-                        &preprocessor,
-                        value.as_str(),
-                        position,
-                        depth - 1,
-                    ),
+                    Err(_) => {
+                        Self::get_define_as_i32_depth(&context, value.as_str(), position, depth - 1)
+                    }
                 },
                 None => Ok(0), // Return false instead of error
             }
         }
     }
     fn get_define_as_i32(
-        preprocessor: &ShaderPreprocessor,
+        context: &ShaderPreprocessorContext,
         name: &str,
         position: &ShaderPosition,
     ) -> Result<i32, ShaderError> {
-        match Self::get_define_value(preprocessor, name, position) {
+        match Self::get_define_value(context, name) {
             Some(value) => match value.parse::<i32>() {
                 Ok(parsed_value) => Ok(parsed_value),
                 Err(_) => {
                     // Recurse result up to 10 times for macro that define other macro.
-                    Self::get_define_as_i32_depth(&preprocessor, value.as_str(), &position, 10)
+                    Self::get_define_as_i32_depth(&context, value.as_str(), &position, 10)
                 }
             },
             None => Ok(0), // Return false instead of error
         }
     }
-    fn is_define_defined(
-        preprocessor: &ShaderPreprocessor,
-        name: &str,
-        position: &ShaderPosition,
-    ) -> i32 {
-        Self::get_define_value(preprocessor, name, position).is_some() as i32
+    fn is_define_defined(context: &ShaderPreprocessorContext, name: &str) -> i32 {
+        Self::get_define_value(context, name).is_some() as i32
     }
     fn resolve_condition(
         cursor: tree_sitter::TreeCursor,
         symbol_tree: &SymbolTree,
-        preprocessor: &ShaderPreprocessor,
+        context: &ShaderPreprocessorContext,
     ) -> Result<i32, ShaderError> {
         let mut cursor = cursor;
         match cursor.node().kind() {
@@ -263,15 +234,7 @@ impl HlslSymbolRegionFinder {
                 }
                 assert_node_kind!(symbol_tree.file_path, cursor, "identifier");
                 let condition_macro = get_name(&symbol_tree.content, cursor.node());
-                let position = ShaderPosition::from_tree_sitter_point(
-                    cursor.node().range().end_point,
-                    &symbol_tree.file_path,
-                );
-                Ok(Self::is_define_defined(
-                    preprocessor,
-                    condition_macro,
-                    &position,
-                ))
+                Ok(Self::is_define_defined(context, condition_macro))
             }
             "number_literal" => {
                 // As simple as it is, but need to be warry of hexa or octal values.
@@ -291,7 +254,7 @@ impl HlslSymbolRegionFinder {
                 let _ = r#"condition: (identifier)"#;
                 let condition_macro = get_name(&symbol_tree.content, cursor.node());
                 let value = Self::get_define_as_i32(
-                    preprocessor,
+                    context,
                     condition_macro,
                     &ShaderPosition::from_tree_sitter_point(
                         cursor.node().start_position(),
@@ -309,15 +272,14 @@ impl HlslSymbolRegionFinder {
                 )"#;
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
                 assert_field_name!(symbol_tree.file_path, cursor, "left");
-                let left_condition =
-                    Self::resolve_condition(cursor.clone(), symbol_tree, preprocessor)?;
+                let left_condition = Self::resolve_condition(cursor.clone(), symbol_tree, context)?;
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
                 assert_field_name!(symbol_tree.file_path, cursor, "operator");
                 let operator = cursor.node().kind();
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
                 assert_field_name!(symbol_tree.file_path, cursor, "right");
                 let right_condition =
-                    Self::resolve_condition(cursor.clone(), symbol_tree, preprocessor)?;
+                    Self::resolve_condition(cursor.clone(), symbol_tree, context)?;
                 match operator {
                     "&&" => Ok(((left_condition != 0) && (right_condition != 0)) as i32),
                     "||" => Ok(((left_condition != 0) || (right_condition != 0)) as i32),
@@ -355,7 +317,7 @@ impl HlslSymbolRegionFinder {
                 assert_node_kind!(symbol_tree.file_path, cursor, "!");
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
                 assert_field_name!(symbol_tree.file_path, cursor, "argument");
-                let value = Self::resolve_condition(cursor.clone(), symbol_tree, preprocessor)?;
+                let value = Self::resolve_condition(cursor.clone(), symbol_tree, context)?;
                 match operator {
                     "!" => Ok(!(value != 0) as i32), // Comparing as bool
                     "+" => Ok(value),
@@ -376,7 +338,7 @@ impl HlslSymbolRegionFinder {
                 )"#;
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                Self::resolve_condition(cursor, symbol_tree, preprocessor)
+                Self::resolve_condition(cursor, symbol_tree, context)
             }
             "call_expression" => {
                 // This expression is a function call
@@ -405,24 +367,65 @@ impl HlslSymbolRegionFinder {
     }
 }
 impl SymbolRegionFinder for HlslSymbolRegionFinder {
-    fn query_regions_in_node(
+    fn query_regions_in_node<'a>(
         &self,
         symbol_tree: &SymbolTree,
         node: tree_sitter::Node,
         preprocessor: &mut ShaderPreprocessor,
+        context: &'a mut ShaderPreprocessorContext,
+        include_handler: &'a mut IncludeHandler,
+        include_callback: &'a mut SymbolIncludeCallback<'a>,
     ) -> Result<Vec<ShaderRegion>, ShaderError> {
         let mut query_cursor = QueryCursor::new();
         let mut regions = Vec::new();
+        let mut processed_includes = HashSet::new();
         for region_match in
             query_cursor.matches(&self.query_if, node, symbol_tree.content.as_bytes())
         {
-            fn parse_region(
+            fn parse_region<'a>(
                 symbol_tree: &SymbolTree,
                 preprocessor: &mut ShaderPreprocessor,
                 cursor: &mut tree_sitter::TreeCursor,
                 found_active_region: bool,
+                context: &mut ShaderPreprocessorContext,
+                include_handler: &mut IncludeHandler,
+                include_callback: &mut SymbolIncludeCallback<'a>,
+                processed_includes: &mut HashSet<PathBuf>,
             ) -> Result<Vec<ShaderRegion>, ShaderError> {
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
+                // Process includes here as they will impact defines which impact regions.
+                let region_start = ShaderPosition::from_tree_sitter_point(
+                    cursor.node().range().start_point,
+                    &symbol_tree.file_path,
+                );
+                // Find include before this region that defines its context.
+                // Need to filter already processed includes.
+                let include_before = preprocessor
+                    .includes
+                    .iter()
+                    .filter(|include| {
+                        include.range.end < region_start
+                            && !processed_includes.contains(&include.absolute_path)
+                    })
+                    .cloned()
+                    .collect::<Vec<ShaderPreprocessorInclude>>();
+                for include in include_before {
+                    processed_includes.insert(include.absolute_path.clone());
+                    let define_before_include = preprocessor
+                        .defines
+                        .iter()
+                        .filter(|define| match &define.range {
+                            Some(range) => range.end < include.range.start,
+                            None => true, // Global
+                        })
+                        .cloned()
+                        .collect::<Vec<ShaderPreprocessorDefine>>();
+                    context.append_defines(define_before_include);
+                    // https://stevedonovan.github.io/rustifications/2018/08/18/rust-closures-are-hard.html
+                    let included_context = include_callback(include, context, include_handler)?;
+                    context.append(included_context);
+                }
+                // Process regions
                 let (is_active_region, region_start) = match cursor.node().kind() {
                     "#ifdef" => {
                         assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
@@ -433,11 +436,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             &symbol_tree.file_path,
                         );
                         (
-                            HlslSymbolRegionFinder::is_define_defined(
-                                preprocessor,
-                                condition_macro,
-                                &position,
-                            ),
+                            HlslSymbolRegionFinder::is_define_defined(context, condition_macro),
                             position,
                         )
                     }
@@ -450,11 +449,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             &symbol_tree.file_path,
                         );
                         (
-                            1 - HlslSymbolRegionFinder::is_define_defined(
-                                preprocessor,
-                                condition_macro,
-                                &position,
-                            ),
+                            1 - HlslSymbolRegionFinder::is_define_defined(context, condition_macro),
                             position,
                         )
                     }
@@ -469,7 +464,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             match HlslSymbolRegionFinder::resolve_condition(
                                 cursor.clone(),
                                 symbol_tree,
-                                preprocessor,
+                                context,
                             ) {
                                 Ok(value) => value,
                                 Err(err) => {
@@ -509,7 +504,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                 match HlslSymbolRegionFinder::resolve_condition(
                                     cursor.clone(),
                                     symbol_tree,
-                                    preprocessor,
+                                    context,
                                 ) {
                                     Ok(value) => value,
                                     Err(err) => {
@@ -569,11 +564,16 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                         || (is_active_region == 0
                                             && !region_range.contain_bounds(&include.range))
                                 });
+
                                 let mut next_region = parse_region(
                                     symbol_tree,
                                     preprocessor,
                                     cursor,
                                     (is_active_region != 0) || found_active_region,
+                                    context,
+                                    include_handler,
+                                    include_callback,
+                                    processed_includes,
                                 )?;
                                 regions.append(&mut next_region);
                                 return Ok(regions);
@@ -632,7 +632,33 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 preprocessor,
                 &mut cursor,
                 false,
+                context,
+                include_handler,
+                include_callback,
+                &mut processed_includes,
             )?)
+        }
+        // Handle includes that were not dealt by regions.
+        let include_left = preprocessor
+            .includes
+            .iter()
+            .filter(|include| !processed_includes.contains(&include.absolute_path))
+            .cloned()
+            .collect::<Vec<ShaderPreprocessorInclude>>();
+        for include in include_left {
+            //processed_includes.insert(include.absolute_path.clone());
+            let define_before_include = preprocessor
+                .defines
+                .iter()
+                .filter(|define| match &define.range {
+                    Some(range) => range.end < include.range.start,
+                    None => true, // Global
+                })
+                .cloned()
+                .collect::<Vec<ShaderPreprocessorDefine>>();
+            context.append_defines(define_before_include);
+            let included_context = include_callback(include, context, include_handler)?;
+            context.append(included_context);
         }
 
         Ok(regions)

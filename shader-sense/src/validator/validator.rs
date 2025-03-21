@@ -21,6 +21,9 @@ pub struct ValidationParams {
     pub glsl_spirv: GlslSpirvVersion,
 }
 
+pub fn default_include_callback(path: &Path) -> Option<String> {
+    Some(std::fs::read_to_string(path).unwrap())
+}
 pub trait Validator {
     fn validate_shader(
         &mut self,

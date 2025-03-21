@@ -32,11 +32,13 @@ mod tests {
 
     use crate::{
         include::IncludeHandler,
-        shader::ShadingLanguage,
+        shader::{
+            GlslShadingLanguageTag, HlslShadingLanguageTag, ShadingLanguage, ShadingLanguageTag,
+        },
         symbols::{
             shader_language::ShaderLanguage,
-            symbol_provider::SymbolProvider,
-            symbols::{ShaderPosition, ShaderRange, ShaderRegion, ShaderSymbolParams},
+            symbol_provider::{default_include_callback, SymbolProvider},
+            symbols::{ShaderPosition, ShaderPreprocessorContext, ShaderRange, ShaderRegion},
         },
     };
 
@@ -44,24 +46,28 @@ mod tests {
     fn test_hlsl_regions() {
         let language = ShaderLanguage::new(ShadingLanguage::Hlsl);
         let symbol_provider = language.create_symbol_provider();
-        test_regions(language, symbol_provider);
+        test_regions::<HlslShadingLanguageTag>(language, symbol_provider);
     }
     #[test]
     fn test_glsl_regions() {
         let language = ShaderLanguage::new(ShadingLanguage::Glsl);
         let symbol_provider = language.create_symbol_provider();
-        test_regions(language, symbol_provider);
+        test_regions::<GlslShadingLanguageTag>(language, symbol_provider);
     }
 
-    fn test_regions(mut language: ShaderLanguage, symbol_provider: SymbolProvider) {
+    fn test_regions<T: ShadingLanguageTag>(
+        mut language: ShaderLanguage,
+        symbol_provider: SymbolProvider,
+    ) {
         let file_path = Path::new("./test/hlsl/regions.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
         let preprocessor = symbol_provider
             .query_preprocessor(
                 &symbol_tree,
-                &ShaderSymbolParams::default(),
-                &mut IncludeHandler::default(file_path),
+                &mut ShaderPreprocessorContext::default(),
+                &mut IncludeHandler::default(&file_path),
+                &mut default_include_callback::<T>,
             )
             .unwrap();
         //let symbols = symbol_provider.query_file_symbols(&symbol_tree, Some(&preprocessor));
@@ -102,7 +108,7 @@ mod tests {
             set_region(56, 25, 57, 35, false),
             set_region(59, 28, 60, 34, false),
             // included macro
-            set_region(64, 26, 65, 34, true),
+            set_region(64, 26, 65, 34, false),
         ];
         assert!(preprocessor.regions.len() == expected_regions.len());
         for region_index in 0..preprocessor.regions.len() {

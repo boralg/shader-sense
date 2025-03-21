@@ -23,9 +23,8 @@ use shader_sense::{
         symbol_provider::SymbolProvider,
         symbol_tree::SymbolTree,
         symbols::{
-            ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext,
-            ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderSymbol, ShaderSymbolData,
-            ShaderSymbolList, ShaderSymbolParams,
+            ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine, ShaderSymbol,
+            ShaderSymbolData, ShaderSymbolList,
         },
     },
     validator::validator::Validator,
@@ -129,103 +128,6 @@ pub struct ServerLanguageFileCache {
     pub variants: HashMap<Url, ShaderVariant>,
 }
 
-struct IncludeContext {
-    includer_uri: Url,                  // The file from which this file is included.
-    visited_dependencies: HashSet<Url>, // Already visited deps, needed for once.
-    include_handler: IncludeHandler,    // Handler for includes.
-    defines: HashMap<String, String>,   // Preprocessor macros defined in context.
-}
-
-impl IncludeContext {
-    pub fn main(
-        uri: &Url,
-        includes: Vec<String>,
-        defines: HashMap<String, String>,
-        path_remapping: HashMap<String, String>,
-    ) -> Self {
-        Self {
-            includer_uri: uri.clone(),
-            visited_dependencies: HashSet::new(),
-            include_handler: IncludeHandler::new(
-                &uri.to_file_path().unwrap(),
-                includes,
-                path_remapping
-                    .iter()
-                    .map(|(vp, p)| (vp.into(), p.into()))
-                    .collect(),
-            ),
-            defines,
-        }
-    }
-    pub fn should_visit(&mut self, uri: &Url) -> bool {
-        // For now, every include is included once, should cover 99% of case.
-        if self.visited_dependencies.insert(uri.clone()) {
-            true
-        } else {
-            false // !preprocessor.once
-        }
-    }
-    pub fn add_context_for_include(
-        &mut self,
-        include: &ShaderPreprocessorInclude,
-        context_preprocessor_define: &mut Vec<ShaderPreprocessorDefine>,
-    ) {
-        let is_defined_before_include =
-            |include_position: &ShaderPosition, define: &ShaderPreprocessorDefine| -> bool {
-                match &define.range {
-                    // Check define is before include position.
-                    Some(range) => range.start < *include_position,
-                    None => false, // Should not happen with local symbols...
-                }
-            };
-        // Get context defined before include & add them to current context.
-        let include_define_context: Vec<&ShaderPreprocessorDefine> = context_preprocessor_define
-            .iter()
-            .filter(|define| is_defined_before_include(&include.range.start, define))
-            .collect();
-        for define in include_define_context {
-            self.defines.insert(
-                define.name.clone(),
-                define.value.clone().unwrap_or("".into()),
-            );
-        }
-        context_preprocessor_define
-            .retain(|define| !is_defined_before_include(&include.range.start, define));
-    }
-    pub fn add_context(&mut self, context_preprocessor_define: Vec<ShaderPreprocessorDefine>) {
-        for define in context_preprocessor_define {
-            self.defines
-                .insert(define.name, define.value.unwrap_or("".into()));
-        }
-    }
-    pub fn visit_data<F: FnOnce(&mut ServerFileCacheData)>(
-        &self,
-        uri: &Url,
-        cached_file: &ServerFileCacheHandle,
-        visitor: F,
-    ) {
-        if *uri == self.includer_uri {
-            visitor(&mut RefCell::borrow_mut(cached_file).data);
-        } else {
-            let cached_file = &mut RefCell::borrow_mut(cached_file);
-            match cached_file.included_data.get_mut(&self.includer_uri) {
-                Some(data) => visitor(data),
-                None => {
-                    cached_file
-                        .included_data
-                        .insert(self.includer_uri.clone(), ServerFileCacheData::default());
-                    visitor(
-                        cached_file
-                            .included_data
-                            .get_mut(&self.includer_uri)
-                            .unwrap(),
-                    );
-                }
-            }
-        }
-    }
-}
-
 impl ServerLanguageFileCache {
     pub fn new() -> Self {
         Self {
@@ -238,42 +140,74 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         cached_file: &ServerFileCacheHandle,
+        includer_uri: &Url,
         shader_language: &mut ShaderLanguage,
         symbol_provider: &SymbolProvider,
-        include_context: &mut IncludeContext,
+        context: &mut ShaderPreprocessorContext,
+        include_handler: &mut IncludeHandler,
+        visited_deps: &mut HashSet<Url>,
     ) -> Result<(), ShaderError> {
         profile_scope!("Recursing symbols for file {}", uri);
         let shading_language = RefCell::borrow(cached_file).shading_language;
-        let context_symbol_params = ShaderSymbolParams {
-            defines: include_context.defines.clone(),
-        };
+        let mut cached_file = RefCell::borrow_mut(cached_file);
+        let mut dependencies = HashMap::new();
         // We are recomputing every deps symbols here, but not really required, isnt it ?
         let (preprocessor_cache, symbol_cache, diagnostic_cache) = match symbol_provider
             .query_preprocessor(
-                &RefCell::borrow(cached_file).symbol_tree,
-                &context_symbol_params,
-                &mut include_context.include_handler,
+                &cached_file.symbol_tree,
+                context,
+                include_handler,
+                &mut |include, context, include_handler| {
+                    let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
+                    let included_file =
+                        self.watch_dependency(&include_uri, shading_language, shader_language)?;
+                    // Skip already visited deps if once.
+                    if !visited_deps.contains(&include_uri) {
+                        visited_deps.insert(include_uri.clone());
+                        self.recurse_file_symbol(
+                            &include_uri,
+                            &included_file,
+                            includer_uri,
+                            shader_language,
+                            symbol_provider,
+                            context,
+                            include_handler,
+                            visited_deps,
+                        )?;
+                        // Get context for this file
+                        let include_defines = RefCell::borrow(&included_file)
+                            .included_data
+                            .get(&includer_uri)
+                            .unwrap()
+                            .preprocessor_cache
+                            .defines
+                            .clone();
+                        // Register deps for current file.
+                        dependencies.insert(include_uri.clone(), included_file);
+                        Ok(ShaderPreprocessorContext::from_defines(include_defines))
+                    } else {
+                        Ok(ShaderPreprocessorContext::default())
+                    }
+                },
             ) {
             Ok(preprocessor_cache) => {
                 // Might not have included data if first visit.
-                let symbol_cache = match RefCell::borrow(cached_file).included_data.get(&uri) {
+                let symbol_cache = match cached_file.included_data.get(&uri) {
                     // Only query new symbols for dirty files (main files).
                     // Deps do not need update as they are not edited.
                     // But preprocessor changes in main file might impact deps.
                     Some(data) => {
-                        if *uri != include_context.includer_uri {
+                        if *uri != *includer_uri {
                             profile_scope!("Cloning symbols for file {}", uri);
                             data.symbol_cache.clone()
                         } else {
                             profile_scope!("Query symbols for file {}", uri);
-                            symbol_provider
-                                .query_file_symbols(&RefCell::borrow(cached_file).symbol_tree)?
+                            symbol_provider.query_file_symbols(&cached_file.symbol_tree)?
                         }
                     }
                     None => {
                         profile_scope!("Query symbols for empty file {}", uri);
-                        symbol_provider
-                            .query_file_symbols(&RefCell::borrow(cached_file).symbol_tree)?
+                        symbol_provider.query_file_symbols(&cached_file.symbol_tree)?
                     }
                 };
                 (
@@ -286,9 +220,7 @@ impl ServerLanguageFileCache {
                 // Return this error & store it to display it as a diagnostic & dont prevent linting.
                 if let ShaderError::SymbolQueryError(message, range) = error {
                     (
-                        ShaderPreprocessor::new(ShaderPreprocessorContext {
-                            defines: include_context.defines.clone(),
-                        }),
+                        ShaderPreprocessor::new(context.clone()),
                         ShaderSymbolList::default(),
                         ShaderDiagnosticList {
                             diagnostics: vec![ShaderDiagnostic {
@@ -303,42 +235,26 @@ impl ServerLanguageFileCache {
                 }
             }
         };
-        let mut context_define = preprocessor_cache.defines.clone();
-        let includes = preprocessor_cache.includes.clone();
-        // Store symbol cache.
-        include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
+        if includer_uri == uri {
+            cached_file.data.dependencies = dependencies;
+            cached_file.data.preprocessor_cache = preprocessor_cache;
+            cached_file.data.symbol_cache = symbol_cache;
+            cached_file.data.diagnostic_cache = diagnostic_cache;
+        } else {
+            let data = match cached_file.included_data.get_mut(&includer_uri) {
+                Some(data) => data,
+                None => {
+                    cached_file
+                        .included_data
+                        .insert(includer_uri.clone(), ServerFileCacheData::default());
+                    cached_file.included_data.get_mut(&includer_uri).unwrap()
+                }
+            };
+            data.dependencies = dependencies;
             data.preprocessor_cache = preprocessor_cache;
             data.symbol_cache = symbol_cache;
             data.diagnostic_cache = diagnostic_cache;
-        });
-        // Recurse dependencies.
-        for include in &includes {
-            let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
-            let included_file =
-                self.watch_dependency(&include_uri, shading_language, shader_language)?;
-            // Skip already visited deps if once.
-            // If we skip this, we will need to fill data before.
-            if include_context.should_visit(&include_uri) {
-                include_context.add_context_for_include(include, &mut context_define);
-                RefCell::borrow_mut(&included_file).included_data.insert(
-                    include_context.includer_uri.clone(),
-                    ServerFileCacheData::default(),
-                );
-                self.recurse_file_symbol(
-                    &include_uri,
-                    &included_file,
-                    shader_language,
-                    symbol_provider,
-                    include_context,
-                )?;
-            }
-            // Add deps to current file
-            include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
-                data.dependencies.insert(include_uri.clone(), included_file);
-            });
         }
-        // Add remaining context
-        include_context.add_context(context_define);
         Ok(())
     }
     pub fn cache_file_data(
@@ -351,37 +267,49 @@ impl ServerLanguageFileCache {
         shader_variant: Option<ShaderVariant>,
         config: &ServerConfig,
     ) -> Result<(), ShaderError> {
-        // TODO: remove include context & replace it by includeHandler.
-        // But it does not support uri though... Or include handler in include context.
-        let mut include_context = IncludeContext::main(
-            uri,
-            config.includes.clone(),
-            config.defines.clone(),
-            config.path_remapping.clone(),
-        );
+        let file_path = uri.to_file_path().unwrap();
         // Reset cache
-        include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
-            data.preprocessor_cache = ShaderPreprocessor::default();
-            data.symbol_cache = ShaderSymbolList::default();
-            data.diagnostic_cache = ShaderDiagnosticList::default();
-        });
+        RefCell::borrow_mut(&cached_file).data.preprocessor_cache = ShaderPreprocessor::default();
+        RefCell::borrow_mut(&cached_file).data.symbol_cache = ShaderSymbolList::default();
+        RefCell::borrow_mut(&cached_file).data.diagnostic_cache = ShaderDiagnosticList::default();
         // Get symbols for main file.
         if config.symbols {
             profile_scope!("Parsing symbols for file {}", uri);
+            let mut include_handler = IncludeHandler::new(
+                file_path.as_path(),
+                config.includes.clone(),
+                config
+                    .path_remapping
+                    .iter()
+                    .map(|e| (e.0.into(), e.1.into()))
+                    .collect(),
+            );
+            let mut context = ShaderPreprocessorContext::from_defines(
+                config
+                    .defines
+                    .iter()
+                    .map(|e| ShaderPreprocessorDefine {
+                        name: e.0.clone(),
+                        value: Some(e.1.clone()),
+                        range: None,
+                    })
+                    .collect(),
+            );
             // Add variant data if some.
             if let Some(variant) = &shader_variant {
                 for (variable, value) in &variant.defines {
-                    include_context
-                        .defines
-                        .insert(variable.clone(), value.clone());
+                    context.defines.insert(variable.clone(), value.clone());
                 }
             }
             self.recurse_file_symbol(
                 uri,
                 cached_file,
+                uri,
                 shader_language,
                 symbol_provider,
-                &mut include_context,
+                &mut context,
+                &mut include_handler,
+                &mut HashSet::new(),
             )?;
         }
         // Get diagnostics
@@ -432,14 +360,7 @@ impl ServerLanguageFileCache {
                         let content = RefCell::borrow(&deps_file).symbol_tree.content.clone();
                         // Add deps as direct deps if they werent added by symbols.
                         if !config.symbols {
-                            include_context.visit_data(
-                                uri,
-                                cached_file,
-                                |data: &mut ServerFileCacheData| {
-                                    data.dependencies
-                                        .insert(Url::from_file_path(&deps_path).unwrap(), deps_file);
-                                },
-                            );
+                            RefCell::borrow_mut(cached_file).data.dependencies.insert(deps_uri, deps_file);
                         }
                         Some(content)
                     },
@@ -533,14 +454,19 @@ impl ServerLanguageFileCache {
                 .diagnostics
                 .append(&mut ascended_diagnostics);
 
-            include_context.visit_data(uri, cached_file, |data: &mut ServerFileCacheData| {
-                data.diagnostic_cache
-                    .diagnostics
-                    .append(&mut data.preprocessor_cache.diagnostics);
-                data.diagnostic_cache
-                    .diagnostics
-                    .append(&mut diagnostic_list.diagnostics);
-            });
+            let mut cached_file = RefCell::borrow_mut(cached_file);
+            let mut preprocessor_diagnostic =
+                cached_file.data.preprocessor_cache.diagnostics.clone();
+            cached_file
+                .data
+                .diagnostic_cache
+                .diagnostics
+                .append(&mut preprocessor_diagnostic);
+            cached_file
+                .data
+                .diagnostic_cache
+                .diagnostics
+                .append(&mut diagnostic_list.diagnostics);
         }
         Ok(())
     }
@@ -889,7 +815,7 @@ impl ServerLanguageFileCache {
             uri: &Url,
             cached_file: &ServerFileCacheHandle,
             includer_uri: &Url,
-            include_context: &mut IncludeContext,
+            visited_deps: &mut HashSet<Url>,
         ) -> ShaderSymbolList {
             let cached_file = RefCell::borrow(&cached_file);
             match cached_file.included_data.get(includer_uri) {
@@ -898,13 +824,14 @@ impl ServerLanguageFileCache {
                     data.preprocessor_cache
                         .preprocess_symbols(&mut symbol_cache);
                     for (deps_uri, deps_cached_file) in &data.dependencies {
-                        if include_context.should_visit(deps_uri) {
+                        if !visited_deps.contains(deps_uri) {
+                            visited_deps.insert(deps_uri.clone());
                             // Dont need to add_context_for_include here, bcz we only care about should_visit.
                             symbol_cache.append(get_deps(
                                 deps_uri,
                                 deps_cached_file,
                                 includer_uri,
-                                include_context,
+                                visited_deps,
                             ));
                         }
                     }
@@ -924,7 +851,7 @@ impl ServerLanguageFileCache {
                 deps_uri,
                 deps_cached_file,
                 uri,
-                &mut IncludeContext::main(uri, Vec::new(), HashMap::new(), HashMap::new()),
+                &mut HashSet::new(),
             ));
         }
         // Add config symbols

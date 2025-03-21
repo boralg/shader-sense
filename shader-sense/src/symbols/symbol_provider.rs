@@ -2,18 +2,20 @@ use tree_sitter::{Query, QueryCursor};
 
 use crate::{
     include::IncludeHandler,
+    shader::ShadingLanguageTag,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
 };
 
 use super::{
+    shader_language::ShaderLanguage,
     symbol_parser::{
         ShaderSymbolListBuilder, SymbolLabelChainProvider, SymbolLabelProvider, SymbolRegionFinder,
         SymbolTreeFilter, SymbolTreeParser, SymbolTreePreprocessorParser,
     },
     symbol_tree::SymbolTree,
     symbols::{
-        ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext, ShaderRange, ShaderScope,
-        ShaderSymbol, ShaderSymbolList, ShaderSymbolParams,
+        ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude,
+        ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolList,
     },
 };
 
@@ -27,6 +29,37 @@ pub struct SymbolProvider {
     region_finder: Box<dyn SymbolRegionFinder>,
     word_chain_provider: Box<dyn SymbolLabelChainProvider>,
     word_provider: Box<dyn SymbolLabelProvider>,
+}
+
+pub type SymbolIncludeCallback<'a> = dyn FnMut(
+        ShaderPreprocessorInclude,
+        &mut ShaderPreprocessorContext,
+        &mut IncludeHandler,
+    ) -> Result<ShaderPreprocessorContext, ShaderError>
+    + 'a;
+
+pub fn default_include_callback<T: ShadingLanguageTag>(
+    include: ShaderPreprocessorInclude,
+    context: &mut ShaderPreprocessorContext,
+    include_handler: &mut IncludeHandler,
+) -> Result<ShaderPreprocessorContext, ShaderError> {
+    let mut language = ShaderLanguage::new(T::get_language());
+    let symbol_provider = language.create_symbol_provider();
+    let include_module = language.create_module(
+        &include.absolute_path,
+        std::fs::read_to_string(&include.absolute_path)
+            .unwrap()
+            .as_str(),
+    )?;
+    let include_preprocessor = symbol_provider.query_preprocessor(
+        &include_module,
+        context,
+        include_handler,
+        &mut default_include_callback::<T>,
+    )?;
+    Ok(ShaderPreprocessorContext::from_defines(
+        include_preprocessor.defines,
+    ))
 }
 
 impl SymbolProvider {
@@ -119,15 +152,14 @@ impl SymbolProvider {
         }
         scopes
     }
-    pub fn query_preprocessor(
+    pub fn query_preprocessor<'a>(
         &self,
         symbol_tree: &SymbolTree,
-        symbol_params: &ShaderSymbolParams,
+        context: &'a mut ShaderPreprocessorContext,
         include_handler: &mut IncludeHandler,
+        include_callback: &'a mut SymbolIncludeCallback<'a>,
     ) -> Result<ShaderPreprocessor, ShaderError> {
-        let mut preprocessor = ShaderPreprocessor::new(ShaderPreprocessorContext {
-            defines: symbol_params.defines.clone(),
-        });
+        let mut preprocessor = ShaderPreprocessor::new(context.clone());
         for parser in &self.preprocessor_parsers {
             let mut query_cursor = QueryCursor::new();
             for matches in query_cursor.matches(
@@ -150,6 +182,9 @@ impl SymbolProvider {
             symbol_tree,
             symbol_tree.tree.root_node(),
             &mut preprocessor,
+            context,
+            include_handler,
+            include_callback,
         )?;
         // Mark this shader as once if pragma once is set.
         if let Some(once_byte_offset) = symbol_tree.content.find("#pragma once") {
