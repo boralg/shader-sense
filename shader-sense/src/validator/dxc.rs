@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    include::{Dependencies, IncludeHandler},
+    include::IncludeHandler,
     shader::{HlslShaderModel, HlslVersion},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::symbols::{ShaderPosition, ShaderRange},
@@ -40,9 +40,6 @@ impl<'a> DxcIncludeHandler<'a> {
             include_handler: IncludeHandler::new(file, includes, path_remapping),
             include_callback: include_callback,
         }
-    }
-    fn get_dependencies(&self) -> &Dependencies {
-        self.include_handler.get_dependencies()
     }
 }
 
@@ -199,7 +196,7 @@ impl Validator for Dxc {
         file_path: &Path,
         params: &ValidationParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
-    ) -> Result<(ShaderDiagnosticList, Dependencies), ShaderError> {
+    ) -> Result<ShaderDiagnosticList, ShaderError> {
         let file_name = self.get_file_name(file_path);
 
         let blob = match self
@@ -208,7 +205,7 @@ impl Validator for Dxc {
         {
             Ok(blob) => blob,
             Err(err) => match self.from_hassle_error(err, file_path, &params) {
-                Ok(diagnostics) => return Ok((diagnostics, Dependencies::default())),
+                Ok(diagnostics) => return Ok(diagnostics),
                 Err(error) => return Err(error),
             },
         };
@@ -271,9 +268,7 @@ impl Validator for Dxc {
                 let result_blob = match dxc_result.get_result() {
                     Ok(blob) => blob,
                     Err(err) => match self.from_hassle_error(err, file_path, &params) {
-                        Ok(diagnostics) => {
-                            return Ok((diagnostics, include_handler.get_dependencies().clone()))
-                        }
+                        Ok(diagnostics) => return Ok(diagnostics),
                         Err(error) => return Err(error),
                     },
                 };
@@ -284,53 +279,38 @@ impl Validator for Dxc {
                     {
                         Ok(blob) => blob,
                         Err(err) => match self.from_hassle_error(err, file_path, &params) {
-                            Ok(diagnostics) => {
-                                return Ok((
-                                    diagnostics,
-                                    include_handler.get_dependencies().clone(),
-                                ))
-                            }
+                            Ok(diagnostics) => return Ok(diagnostics),
                             Err(error) => return Err(error),
                         },
                     };
 
                     match validator.validate(blob_encoding.into()) {
-                        Ok(_) => Ok((
-                            ShaderDiagnosticList::empty(),
-                            include_handler.get_dependencies().clone(),
-                        )),
+                        Ok(_) => Ok(ShaderDiagnosticList::empty()),
                         Err(dxc_err) => {
                             //let error_blob = dxc_err.0.get_error_buffer().map_err(|e| self.from_hassle_error(e))?;
                             //let error_emitted = self.library.get_blob_as_string(&error_blob.into()).map_err(|e| self.from_hassle_error(e))?;
                             match self.from_hassle_error(dxc_err.1, file_path, &params) {
-                                Ok(diag) => Ok((diag, include_handler.get_dependencies().clone())),
+                                Ok(diag) => Ok(diag),
                                 Err(err) => Err(err),
                             }
                         }
                     }
                 } else {
-                    Ok((
-                        ShaderDiagnosticList::empty(),
-                        include_handler.get_dependencies().clone(),
-                    ))
+                    Ok(ShaderDiagnosticList::empty())
                 }
             }
             Err((dxc_result, _hresult)) => {
                 let error_blob = match dxc_result.get_error_buffer() {
                     Ok(blob) => blob,
                     Err(err) => match self.from_hassle_error(err, file_path, &params) {
-                        Ok(diagnostics) => {
-                            return Ok((diagnostics, include_handler.get_dependencies().clone()))
-                        }
+                        Ok(diagnostics) => return Ok(diagnostics),
                         Err(error) => return Err(error),
                     },
                 };
                 let error_emitted = match self.library.get_blob_as_string(&error_blob.into()) {
                     Ok(blob) => blob,
                     Err(err) => match self.from_hassle_error(err, file_path, &params) {
-                        Ok(diagnostics) => {
-                            return Ok((diagnostics, include_handler.get_dependencies().clone()))
-                        }
+                        Ok(diagnostics) => return Ok(diagnostics),
                         Err(error) => return Err(error),
                     },
                 };
@@ -340,7 +320,7 @@ impl Validator for Dxc {
                     &params,
                 ) {
                     Err(error) => Err(error),
-                    Ok(diag) => Ok((diag, include_handler.get_dependencies().clone())),
+                    Ok(diag) => Ok(diag),
                 }
             }
         }

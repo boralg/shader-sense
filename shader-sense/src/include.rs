@@ -1,17 +1,11 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::{Path, PathBuf},
 };
-
-#[derive(Debug, Default, Clone)]
-pub struct Dependencies {
-    dependencies: HashSet<PathBuf>,
-}
 
 pub struct IncludeHandler {
     includes: Vec<String>,
     directory_stack: Vec<PathBuf>, // Vec for keeping insertion order. Might own duplicate.
-    dependencies: Dependencies,    // TODO: Remove
     path_remapping: HashMap<PathBuf, PathBuf>, // remapping of path / virtual path
 }
 // std::fs::canonicalize not supported on wasi target... Emulate it.
@@ -45,24 +39,6 @@ pub fn canonicalize(p: &Path) -> std::io::Result<PathBuf> {
     Ok(path)
 }
 
-impl Dependencies {
-    pub fn new() -> Self {
-        Self {
-            dependencies: HashSet::new(),
-        }
-    }
-    pub fn add_dependency(&mut self, relative_path: PathBuf) {
-        self.dependencies.insert(
-            canonicalize(&relative_path).expect("Failed to convert dependency path to absolute"),
-        );
-    }
-    pub fn visit_dependencies<F: FnMut(&Path)>(&self, callback: &mut F) {
-        for dependency in &self.dependencies {
-            callback(&dependency);
-        }
-    }
-}
-
 impl IncludeHandler {
     pub fn default(file: &Path) -> Self {
         Self::new(file, Vec::new(), HashMap::new())
@@ -79,7 +55,6 @@ impl IncludeHandler {
         Self {
             includes: includes,
             directory_stack: stack,
-            dependencies: Dependencies::new(),
             path_remapping: path_remapping,
         }
     }
@@ -114,7 +89,6 @@ impl IncludeHandler {
                     if let Some(parent) = path.parent() {
                         self.directory_stack.push(canonicalize(parent).unwrap());
                     }
-                    self.dependencies.add_dependency(path.clone());
                     return Some(path);
                 }
             }
@@ -125,7 +99,6 @@ impl IncludeHandler {
                     if let Some(parent) = path.parent() {
                         self.directory_stack.push(canonicalize(parent).unwrap());
                     }
-                    self.dependencies.add_dependency(path.clone());
                     return Some(path);
                 }
             }
@@ -139,7 +112,6 @@ impl IncludeHandler {
                     if let Some(parent) = target_path.parent() {
                         self.directory_stack.push(canonicalize(parent).unwrap());
                     }
-                    self.dependencies.add_dependency(target_path.clone());
                     return Some(target_path);
                 }
             }
@@ -189,8 +161,5 @@ impl IncludeHandler {
         } else {
             None
         }
-    }
-    pub fn get_dependencies(&self) -> &Dependencies {
-        return &self.dependencies;
     }
 }

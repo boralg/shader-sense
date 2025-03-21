@@ -5,7 +5,6 @@ use naga::{
 use std::path::Path;
 
 use crate::{
-    include::Dependencies,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::symbols::{ShaderPosition, ShaderRange},
 };
@@ -53,13 +52,13 @@ impl Validator for Naga {
         file_path: &Path,
         _params: &ValidationParams,
         _include_callback: &mut dyn FnMut(&Path) -> Option<String>,
-    ) -> Result<(ShaderDiagnosticList, Dependencies), ShaderError> {
+    ) -> Result<ShaderDiagnosticList, ShaderError> {
         let module = match wgsl::parse_str(&shader_content)
             .map_err(|err| Self::from_parse_err(err, file_path, shader_content))
         {
             Ok(module) => module,
             Err(diag) => {
-                return Ok((ShaderDiagnosticList::from(diag), Dependencies::new()));
+                return Ok(ShaderDiagnosticList::from(diag));
             }
         };
 
@@ -89,10 +88,10 @@ impl Validator for Naga {
                     error.emit_to_string(&shader_content),
                 ))
             } else {
-                Ok((list, Dependencies::new()))
+                Ok(list)
             }
         } else {
-            Ok((ShaderDiagnosticList::empty(), Dependencies::new()))
+            Ok(ShaderDiagnosticList::empty())
         }
     }
 }

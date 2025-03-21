@@ -1,6 +1,6 @@
 use super::validator::{ValidationParams, Validator};
 use crate::{
-    include::{Dependencies, IncludeHandler},
+    include::IncludeHandler,
     shader::{GlslSpirvVersion, GlslTargetClient, ShaderStage},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::symbols::{ShaderPosition, ShaderRange},
@@ -75,9 +75,6 @@ impl<'a> GlslangIncludeHandler<'a> {
             include_handler: IncludeHandler::new(file_path, includes, path_remapping),
             include_callback: include_callback,
         }
-    }
-    pub fn get_dependencies(&self) -> &Dependencies {
-        self.include_handler.get_dependencies()
     }
 }
 
@@ -244,7 +241,7 @@ impl Validator for Glslang {
         file_path: &Path,
         params: &ValidationParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
-    ) -> Result<(ShaderDiagnosticList, Dependencies), ShaderError> {
+    ) -> Result<ShaderDiagnosticList, ShaderError> {
         let file_name = self.get_file_name(file_path);
 
         let (shader_stage, shader_source, offset_first_line) =
@@ -345,7 +342,7 @@ impl Validator for Glslang {
             Ok(value) => value,
             Err(error) => match error {
                 Err(error) => return Err(error),
-                Ok(diag) => return Ok((diag, include_handler.get_dependencies().clone())),
+                Ok(diag) => return Ok(diag),
             },
         };
         let _shader = match glslang::Shader::new(&self.compiler, input)
@@ -354,7 +351,7 @@ impl Validator for Glslang {
             Ok(value) => value,
             Err(error) => match error {
                 Err(error) => return Err(error),
-                Ok(diag) => return Ok((diag, include_handler.get_dependencies().clone())),
+                Ok(diag) => return Ok(diag),
             },
         };
         // Linking require main entry point. Should work around this somehow.
@@ -366,9 +363,6 @@ impl Validator for Glslang {
             },
         };*/
 
-        Ok((
-            ShaderDiagnosticList::empty(),
-            include_handler.get_dependencies().clone(),
-        )) // No error detected.
+        Ok(ShaderDiagnosticList::empty()) // No error detected.
     }
 }

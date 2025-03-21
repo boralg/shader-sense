@@ -38,8 +38,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         }
@@ -60,8 +60,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         };
@@ -82,8 +82,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         };
@@ -104,8 +104,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         };
@@ -126,8 +126,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         };
@@ -145,7 +145,7 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                let diags = result.0.diagnostics;
+                let diags = result.diagnostics;
                 println!("Diagnostic should be empty: {:#?}", diags);
                 assert!(diags[0].range.start.file_path.exists());
                 assert_eq!(diags[0].error, String::from(" '#include' : Could not process include directive for header name: ./level1.glsl\n"));
@@ -166,8 +166,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         };
@@ -188,8 +188,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         };
@@ -210,8 +210,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         };
@@ -232,8 +232,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         };
@@ -254,8 +254,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         };
@@ -277,8 +277,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         };
@@ -296,8 +296,8 @@ mod tests {
             &mut default_include_callback,
         ) {
             Ok(result) => {
-                println!("Diagnostic should be empty: {:#?}", result.0);
-                assert!(result.0.is_empty())
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
             }
             Err(err) => panic!("{}", err),
         };

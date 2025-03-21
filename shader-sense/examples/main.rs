@@ -20,9 +20,9 @@ fn validate_file(shading_language: ShadingLanguage, shader_path: &Path) {
         &ValidationParams::default(),
         &mut |path: &Path| Some(std::fs::read_to_string(path).unwrap()),
     ) {
-        Ok((diagnostic_list, dependencies)) => println!(
-            "Validated file and return following diagnostics: {:#?}\n With dependencies: {:#?}",
-            diagnostic_list, dependencies
+        Ok(diagnostic_list) => println!(
+            "Validated file and return following diagnostics: {:#?}",
+            diagnostic_list
         ),
         Err(err) => println!("Failed to validate file: {:#?}", err),
     }

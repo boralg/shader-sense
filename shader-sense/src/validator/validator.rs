@@ -4,7 +4,6 @@ use std::{
 };
 
 use crate::{
-    include::Dependencies,
     shader::{GlslSpirvVersion, GlslTargetClient, HlslShaderModel, HlslVersion},
     shader_error::{ShaderDiagnosticList, ShaderError},
 };
@@ -31,7 +30,7 @@ pub trait Validator {
         file_path: &Path,
         params: &ValidationParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
-    ) -> Result<(ShaderDiagnosticList, Dependencies), ShaderError>;
+    ) -> Result<ShaderDiagnosticList, ShaderError>;
 
     fn get_file_name(&self, path: &Path) -> String {
         String::from(path.file_name().unwrap().to_string_lossy())

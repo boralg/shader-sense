@@ -335,7 +335,7 @@ impl ServerLanguageFileCache {
                         .insert(variable.clone(), value.clone());
                 }
             }
-            let (mut diagnostic_list, _dependencies) = {
+            let mut diagnostic_list = {
                 profile_scope!("Raw validation");
                 validator.validate_shader(
                     &RefCell::borrow(cached_file).symbol_tree.content,
