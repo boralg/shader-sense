@@ -10,8 +10,8 @@ pub struct Dependencies {
 
 pub struct IncludeHandler {
     includes: Vec<String>,
-    directory_stack: HashSet<PathBuf>,
-    dependencies: Dependencies,                // TODO: Remove
+    directory_stack: Vec<PathBuf>, // Vec for keeping insertion order. Might own duplicate.
+    dependencies: Dependencies,    // TODO: Remove
     path_remapping: HashMap<PathBuf, PathBuf>, // remapping of path / virtual path
 }
 // std::fs::canonicalize not supported on wasi target... Emulate it.
@@ -74,8 +74,8 @@ impl IncludeHandler {
     ) -> Self {
         // Add local path to directory stack
         let cwd = file.parent().unwrap();
-        let mut stack = HashSet::new();
-        stack.insert(cwd.into());
+        let mut stack = Vec::new();
+        stack.push(cwd.into());
         Self {
             includes: includes,
             directory_stack: stack,
@@ -107,11 +107,12 @@ impl IncludeHandler {
             Some(PathBuf::from(relative_path))
         } else {
             // Check directory stack.
-            for directory_stack in &self.directory_stack {
+            // Reverse order to check first the latest added folders.
+            for directory_stack in self.directory_stack.iter().rev() {
                 let path = Path::new(directory_stack).join(&relative_path);
                 if path.is_file() {
                     if let Some(parent) = path.parent() {
-                        self.directory_stack.insert(canonicalize(parent).unwrap());
+                        self.directory_stack.push(canonicalize(parent).unwrap());
                     }
                     self.dependencies.add_dependency(path.clone());
                     return Some(path);
@@ -122,7 +123,7 @@ impl IncludeHandler {
                 let path = Path::new(include_path).join(&relative_path);
                 if path.is_file() {
                     if let Some(parent) = path.parent() {
-                        self.directory_stack.insert(canonicalize(parent).unwrap());
+                        self.directory_stack.push(canonicalize(parent).unwrap());
                     }
                     self.dependencies.add_dependency(path.clone());
                     return Some(path);
@@ -136,7 +137,7 @@ impl IncludeHandler {
                     // We should not add virtual path to stack, as they are well defined already.
                     // But we expect a correct directory stack.
                     if let Some(parent) = target_path.parent() {
-                        self.directory_stack.insert(canonicalize(parent).unwrap());
+                        self.directory_stack.push(canonicalize(parent).unwrap());
                     }
                     self.dependencies.add_dependency(target_path.clone());
                     return Some(target_path);
