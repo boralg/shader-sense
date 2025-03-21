@@ -147,7 +147,7 @@ fn test_server_wasi_runtime() {
     send_request::<Shutdown>(stdin, &mut reader, 2, &(), |_| {});
     send_notification::<Exit>(stdin, &());
 
-    child.wait().unwrap();
+    child.kill().unwrap();
 }
 
 #[test]
