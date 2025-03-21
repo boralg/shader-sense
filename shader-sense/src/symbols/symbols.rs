@@ -253,23 +253,9 @@ impl ShaderPreprocessorContext {
                 .insert(define.name, define.value.unwrap_or("".into()));
         }
     }
-    pub fn is_dirty(&self, symbol_params: &ShaderSymbolParams) -> bool {
-        // Compare defines to get if context is different.
-        if symbol_params.defines.len() == self.defines.len() {
-            for (key, value) in &symbol_params.defines {
-                match self.defines.get(key) {
-                    Some(define) => {
-                        if *define != *value {
-                            return true;
-                        }
-                    }
-                    None => return true,
-                }
-            }
-            false
-        } else {
-            true
-        }
+    pub fn is_dirty(&self, context: &ShaderPreprocessorContext) -> bool {
+        // Compare defines to determine if context is different.
+        context.defines != self.defines
     }
 }
 
