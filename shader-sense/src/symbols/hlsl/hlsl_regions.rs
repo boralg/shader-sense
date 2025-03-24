@@ -49,36 +49,14 @@ macro_rules! assert_field_name {
                             file!(),
                             line!(),
                         ),
-                        ShaderRange::new(
-                            ShaderPosition::new(
-                                $file_path.clone(),
-                                $cursor.node().range().start_point.row as u32,
-                                $cursor.node().range().start_point.column as u32,
-                            ),
-                            ShaderPosition::new(
-                                $file_path.clone(),
-                                $cursor.node().range().end_point.row as u32,
-                                $cursor.node().range().end_point.column as u32,
-                            ),
-                        ),
+                        ShaderRange::from_range($cursor.node().range(), &$file_path),
                     ));
                 }
             }
             None => {
                 return Err(ShaderError::SymbolQueryError(
                     format!("Missing query field name (at {}:{})", file!(), line!(),),
-                    ShaderRange::new(
-                        ShaderPosition::new(
-                            $file_path.clone(),
-                            $cursor.node().range().start_point.row as u32,
-                            $cursor.node().range().start_point.column as u32,
-                        ),
-                        ShaderPosition::new(
-                            $file_path.clone(),
-                            $cursor.node().range().end_point.row as u32,
-                            $cursor.node().range().end_point.column as u32,
-                        ),
-                    ),
+                    ShaderRange::from_range($cursor.node().range(), &$file_path),
                 ));
             }
         }
@@ -94,18 +72,7 @@ macro_rules! assert_node_kind {
                     file!(),
                     line!(),
                 ),
-                ShaderRange::new(
-                    ShaderPosition::new(
-                        $file_path.clone(),
-                        $cursor.node().range().start_point.row as u32,
-                        $cursor.node().range().start_point.column as u32,
-                    ),
-                    ShaderPosition::new(
-                        $file_path.clone(),
-                        $cursor.node().range().end_point.row as u32,
-                        $cursor.node().range().end_point.column as u32,
-                    ),
-                ),
+                ShaderRange::from_range($cursor.node().range(), &$file_path),
             ));
         }
     };
@@ -174,7 +141,7 @@ impl HlslSymbolRegionFinder {
             // Here we try to detect expression that cannot be parsed, such as expression (#define MACRO (MACRO0 + MACRO1)).
             // TODO: We should store a proxy tree that is used to query over it for solving them.
             Err(ShaderError::SymbolQueryError(
-                format!("Macro expression solving not implemented ({}). Regions behaviour may be incorrect.", name),
+                format!("Macro expression solving not implemented ({}).", name),
                 ShaderRange::new(position.clone(), position.clone()),
             ))
         } else {
@@ -355,7 +322,10 @@ impl HlslSymbolRegionFinder {
                 )"#;
                 // TODO: should solve this complex expression, simply ignoring it for now.
                 Err(ShaderError::SymbolQueryError(
-                    format!("Call expression solving not implemented ({}). Regions behaviour may be incorrect.", get_name(&symbol_tree.content, cursor.node())),
+                    format!(
+                        "Call expression solving not implemented ({}).",
+                        get_name(&symbol_tree.content, cursor.node())
+                    ),
                     ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
                 ))
             }
@@ -468,15 +438,12 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             ) {
                                 Ok(value) => value,
                                 Err(err) => {
-                                    if let ShaderError::SymbolQueryError(message, range) = err {
-                                        preprocessor.diagnostics.push(ShaderDiagnostic {
-                                            severity: ShaderDiagnosticSeverity::Warning,
-                                            error: message,
-                                            range,
-                                        });
-                                        0 // Return zero as default.
-                                    } else {
-                                        return Err(err);
+                                    match err.into_diagnostic(ShaderDiagnosticSeverity::Warning) {
+                                        Some(diagnostic) => {
+                                            preprocessor.diagnostics.push(diagnostic);
+                                            0 // Return 0 as default
+                                        }
+                                        None => return Err(err),
                                     }
                                 }
                             },
@@ -507,18 +474,15 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                     context,
                                 ) {
                                     Ok(value) => value,
-                                    Err(err) => {
-                                        if let ShaderError::SymbolQueryError(message, range) = err {
-                                            preprocessor.diagnostics.push(ShaderDiagnostic {
-                                                severity: ShaderDiagnosticSeverity::Warning,
-                                                error: message,
-                                                range,
-                                            });
-                                            0 // Return zero as default.
-                                        } else {
-                                            return Err(err);
+                                    Err(err) => match err
+                                        .into_diagnostic(ShaderDiagnosticSeverity::Warning)
+                                    {
+                                        Some(diagnostic) => {
+                                            preprocessor.diagnostics.push(diagnostic);
+                                            0 // Return 0 as default
                                         }
-                                    }
+                                        None => return Err(err),
+                                    },
                                 }
                             },
                             position,

@@ -10,6 +10,7 @@ use crate::{
     server::{
         clean_url,
         common::{lsp_range_to_shader_range, read_string_lossy},
+        diagnostic,
     },
 };
 use log::{debug, info, warn};
@@ -227,20 +228,15 @@ impl ServerLanguageFileCache {
             }
             Err(error) => {
                 // Return this error & store it to display it as a diagnostic & dont prevent linting.
-                if let ShaderError::SymbolQueryError(message, range) = error {
-                    (
+                match error.into_diagnostic(ShaderDiagnosticSeverity::Warning) {
+                    Some(diagnostic) => (
                         ShaderPreprocessor::new(context.clone()),
                         ShaderSymbolList::default(),
                         ShaderDiagnosticList {
-                            diagnostics: vec![ShaderDiagnostic {
-                                severity: ShaderDiagnosticSeverity::Warning,
-                                error: message,
-                                range: range,
-                            }],
+                            diagnostics: vec![diagnostic],
                         },
-                    )
-                } else {
-                    return Err(error);
+                    ),
+                    None => return Err(error),
                 }
             }
         };

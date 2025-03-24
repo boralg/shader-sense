@@ -67,6 +67,23 @@ pub enum ShaderError {
     InternalErr(String),
 }
 
+impl ShaderError {
+    pub fn into_diagnostic(&self, severity: ShaderDiagnosticSeverity) -> Option<ShaderDiagnostic> {
+        match self {
+            ShaderError::SymbolQueryError(message, range) => Some(ShaderDiagnostic {
+                error: format!(
+                    "Symbol Query {}, symbol provider may be impacted: {}",
+                    severity.to_string(),
+                    message
+                ),
+                severity: severity,
+                range: range.clone(),
+            }),
+            _ => None,
+        }
+    }
+}
+
 impl From<regex::Error> for ShaderError {
     fn from(error: regex::Error) -> Self {
         match error {
