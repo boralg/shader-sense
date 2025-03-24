@@ -29,7 +29,7 @@ impl ServerLanguage {
             .get_word_range_at_position(&cached_file.symbol_tree, &shader_position)
         {
             // word_range should be the same as symbol range
-            Ok((word, _word_range)) => match self.watched_files.get(uri) {
+            Ok((word, word_range)) => match self.watched_files.get(uri) {
                 Some(target_cached_file) => {
                     let all_symbol_list = self.watched_files.get_all_symbols(
                         uri,
@@ -79,15 +79,11 @@ impl ServerLanguage {
                                     link
                                 ),
                             }),
-                            range: match &symbol.range {
-                                None => None,
-                                Some(range) => {
-                                    if range.start.file_path == *file_path {
-                                        Some(shader_range_to_lsp_range(range))
-                                    } else {
-                                        None
-                                    }
-                                }
+                            // Range of hovered element.
+                            range: if word_range.start.file_path == *file_path {
+                                Some(shader_range_to_lsp_range(&word_range))
+                            } else {
+                                None
                             },
                         }))
                     }
