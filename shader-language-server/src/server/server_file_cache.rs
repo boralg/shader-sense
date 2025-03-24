@@ -468,11 +468,13 @@ impl ServerLanguageFileCache {
             let mut cached_file = RefCell::borrow_mut(cached_file);
             let mut preprocessor_diagnostic =
                 cached_file.data.preprocessor_cache.diagnostics.clone();
-            cached_file
-                .data
-                .diagnostic_cache
-                .diagnostics
-                .append(&mut preprocessor_diagnostic);
+            if config.symbol_diagnostics {
+                cached_file
+                    .data
+                    .diagnostic_cache
+                    .diagnostics
+                    .append(&mut preprocessor_diagnostic);
+            }
             cached_file
                 .data
                 .diagnostic_cache
