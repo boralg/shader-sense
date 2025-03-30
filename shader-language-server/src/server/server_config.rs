@@ -22,6 +22,21 @@ pub struct ServerGlslConfig {
     pub spirv_version: GlslSpirvVersion,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ServerTraceLevel {
+    #[default]
+    Off,
+    Messages,
+    Verbose,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerTrace {
+    server: ServerTraceLevel,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerConfig {
@@ -31,6 +46,7 @@ pub struct ServerConfig {
     pub validate: bool,
     pub symbols: bool,
     pub symbol_diagnostics: bool,
+    pub trace: ServerTrace,
     pub severity: String,
     pub hlsl: ServerHlslConfig,
     pub glsl: ServerGlslConfig,
@@ -64,6 +80,7 @@ impl Default for ServerConfig {
             validate: true,
             symbols: true,
             symbol_diagnostics: false,
+            trace: ServerTrace::default(),
             severity: ShaderDiagnosticSeverity::Hint.to_string(),
             hlsl: ServerHlslConfig::default(),
             glsl: ServerGlslConfig::default(),

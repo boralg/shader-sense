@@ -154,11 +154,10 @@ impl ServerLanguage {
             ),
             ..Default::default()
         })?;
-        let client_initialization_params = self.connection.initialize(server_capabilities);
-        debug!(
-            "Received client params: {:#?}",
-            client_initialization_params
-        );
+        let _client_initialization_params =
+            self.connection.initialize(server_capabilities).unwrap();
+        // TODO: Check features support from client params.
+        debug!("Received client params");
         // Request configuration as its not sent automatically (at least with vscode)
         self.request_configuration();
 
