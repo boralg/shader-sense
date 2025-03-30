@@ -15,7 +15,9 @@ pub fn new_hlsl_scalar(label: &str, description: &str, version: &str) -> ShaderS
             "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-scalar"
                 .into(),
         ),
-        data: ShaderSymbolData::Types { ty: label.into() },
+        data: ShaderSymbolData::Types {
+            constructors: vec![],
+        },
         range: None,
         scope_stack: None,
     }
@@ -72,6 +74,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-buffer".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -88,6 +91,7 @@ impl HlslIntrinsicParser {
                     .into(),
             ),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -101,6 +105,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1darray".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -117,6 +122,7 @@ impl HlslIntrinsicParser {
                     .into(),
             ),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -130,6 +136,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2darray".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -146,6 +153,7 @@ impl HlslIntrinsicParser {
                     .into(),
             ),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -159,6 +167,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texturecube".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -172,6 +181,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texturecubearray".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -185,6 +195,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2dms".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -198,6 +209,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-Texture2DMSArray".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -213,6 +225,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-AppendStructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![/*ShaderMethod {
                     // GetDimensions
@@ -230,6 +243,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-ByteAddressBuffer".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -243,6 +257,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-ByteAddressBuffer".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -256,6 +271,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-ConsumeStructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -269,6 +285,7 @@ impl HlslIntrinsicParser {
             stages: vec![ShaderStage::TesselationControl],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-InputPatch".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -282,6 +299,7 @@ impl HlslIntrinsicParser {
             stages: vec![ShaderStage::TesselationControl],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-OutputPatch".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -298,6 +316,7 @@ impl HlslIntrinsicParser {
                     .into(),
             ),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -311,6 +330,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWByteAddressBuffer".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -324,6 +344,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWStructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -337,6 +358,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture1D".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -350,6 +372,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture1DArray".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -363,6 +386,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture2D".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -376,6 +400,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture2DArray".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -389,6 +414,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture3D".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -402,6 +428,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-StructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -416,6 +443,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-StructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -429,6 +457,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -442,6 +471,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -455,6 +485,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -468,6 +499,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -481,6 +513,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -494,6 +527,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -507,6 +541,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -520,6 +555,7 @@ impl HlslIntrinsicParser {
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
             data: ShaderSymbolData::Struct {
+                constructors: vec![],
                 members: vec![],
                 methods: vec![],
             },
@@ -589,7 +625,7 @@ impl HlslIntrinsicParser {
                     label: fmt.clone(),
                     description: format!("Vector with {} components of {}", component_col, scalar.label),
                     link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-vector".into()),
-                    data: ShaderSymbolData::Types { ty:fmt.clone() },
+                    data: ShaderSymbolData::Types { constructors: vec![] },
                     version: "".into(),
                     stages: vec![],
                     range: None,
@@ -609,7 +645,7 @@ impl HlslIntrinsicParser {
                         label: fmt.clone(),
                         description: format!("Matrice with {} rows and {} columns of {}", component_row, component_col, scalar.label),
                         link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-matrix".into()),
-                        data: ShaderSymbolData::Types { ty:fmt.clone() },
+                        data: ShaderSymbolData::Types { constructors: vec![] },
                         version: "".into(),
                         stages: vec![],
                         range: None,

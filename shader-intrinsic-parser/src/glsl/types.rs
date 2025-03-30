@@ -1,4 +1,6 @@
-use shader_sense::symbols::symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolList};
+use shader_sense::symbols::symbols::{
+    ShaderParameter, ShaderSignature, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
+};
 
 use super::GlslIntrinsicParser;
 
@@ -11,7 +13,17 @@ impl GlslIntrinsicParser {
                 version: version.to_string(),
                 stages: vec![],
                 link: None,
-                data: ShaderSymbolData::Types { ty: label.into() },
+                data: ShaderSymbolData::Types {
+                    constructors: vec![ShaderSignature {
+                        returnType: "".into(),
+                        description: format!("Constructor for type {}", label),
+                        parameters: vec![ShaderParameter {
+                            ty: label.into(),
+                            label: "value".into(),
+                            description: "".into(),
+                        }],
+                    }],
+                },
                 range: None,
                 scope_stack: None,
             }

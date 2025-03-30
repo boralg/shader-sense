@@ -34,9 +34,9 @@ impl ServerLanguage {
         let all_symbol_list =
             self.watched_files
                 .get_all_symbols(uri, &cached_file, &language_data.language);
-        let function_parameter =
+        let item_parameter =
             get_function_parameter_at_position(&cached_file_borrowed.symbol_tree.content, position);
-        debug!("Found requested func name {:?}", function_parameter);
+        debug!("Found requested func name {:?}", item_parameter);
 
         let file_path = uri.to_file_path().unwrap();
         let completion = all_symbol_list.filter_scoped_symbol(&ShaderPosition {
@@ -45,57 +45,56 @@ impl ServerLanguage {
             pos: position.character as u32,
         });
         let (shader_symbols, parameter_index): (Vec<&ShaderSymbol>, u32) =
-            if let (Some(function), Some(parameter_index)) = function_parameter {
-                (
-                    completion
-                        .functions
-                        .iter()
-                        .filter(|shader_symbol| shader_symbol.label == function)
-                        .collect(),
-                    parameter_index,
-                )
+            if let (Some(item_label), Some(parameter_index)) = item_parameter {
+                (completion.find_symbols(&item_label), parameter_index)
             } else {
                 (Vec::new(), 0)
             };
         let signatures: Vec<SignatureInformation> = shader_symbols
             .iter()
             .filter_map(|shader_symbol| {
-                if let ShaderSymbolData::Functions { signatures } = &shader_symbol.data {
-                    Some(
-                        signatures
-                            .iter()
-                            .map(|signature| SignatureInformation {
-                                label: signature.format(shader_symbol.label.as_str()),
-                                documentation: Some(lsp_types::Documentation::MarkupContent(
-                                    MarkupContent {
-                                        kind: lsp_types::MarkupKind::Markdown,
-                                        value: shader_symbol.description.clone(),
-                                    },
-                                )),
-                                parameters: Some(
-                                    signature
-                                        .parameters
-                                        .iter()
-                                        .map(|e| ParameterInformation {
-                                            label: ParameterLabel::Simple(e.label.clone()),
-                                            documentation: Some(
-                                                lsp_types::Documentation::MarkupContent(
-                                                    MarkupContent {
-                                                        kind: lsp_types::MarkupKind::Markdown,
-                                                        value: e.description.clone(),
-                                                    },
-                                                ),
+                let functions = match &shader_symbol.data {
+                    ShaderSymbolData::Functions { signatures } => signatures,
+                    ShaderSymbolData::Struct {
+                        constructors,
+                        members: _,
+                        methods: _,
+                    } => constructors,
+                    ShaderSymbolData::Types { constructors } => constructors,
+                    _ => return None,
+                };
+                Some(
+                    functions
+                        .iter()
+                        .map(|signature| SignatureInformation {
+                            label: signature.format(shader_symbol.label.as_str()),
+                            documentation: Some(lsp_types::Documentation::MarkupContent(
+                                MarkupContent {
+                                    kind: lsp_types::MarkupKind::Markdown,
+                                    value: shader_symbol.description.clone(),
+                                },
+                            )),
+                            parameters: Some(
+                                signature
+                                    .parameters
+                                    .iter()
+                                    .map(|e| ParameterInformation {
+                                        label: ParameterLabel::Simple(e.label.clone()),
+                                        documentation: Some(
+                                            lsp_types::Documentation::MarkupContent(
+                                                MarkupContent {
+                                                    kind: lsp_types::MarkupKind::Markdown,
+                                                    value: e.description.clone(),
+                                                },
                                             ),
-                                        })
-                                        .collect(),
-                                ),
-                                active_parameter: None,
-                            })
-                            .collect::<Vec<SignatureInformation>>(),
-                    )
-                } else {
-                    None
-                }
+                                        ),
+                                    })
+                                    .collect(),
+                            ),
+                            active_parameter: None,
+                        })
+                        .collect::<Vec<SignatureInformation>>(),
+                )
             })
             .collect::<Vec<Vec<SignatureInformation>>>()
             .concat();

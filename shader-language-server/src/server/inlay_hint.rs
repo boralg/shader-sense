@@ -54,35 +54,38 @@ impl ServerLanguage {
                                 // https://github.com/microsoft/vscode/pull/201190
                                 // TODO: could solve parameter type to pick correct signature.
                                 let symbol = symbols[0]; // Just pick first one now.
-                                match &symbol.data {
-                                    ShaderSymbolData::Functions { signatures } => {
-                                        match signatures
-                                            .iter()
-                                            .find(|s| s.parameters.len() == parameters.len())
-                                        {
-                                            Some(signature) => parameters
-                                                .iter()
-                                                .enumerate()
-                                                .map(|(i, (_, range))| InlayHint {
-                                                    position: shader_position_to_lsp_position(
-                                                        &range.start,
-                                                    ),
-                                                    label: InlayHintLabel::String(format!(
-                                                        "{}:",
-                                                        signature.parameters[i].label
-                                                    )),
-                                                    kind: Some(InlayHintKind::PARAMETER),
-                                                    text_edits: None,
-                                                    tooltip: None,
-                                                    padding_left: Some(true),
-                                                    padding_right: Some(true),
-                                                    data: None,
-                                                })
-                                                .collect::<Vec<InlayHint>>(),
-                                            None => vec![],
-                                        }
-                                    }
-                                    _ => vec![],
+                                let functions = match &symbol.data {
+                                    ShaderSymbolData::Functions { signatures } => signatures,
+                                    ShaderSymbolData::Struct {
+                                        constructors,
+                                        members: _,
+                                        methods: _,
+                                    } => constructors,
+                                    ShaderSymbolData::Types { constructors } => constructors,
+                                    _ => &vec![],
+                                };
+                                match functions
+                                    .iter()
+                                    .find(|s| s.parameters.len() == parameters.len())
+                                {
+                                    Some(signature) => parameters
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(i, (_, range))| InlayHint {
+                                            position: shader_position_to_lsp_position(&range.start),
+                                            label: InlayHintLabel::String(format!(
+                                                "{}:",
+                                                signature.parameters[i].label
+                                            )),
+                                            kind: Some(InlayHintKind::PARAMETER),
+                                            text_edits: None,
+                                            tooltip: None,
+                                            padding_left: None,
+                                            padding_right: Some(true),
+                                            data: None,
+                                        })
+                                        .collect::<Vec<InlayHint>>(),
+                                    None => vec![],
                                 }
                             }
                         }

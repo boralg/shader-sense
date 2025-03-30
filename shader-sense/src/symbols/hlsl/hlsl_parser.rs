@@ -230,6 +230,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
             stages: vec![],
             link: None,
             data: ShaderSymbolData::Struct {
+                constructors: vec![], // No constructor in HLSL
                 members: members,
                 methods: methods,
             },

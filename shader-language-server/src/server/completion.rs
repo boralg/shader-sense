@@ -15,7 +15,12 @@ use super::{ServerFileCacheHandle, ServerLanguage};
 
 impl ServerLanguage {
     fn list_members_and_methods(&self, symbol: &ShaderSymbol) -> Vec<ShaderSymbol> {
-        if let ShaderSymbolData::Struct { members, methods } = &symbol.data {
+        if let ShaderSymbolData::Struct {
+            constructors: _,
+            members,
+            methods,
+        } = &symbol.data
+        {
             let mut converted_members: Vec<ShaderSymbol> =
                 members.iter().map(|e| e.as_symbol()).collect();
             let converted_methods: Vec<ShaderSymbol> =

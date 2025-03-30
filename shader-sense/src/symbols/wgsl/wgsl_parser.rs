@@ -43,6 +43,7 @@ impl SymbolTreeParser for WgslStructTreeParser {
             stages: vec![],
             link: None,
             data: ShaderSymbolData::Struct {
+                constructors: vec![], // Constructor in wgsl ?
                 members: matches.captures[1..]
                     .chunks(2)
                     .map(|w| ShaderParameter {

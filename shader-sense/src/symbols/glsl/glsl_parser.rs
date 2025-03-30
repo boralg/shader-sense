@@ -125,6 +125,7 @@ impl SymbolTreeParser for GlslUniformBlock {
                 stages: vec![],
                 link: None,
                 data: ShaderSymbolData::Struct {
+                    constructors: vec![], // No constructor for uniform.
                     members: matches.captures[1..capture_count - 1]
                         .chunks(2)
                         .map(|w| ShaderParameter {
@@ -202,21 +203,29 @@ impl SymbolTreeParser for GlslStructTreeParser {
         let label_node = matches.captures[0].node;
         let range = ShaderRange::from_range(label_node.range(), file_path.into());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
+        let members = matches.captures[1..]
+            .chunks(2)
+            .map(|w| ShaderParameter {
+                ty: get_name(shader_content, w[0].node).into(),
+                label: get_name(shader_content, w[1].node).into(),
+                description: "".into(),
+            })
+            .collect::<Vec<ShaderParameter>>();
+        let label = get_name(shader_content, label_node).to_string();
         symbols.add_type(ShaderSymbol {
-            label: get_name(shader_content, matches.captures[0].node).into(),
+            label: label.clone(),
             description: "".into(),
             version: "".into(),
             stages: vec![],
             link: None,
             data: ShaderSymbolData::Struct {
-                members: matches.captures[1..]
-                    .chunks(2)
-                    .map(|w| ShaderParameter {
-                        ty: get_name(shader_content, w[0].node).into(),
-                        label: get_name(shader_content, w[1].node).into(),
-                        description: "".into(),
-                    })
-                    .collect::<Vec<ShaderParameter>>(),
+                // In Glsl, constructor are auto built from all there members.
+                constructors: vec![ShaderSignature {
+                    returnType: "void".into(),
+                    description: format!("{} constructor", label),
+                    parameters: members.clone(),
+                }],
+                members: members,
                 methods: vec![],
             },
             range: Some(range),

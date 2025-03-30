@@ -18,7 +18,7 @@ pub struct ShaderParameter {
 #[allow(non_snake_case)] // for JSON
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderSignature {
-    pub returnType: String,
+    pub returnType: String, // Should be an option for constructor
     pub description: String,
     pub parameters: Vec<ShaderParameter>,
 }
@@ -426,12 +426,14 @@ impl ShaderMethod {
 pub enum ShaderSymbolData {
     #[default]
     None,
+    // A bit of duplicate from variables ? Should be struct (Which should be renamed something else)
     Types {
-        ty: String,
+        constructors: Vec<ShaderSignature>,
     },
     Struct {
-        members: Vec<ShaderMember>, // Need a range aswell for hover.
-        methods: Vec<ShaderMethod>, // Need a range aswell for hover.
+        constructors: Vec<ShaderSignature>, // Need a range aswell for hover.
+        members: Vec<ShaderMember>,         // Need a range aswell for hover.
+        methods: Vec<ShaderMethod>,         // Need a range aswell for hover.
     },
     Constants {
         ty: String,
@@ -870,8 +872,9 @@ impl ShaderSymbol {
     pub fn get_type(&self) -> Option<ShaderSymbolType> {
         match &self.data {
             ShaderSymbolData::None => None,
-            ShaderSymbolData::Types { ty: _ } => Some(ShaderSymbolType::Types),
+            ShaderSymbolData::Types { constructors: _ } => Some(ShaderSymbolType::Types),
             ShaderSymbolData::Struct {
+                constructors: _,
                 members: _,
                 methods: _,
             } => Some(ShaderSymbolType::Types),
@@ -895,8 +898,9 @@ impl ShaderSymbol {
     pub fn format(&self) -> String {
         match &self.data {
             ShaderSymbolData::None => format!("Unknown {}", self.label.clone()),
-            ShaderSymbolData::Types { ty } => format!("{}", ty), // ty == label
+            ShaderSymbolData::Types { constructors: _ } => format!("{}", self.label.clone()),
             ShaderSymbolData::Struct {
+                constructors: _,
                 members: _,
                 methods: _,
             } => format!("struct {}", self.label.clone()),
