@@ -193,6 +193,8 @@ impl ServerLanguageFileCache {
                         dependencies.insert(include_uri.clone(), included_file);
                         Ok(ShaderPreprocessorContext::from_defines(include_defines))
                     } else {
+                        // Still re-register deps.
+                        dependencies.insert(include_uri.clone(), included_file);
                         Ok(ShaderPreprocessorContext::default())
                     }
                 },
