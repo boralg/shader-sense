@@ -147,6 +147,7 @@ impl ServerLanguage {
             }
             None => Ok(symbol_list
                 .into_iter()
+                .filter(|(_, ty)| *ty != ShaderSymbolType::CallExpression)
                 .map(|(symbol_list, ty)| {
                     symbol_list
                         .into_iter()
@@ -162,6 +163,9 @@ impl ServerLanguage {
                                     ShaderSymbolType::Keyword => CompletionItemKind::KEYWORD,
                                     ShaderSymbolType::Macros => CompletionItemKind::CONSTANT,
                                     ShaderSymbolType::Include => CompletionItemKind::FILE,
+                                    ShaderSymbolType::CallExpression => {
+                                        unreachable!("Field should be filtered out.")
+                                    }
                                 },
                             )
                         })

@@ -21,8 +21,10 @@ impl ServerLanguage {
                 symbols
                     .iter()
                     .filter(|symbol| {
-                        // Dont publish keywords.
-                        ty != ShaderSymbolType::Keyword && symbol.range.is_some()
+                        // Dont publish keywords & transient.
+                        ty != ShaderSymbolType::Keyword
+                            && !ty.is_transient()
+                            && symbol.range.is_some()
                     })
                     .map(|symbol| {
                         #[allow(deprecated)]
@@ -36,8 +38,8 @@ impl ServerLanguage {
                                 ShaderSymbolType::Functions => SymbolKind::FUNCTION,
                                 ShaderSymbolType::Macros => SymbolKind::CONSTANT,
                                 ShaderSymbolType::Include => SymbolKind::FILE,
-                                ShaderSymbolType::Keyword => {
-                                    unreachable!("Should be filtered out")
+                                ShaderSymbolType::Keyword | ShaderSymbolType::CallExpression => {
+                                    unreachable!("Field should be filtered out")
                                 }
                             },
                             tags: None,

@@ -430,24 +430,33 @@ pub enum ShaderSymbolData {
         ty: String,
     },
     Struct {
-        members: Vec<ShaderMember>,
-        methods: Vec<ShaderMethod>,
+        members: Vec<ShaderMember>, // Need a range aswell for hover.
+        methods: Vec<ShaderMethod>, // Need a range aswell for hover.
     },
     Constants {
         ty: String,
         qualifier: String,
         value: String,
     },
-    Variables {
-        ty: String,
-    },
     Functions {
         signatures: Vec<ShaderSignature>,
     },
     Keyword {},
+    // Mostly runtime, but GLSL has global variable in builtin that need serial.
+    Variables {
+        ty: String,
+    },
+    #[serde(skip)] // This is runtime only. No serialization.
+    CallExpression {
+        label: String,
+        range: ShaderRange, // label range.
+        parameters: Vec<(String, ShaderRange)>,
+    },
+    #[serde(skip)] // This is runtime only. No serialization.
     Link {
         target: ShaderPosition,
     },
+    #[serde(skip)] // This is runtime only. No serialization.
     Macro {
         value: String,
     },
@@ -475,6 +484,7 @@ pub enum ShaderSymbolType {
     Types,
     Constants,
     Variables,
+    CallExpression,
     Functions,
     Keyword,
     Macros,
@@ -489,6 +499,8 @@ pub struct ShaderSymbolList {
     pub types: Vec<ShaderSymbol>,
     pub constants: Vec<ShaderSymbol>,
     pub variables: Vec<ShaderSymbol>,
+    #[serde(skip)] // Only used at runtime.
+    pub call_expression: Vec<ShaderSymbol>,
     pub functions: Vec<ShaderSymbol>,
     pub keywords: Vec<ShaderSymbol>,
     pub macros: Vec<ShaderSymbol>,
@@ -502,55 +514,52 @@ impl ShaderSymbolList {
     }
     pub fn find_symbols_before(
         &self,
-        label: String,
+        label: &String,
         position: &ShaderPosition,
-    ) -> Vec<ShaderSymbol> {
+    ) -> Vec<&ShaderSymbol> {
         self.iter()
-            .map(|e| {
-                e.0.iter()
-                    .filter_map(|e| {
-                        if e.label == label {
-                            match &e.range {
-                                Some(range) => {
-                                    if *position > range.start
-                                        || range.start.file_path != position.file_path
-                                    {
-                                        Some(e.clone())
-                                    } else {
-                                        None
+            .map(|(sl, ty)| {
+                if !ty.is_transient() {
+                    sl.iter()
+                        .filter(|e| {
+                            if e.label == *label {
+                                match &e.range {
+                                    Some(range) => {
+                                        *position > range.start
+                                            || range.start.file_path != position.file_path
                                     }
+                                    None => true,
                                 }
-                                None => Some(e.clone()),
+                            } else {
+                                false
                             }
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<ShaderSymbol>>()
+                        })
+                        .collect::<Vec<&ShaderSymbol>>()
+                } else {
+                    vec![]
+                }
             })
-            .collect::<Vec<Vec<ShaderSymbol>>>()
+            .collect::<Vec<Vec<&ShaderSymbol>>>()
             .concat()
     }
-    pub fn find_symbols(&self, label: String) -> Vec<ShaderSymbol> {
+    pub fn find_symbols(&self, label: &String) -> Vec<&ShaderSymbol> {
         self.iter()
-            .map(|e| {
-                e.0.iter()
-                    .filter_map(|e| {
-                        if e.label == label {
-                            Some(e.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<ShaderSymbol>>()
+            .map(|(sl, ty)| {
+                if !ty.is_transient() {
+                    sl.iter()
+                        .filter_map(|e| if e.label == *label { Some(e) } else { None })
+                        .collect::<Vec<&ShaderSymbol>>()
+                } else {
+                    vec![]
+                }
             })
-            .collect::<Vec<Vec<ShaderSymbol>>>()
+            .collect::<Vec<Vec<&ShaderSymbol>>>()
             .concat()
     }
-    pub fn find_symbol(&self, label: &String) -> Option<ShaderSymbol> {
+    pub fn find_symbol(&self, label: &String) -> Option<&ShaderSymbol> {
         for symbol_list in self.iter() {
             match symbol_list.0.iter().find(|e| e.label == *label) {
-                Some(symbol) => return Some(symbol.clone()),
+                Some(symbol) => return Some(symbol),
                 None => {}
             }
         }
@@ -566,6 +575,8 @@ impl ShaderSymbolList {
         let mut shader_symbol_list_mut = shader_symbol_list;
         self.functions.append(&mut shader_symbol_list_mut.functions);
         self.variables.append(&mut shader_symbol_list_mut.variables);
+        self.call_expression
+            .append(&mut shader_symbol_list_mut.variables);
         self.constants.append(&mut shader_symbol_list_mut.constants);
         self.types.append(&mut shader_symbol_list_mut.types);
         self.keywords.append(&mut shader_symbol_list_mut.keywords);
@@ -594,6 +605,12 @@ impl ShaderSymbolList {
                 .collect(),
             variables: self
                 .variables
+                .iter()
+                .filter(|e| predicate(*e))
+                .cloned()
+                .collect(),
+            call_expression: self
+                .call_expression
                 .iter()
                 .filter(|e| predicate(*e))
                 .cloned()
@@ -629,6 +646,7 @@ impl ShaderSymbolList {
         self.constants.retain(&predicate);
         self.functions.retain(&predicate);
         self.variables.retain(&predicate);
+        self.call_expression.retain(&predicate);
         self.keywords.retain(&predicate);
         self.macros.retain(&predicate);
         self.includes.retain(&predicate);
@@ -697,6 +715,7 @@ impl ShaderSymbolList {
             types: self.types.iter().filter_map(filter_all).collect(),
             constants: self.constants.iter().filter_map(filter_all).collect(),
             variables: self.variables.iter().filter_map(filter_all).collect(),
+            call_expression: self.call_expression.iter().filter_map(filter_all).collect(),
             keywords: self.keywords.iter().filter_map(filter_all).collect(),
             macros: self.macros.iter().filter_map(filter_all).collect(),
             includes: self.includes.iter().filter_map(filter_all).collect(),
@@ -724,8 +743,12 @@ impl<'a> Iterator for ShaderSymbolListIterator<'a> {
                     Some((&self.list.constants, ShaderSymbolType::Constants))
                 }
                 ShaderSymbolType::Variables => {
-                    self.next = Some(ShaderSymbolType::Functions);
+                    self.next = Some(ShaderSymbolType::CallExpression);
                     Some((&self.list.variables, ShaderSymbolType::Variables))
+                }
+                ShaderSymbolType::CallExpression => {
+                    self.next = Some(ShaderSymbolType::Functions);
+                    Some((&self.list.call_expression, ShaderSymbolType::CallExpression))
                 }
                 ShaderSymbolType::Functions => {
                     self.next = Some(ShaderSymbolType::Keyword);
@@ -774,10 +797,17 @@ impl Iterator for ShaderSymbolListIntoIterator {
                     ))
                 }
                 ShaderSymbolType::Variables => {
-                    self.next = Some(ShaderSymbolType::Functions);
+                    self.next = Some(ShaderSymbolType::CallExpression);
                     Some((
                         std::mem::take(&mut self.list.variables),
                         ShaderSymbolType::Variables,
+                    ))
+                }
+                ShaderSymbolType::CallExpression => {
+                    self.next = Some(ShaderSymbolType::Functions);
+                    Some((
+                        std::mem::take(&mut self.list.call_expression),
+                        ShaderSymbolType::CallExpression,
                     ))
                 }
                 ShaderSymbolType::Functions => {
@@ -826,7 +856,42 @@ impl IntoIterator for ShaderSymbolList {
     }
 }
 
+impl ShaderSymbolType {
+    // Transient symbol are not serialized nor used for hover & completion.
+    pub fn is_transient(&self) -> bool {
+        match &self {
+            Self::CallExpression => true,
+            _ => false,
+        }
+    }
+}
+
 impl ShaderSymbol {
+    pub fn get_type(&self) -> Option<ShaderSymbolType> {
+        match &self.data {
+            ShaderSymbolData::None => None,
+            ShaderSymbolData::Types { ty: _ } => Some(ShaderSymbolType::Types),
+            ShaderSymbolData::Struct {
+                members: _,
+                methods: _,
+            } => Some(ShaderSymbolType::Types),
+            ShaderSymbolData::Constants {
+                ty: _,
+                qualifier: _,
+                value: _,
+            } => Some(ShaderSymbolType::Constants),
+            ShaderSymbolData::Variables { ty: _ } => Some(ShaderSymbolType::Variables),
+            ShaderSymbolData::CallExpression {
+                label: _,
+                range: _,
+                parameters: _,
+            } => Some(ShaderSymbolType::CallExpression),
+            ShaderSymbolData::Functions { signatures: _ } => Some(ShaderSymbolType::Functions),
+            ShaderSymbolData::Keyword {} => Some(ShaderSymbolType::Keyword),
+            ShaderSymbolData::Link { target: _ } => Some(ShaderSymbolType::Include),
+            ShaderSymbolData::Macro { value: _ } => Some(ShaderSymbolType::Macros),
+        }
+    }
     pub fn format(&self) -> String {
         match &self.data {
             ShaderSymbolData::None => format!("Unknown {}", self.label.clone()),
@@ -841,6 +906,19 @@ impl ShaderSymbol {
                 value,
             } => format!("{} {} {} = {};", qualifier, ty, self.label.clone(), value),
             ShaderSymbolData::Variables { ty } => format!("{} {}", ty, self.label),
+            ShaderSymbolData::CallExpression {
+                label,
+                range: _,
+                parameters,
+            } => format!(
+                "{}({})",
+                label,
+                parameters
+                    .iter()
+                    .map(|(label, _)| label.clone())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
             ShaderSymbolData::Functions { signatures } => signatures[0].format(&self.label), // TODO: append +1 symbol
             ShaderSymbolData::Keyword {} => format!("{}", self.label.clone()),
             ShaderSymbolData::Link { target } => {

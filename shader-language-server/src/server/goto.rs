@@ -36,7 +36,7 @@ impl ServerLanguage {
         {
             Ok((word, word_range)) => {
                 let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);
-                let matching_symbols = symbol_list.find_symbols_before(word, &shader_position);
+                let matching_symbols = symbol_list.find_symbols_before(&word, &shader_position);
                 Ok(Some(GotoDefinitionResponse::Link(
                     matching_symbols
                         .iter()

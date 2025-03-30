@@ -136,6 +136,7 @@ impl IntrinsicParser for HlslIntrinsicParser {
             types: Vec::new(),
             constants: Vec::new(),
             variables: Vec::new(),
+            call_expression: Vec::new(),
             functions: Vec::new(),
             keywords: Vec::new(),
             macros: Vec::new(),

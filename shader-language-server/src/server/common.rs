@@ -30,6 +30,12 @@ pub fn lsp_range_to_shader_range(range: &lsp_types::Range, file_path: &Path) -> 
         },
     }
 }
+pub fn shader_position_to_lsp_position(position: &ShaderPosition) -> lsp_types::Position {
+    lsp_types::Position {
+        line: position.line,
+        character: position.pos,
+    }
+}
 
 pub fn shader_range_to_location(range: &ShaderRange) -> Location {
     Location::new(

@@ -16,6 +16,7 @@ pub fn get_hlsl_parsers() -> Vec<Box<dyn SymbolTreeParser>> {
         Box::new(HlslFunctionTreeParser { is_field: false }),
         Box::new(HlslStructTreeParser::new()),
         Box::new(HlslVariableTreeParser { is_field: false }),
+        Box::new(HlslCallExpressionTreeParser {}),
     ]
 }
 
@@ -283,6 +284,63 @@ impl SymbolTreeParser for HlslVariableTreeParser {
                 ty: get_name(shader_content, matches.captures[0].node).into(),
             },
             range: Some(range),
+            scope_stack: Some(scope_stack),
+        });
+    }
+}
+
+struct HlslCallExpressionTreeParser {}
+
+impl SymbolTreeParser for HlslCallExpressionTreeParser {
+    fn get_query(&self) -> String {
+        r#"(call_expression
+            function: (identifier) @call.identifier
+            arguments: (argument_list
+                "("
+                [
+                    (
+                        (_) @call.parameter
+                    (",")?)
+                ]*
+                ")"
+            )
+        )"#
+        .into()
+    }
+    fn process_match(
+        &self,
+        matches: tree_sitter::QueryMatch,
+        file_path: &Path,
+        shader_content: &str,
+        scopes: &Vec<ShaderScope>,
+        symbol_builder: &mut ShaderSymbolListBuilder,
+    ) {
+        let label_node = matches.captures[0].node;
+        let range = ShaderRange::from_range(label_node.range(), file_path.into());
+        let scope_stack = self.compute_scope_stack(&scopes, &range);
+        let label = get_name(shader_content, label_node).into();
+        symbol_builder.add_call_expression(ShaderSymbol {
+            label: label,
+            description: "".into(),
+            version: "".into(),
+            stages: vec![],
+            link: None,
+            data: ShaderSymbolData::CallExpression {
+                label: get_name(shader_content, label_node).into(),
+                range: range.clone(),
+                parameters: matches.captures[1..]
+                    .iter()
+                    .enumerate()
+                    .map(|(i, e)| {
+                        // These name are not variable. Should find definition in symbols.
+                        (
+                            format!("param{}:", i),
+                            ShaderRange::from_range(e.node.range(), file_path.into()),
+                        )
+                    })
+                    .collect(),
+            },
+            range: Some(range), // TODO: this should be range of whole expression.
             scope_stack: Some(scope_stack),
         });
     }

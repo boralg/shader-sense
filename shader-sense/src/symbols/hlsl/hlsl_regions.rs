@@ -4,7 +4,7 @@ use tree_sitter::{Query, QueryCursor};
 
 use crate::{
     include::IncludeHandler,
-    shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
+    shader_error::{ShaderDiagnosticSeverity, ShaderError},
     symbols::{
         symbol_parser::{get_name, SymbolRegionFinder},
         symbol_provider::SymbolIncludeCallback,

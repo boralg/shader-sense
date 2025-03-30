@@ -10,7 +10,6 @@ use crate::{
     server::{
         clean_url,
         common::{lsp_range_to_shader_range, read_string_lossy},
-        diagnostic,
     },
 };
 use log::{debug, info, warn};

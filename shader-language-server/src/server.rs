@@ -10,6 +10,7 @@ mod diagnostic;
 mod document_symbol;
 mod goto;
 mod hover;
+mod inlay_hint;
 mod semantic_token;
 pub mod shader_variant; // pub for test.
 mod signature;
@@ -29,8 +30,8 @@ use lsp_types::notification::{
 };
 use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, FoldingRangeRequest,
-    GotoDefinition, HoverRequest, Request, SemanticTokensFullRequest, SignatureHelpRequest,
-    WorkspaceConfiguration, WorkspaceSymbolRequest,
+    GotoDefinition, HoverRequest, InlayHintRequest, Request, SemanticTokensFullRequest,
+    SignatureHelpRequest, WorkspaceConfiguration, WorkspaceSymbolRequest,
 };
 use lsp_types::{
     CompletionOptionsCompletionItem, CompletionParams, CompletionResponse, ConfigurationParams,
@@ -40,8 +41,8 @@ use lsp_types::{
     DocumentSymbolOptions, DocumentSymbolParams, DocumentSymbolResponse, FoldingRange,
     FoldingRangeKind, FoldingRangeParams, FoldingRangeProviderCapability,
     FullDocumentDiagnosticReport, GotoDefinitionParams, HoverParams, HoverProviderCapability,
-    OneOf, RelatedFullDocumentDiagnosticReport, SemanticTokenType, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
+    InlayHintParams, OneOf, RelatedFullDocumentDiagnosticReport, SemanticTokenType,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
     SignatureHelpParams, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
     WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
@@ -137,6 +138,7 @@ impl ServerLanguage {
                     work_done_progress: None,
                 },
             })),
+            inlay_hint_provider: Some(OneOf::Left(true)),
             semantic_tokens_provider: Some(
                 SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
                     work_done_progress_options: WorkDoneProgressOptions {
@@ -359,6 +361,28 @@ impl ServerLanguage {
                     )),
                 }
             }
+            InlayHintRequest::METHOD => {
+                let params: InlayHintParams = serde_json::from_value(req.params)?;
+                profile_scope!("Received inlay hint request #{}: {:#?}", req.id, params);
+                let uri = clean_url(&params.text_document.uri);
+                match self.watched_files.get(&uri) {
+                    Some(cached_file) => {
+                        match self.recolt_inlay_hint(&uri, cached_file, &params.range) {
+                            Ok(inlay_hints) => {
+                                self.connection.send_response::<InlayHintRequest>(
+                                    req.id.clone(),
+                                    Some(inlay_hints),
+                                );
+                            }
+                            Err(_) => todo!(),
+                        }
+                    }
+                    None => self.connection.send_notification_error(format!(
+                        "Trying to visit file that is not watched : {}",
+                        uri
+                    )),
+                }
+            }
             // Provider not enabled as vscode already does this nicely with grammar files
             FoldingRangeRequest::METHOD => {
                 let params: FoldingRangeParams = serde_json::from_value(req.params)?;
@@ -367,6 +391,7 @@ impl ServerLanguage {
                 match self.watched_files.get(&uri) {
                     Some(cached_file) => {
                         let cached_file = RefCell::borrow(&cached_file);
+                        // Adding regions
                         let mut folding_ranges: Vec<FoldingRange> = cached_file
                             .data
                             .preprocessor_cache
@@ -381,6 +406,7 @@ impl ServerLanguage {
                                 collapsed_text: None,
                             })
                             .collect();
+                        // Adding scopes from file
                         let symbol_provider = &self
                             .language_data
                             .get(&cached_file.shading_language)
@@ -398,6 +424,11 @@ impl ServerLanguage {
                                 collapsed_text: None,
                             })
                             .collect();
+                        // Adding struct to scopes.
+                        //cached_file.data.get_symbols().iter().map(|e| e.0.iter().map(|e| match &e.data {
+                        //    // We dont have its range stored here...
+                        //    shader_sense::symbols::symbols::ShaderSymbolData::Struct { members, methods } => todo!(),
+                        //}));
                         folding_ranges.append(&mut folded_scopes);
                         self.connection.send_response::<FoldingRangeRequest>(
                             req.id.clone(),

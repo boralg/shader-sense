@@ -38,7 +38,7 @@ impl ServerLanguage {
                     );
                     let target_cached_file = target_cached_file.borrow();
                     let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);
-                    let matching_symbols = symbol_list.find_symbols_before(word, &shader_position);
+                    let matching_symbols = symbol_list.find_symbols_before(&word, &shader_position);
                     if matching_symbols.len() == 0 {
                         Ok(None)
                     } else {

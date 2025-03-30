@@ -111,6 +111,10 @@ impl ServerLanguage {
         }
     }
 }
+// This could be replaced by an API for inlay parameters.
+// Function definition should store range aswell for each parameter.
+// Issue is that it then rely on updated symbols which might take some time to process.
+// With this, we can update completion instantly in a multithread context, using only content.
 fn get_function_parameter_at_position(
     shader: &String,
     position: Position,
