@@ -297,11 +297,15 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
             function: (identifier) @call.identifier
             arguments: (argument_list
                 "("
-                [
                     (
-                        (_) @call.parameter
-                    (",")?)
-                ]*
+                        [
+                            (identifier)
+                            (number_literal)
+                            (call_expression)
+                            (unary_expression)
+                            (binary_expression)
+                        ] @call.parameter
+                    (",")?)*
                 ")"
             )
         )"#

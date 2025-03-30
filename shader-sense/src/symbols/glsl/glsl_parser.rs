@@ -280,14 +280,15 @@ impl SymbolTreeParser for GlslCallExpressionTreeParser {
             function: (identifier) @call.identifier
             arguments: (argument_list
                 "("
-                [
                     (
-                        (identifier) @call.identifier
-                    (",")?)
-                    (
-                        (number_literal) @call.number_literal
-                    (",")?)
-                ]*
+                        [
+                            (identifier)
+                            (number_literal)
+                            (call_expression)
+                            (unary_expression)
+                            (binary_expression)
+                        ] @call.parameter
+                    (",")?)*
                 ")"
             )
         )"#
