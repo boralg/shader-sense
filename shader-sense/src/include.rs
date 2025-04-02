@@ -43,6 +43,7 @@ impl IncludeHandler {
     pub fn default(file: &Path) -> Self {
         Self::new(file, Vec::new(), HashMap::new())
     }
+    // New main file.
     pub fn new(
         file: &Path,
         includes: Vec<String>,
@@ -52,11 +53,21 @@ impl IncludeHandler {
         let cwd = file.parent().unwrap();
         let mut stack = Vec::new();
         stack.push(cwd.into());
+        Self::new_from_stack(includes, path_remapping, stack)
+    }
+    pub fn new_from_stack(
+        includes: Vec<String>,
+        path_remapping: HashMap<PathBuf, PathBuf>,
+        directory_stack: Vec<PathBuf>,
+    ) -> Self {
         Self {
             includes: includes,
-            directory_stack: stack,
+            directory_stack: directory_stack,
             path_remapping: path_remapping,
         }
+    }
+    pub fn get_directory_stack(&self) -> &Vec<PathBuf> {
+        &self.directory_stack
     }
     pub fn search_in_includes(
         &mut self,

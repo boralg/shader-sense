@@ -1,12 +1,12 @@
 use std::{
     cmp::Ordering,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
 
-use crate::{shader::ShaderStage, shader_error::ShaderDiagnostic};
+use crate::{include::IncludeHandler, shader::ShaderStage, shader_error::ShaderDiagnostic};
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderParameter {
@@ -233,16 +233,37 @@ impl ShaderRegion {
 #[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessorContext {
     pub defines: HashMap<String, String>,
+    pub directory_stack: Vec<PathBuf>,
+    pub visited_dependencies: HashSet<PathBuf>,
 }
 
 impl ShaderPreprocessorContext {
-    pub fn from_defines(defines: Vec<ShaderPreprocessorDefine>) -> Self {
+    pub fn main(defines: Vec<ShaderPreprocessorDefine>) -> Self {
         Self {
             defines: defines
                 .into_iter()
                 .map(|define| (define.name, define.value.unwrap_or("".into())))
                 .collect(),
+            directory_stack: Vec::new(),
+            visited_dependencies: HashSet::new(),
         }
+    }
+    pub fn from_include_handler(
+        defines: Vec<ShaderPreprocessorDefine>,
+        visited_dependencies: HashSet<PathBuf>,
+        include_handler: &IncludeHandler,
+    ) -> Self {
+        Self {
+            defines: defines
+                .into_iter()
+                .map(|define| (define.name, define.value.unwrap_or("".into())))
+                .collect(),
+            directory_stack: include_handler.get_directory_stack().clone(),
+            visited_dependencies: visited_dependencies,
+        }
+    }
+    pub fn visit(&mut self, path: &Path) -> bool {
+        !self.visited_dependencies.insert(path.into())
     }
     pub fn append(&mut self, context: ShaderPreprocessorContext) {
         self.defines.extend(context.defines);

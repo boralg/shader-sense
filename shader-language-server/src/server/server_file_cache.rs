@@ -160,27 +160,28 @@ impl ServerLanguageFileCache {
                     let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
                     let included_file =
                         self.watch_dependency(&include_uri, shading_language, shader_language)?;
-                    let is_include_dirty = match RefCell::borrow(&included_file)
-                        .included_data
-                        .get(&includer_uri)
-                    {
-                        Some(data) => data.preprocessor_cache.context.is_dirty(&context),
-                        None => true, // not set means dirty.
-                    };
                     // Skip already visited deps if once.
-                    // Avoid recomputing deps if not required.
-                    if !visited_deps.contains(&include_uri) && is_include_dirty {
-                        visited_deps.insert(include_uri.clone());
-                        self.recurse_file_symbol(
-                            &include_uri,
-                            &included_file,
-                            includer_uri,
-                            shader_language,
-                            symbol_provider,
-                            context,
-                            include_handler,
-                            visited_deps,
-                        )?;
+                    if !context.visit(&include.absolute_path) {
+                        // Avoid recomputing deps if not required.
+                        let is_include_dirty = match RefCell::borrow(&included_file)
+                            .included_data
+                            .get(&includer_uri)
+                        {
+                            Some(data) => data.preprocessor_cache.context.is_dirty(&context),
+                            None => true, // not set means dirty.
+                        };
+                        if is_include_dirty {
+                            self.recurse_file_symbol(
+                                &include_uri,
+                                &included_file,
+                                includer_uri,
+                                shader_language,
+                                symbol_provider,
+                                context,
+                                include_handler,
+                                visited_deps,
+                            )?;
+                        }
                         // Get context for this file
                         let include_defines = RefCell::borrow(&included_file)
                             .included_data
@@ -191,10 +192,16 @@ impl ServerLanguageFileCache {
                             .clone();
                         // Register deps for current file.
                         dependencies.insert(include_uri.clone(), included_file);
-                        Ok(ShaderPreprocessorContext::from_defines(include_defines))
+                        Ok(ShaderPreprocessorContext::from_include_handler(
+                            include_defines,
+                            visited_deps
+                                .iter()
+                                .map(|e| e.to_file_path().unwrap())
+                                .collect(),
+                            &include_handler,
+                        ))
                     } else {
-                        // Still re-register deps.
-                        dependencies.insert(include_uri.clone(), included_file);
+                        // File already visited. Skip it.
                         Ok(ShaderPreprocessorContext::default())
                     }
                 },
@@ -283,16 +290,43 @@ impl ServerLanguageFileCache {
         // Get symbols for main file.
         if config.symbols {
             profile_scope!("Parsing symbols for file {}", uri);
-            let mut include_handler = IncludeHandler::new(
-                file_path.as_path(),
-                config.includes.clone(),
-                config
-                    .path_remapping
-                    .iter()
-                    .map(|e| (e.0.into(), e.1.into()))
-                    .collect(),
-            );
-            let mut context = ShaderPreprocessorContext::from_defines(
+            // Update all context where file is included.
+            // Could be deferred as it mostly impact when a deps is open in editor & edited.
+            let includer_uris: Vec<Url> = RefCell::borrow(&cached_file)
+                .included_data
+                .iter()
+                .map(|e| e.0.clone())
+                .collect();
+            for includer_uri in includer_uris {
+                let mut as_include_context = match RefCell::borrow(&cached_file)
+                    .included_data
+                    .get(&includer_uri)
+                {
+                    Some(data) => data.preprocessor_cache.context.clone(),
+                    None => return Err(ShaderError::InternalErr("Failed".into())),
+                };
+                let mut as_include_include_handler = IncludeHandler::new_from_stack(
+                    config.includes.clone(),
+                    config
+                        .path_remapping
+                        .iter()
+                        .map(|e| (e.0.into(), e.1.into()))
+                        .collect(),
+                    as_include_context.directory_stack.clone(),
+                );
+                self.recurse_file_symbol(
+                    uri,
+                    cached_file,
+                    &includer_uri,
+                    shader_language,
+                    symbol_provider,
+                    &mut as_include_context,
+                    &mut as_include_include_handler,
+                    &mut HashSet::new(),
+                )?;
+            }
+            // Update opened file context with variant.
+            let mut context = ShaderPreprocessorContext::main(
                 config
                     .defines
                     .iter()
@@ -305,10 +339,17 @@ impl ServerLanguageFileCache {
             );
             // Add variant data if some.
             if let Some(variant) = &shader_variant {
-                for (variable, value) in &variant.defines {
-                    context.defines.insert(variable.clone(), value.clone());
-                }
+                context.defines.extend(variant.defines.clone());
             }
+            let mut include_handler = IncludeHandler::new(
+                file_path.as_path(),
+                config.includes.clone(),
+                config
+                    .path_remapping
+                    .iter()
+                    .map(|e| (e.0.into(), e.1.into()))
+                    .collect(),
+            );
             self.recurse_file_symbol(
                 uri,
                 cached_file,

@@ -43,23 +43,31 @@ pub fn default_include_callback<T: ShadingLanguageTag>(
     context: &mut ShaderPreprocessorContext,
     include_handler: &mut IncludeHandler,
 ) -> Result<ShaderPreprocessorContext, ShaderError> {
-    let mut language = ShaderLanguage::new(T::get_language());
-    let symbol_provider = language.create_symbol_provider();
-    let include_module = language.create_module(
-        &include.absolute_path,
-        std::fs::read_to_string(&include.absolute_path)
-            .unwrap()
-            .as_str(),
-    )?;
-    let include_preprocessor = symbol_provider.query_preprocessor(
-        &include_module,
-        context,
-        include_handler,
-        &mut default_include_callback::<T>,
-    )?;
-    Ok(ShaderPreprocessorContext::from_defines(
-        include_preprocessor.defines,
-    ))
+    let mut visited_dependencies = context.visited_dependencies.clone();
+    if visited_dependencies.insert(include.absolute_path.clone()) {
+        let mut language = ShaderLanguage::new(T::get_language());
+        let symbol_provider = language.create_symbol_provider();
+        let include_module = language.create_module(
+            &include.absolute_path,
+            std::fs::read_to_string(&include.absolute_path)
+                .unwrap()
+                .as_str(),
+        )?;
+        let include_preprocessor = symbol_provider.query_preprocessor(
+            &include_module,
+            context,
+            include_handler,
+            &mut default_include_callback::<T>,
+        )?;
+        Ok(ShaderPreprocessorContext::from_include_handler(
+            include_preprocessor.defines,
+            visited_dependencies,
+            &include_handler,
+        ))
+    } else {
+        // Avoid stack overflow by recomputing same file infinitely.
+        Ok(ShaderPreprocessorContext::default())
+    }
 }
 
 impl SymbolProvider {
