@@ -83,32 +83,32 @@ mod tests {
             };
         let expected_regions = vec![
             // elif
-            set_region(7, 21, 8, 16, true),
-            set_region(9, 32, 10, 16, false),
-            set_region(11, 5, 12, 16, false),
+            set_region(7, 21, 8, 16, true),   // 00
+            set_region(9, 32, 10, 16, false), // 01
+            set_region(11, 5, 12, 16, false), // 02
             // ifdef true
-            set_region(15, 24, 16, 16, true),
-            set_region(17, 5, 18, 16, false),
+            set_region(15, 24, 16, 16, true), // 03
+            set_region(17, 5, 18, 16, false), // 04
             // ifndef
-            set_region(21, 25, 22, 16, false),
-            set_region(23, 5, 24, 16, true),
+            set_region(21, 25, 22, 16, false), // 05
+            set_region(23, 5, 24, 16, true),   // 06
             // ifdef false
-            set_region(27, 28, 28, 16, false),
+            set_region(27, 28, 28, 16, false), // 07
             // if 0
-            set_region(31, 5, 32, 16, false),
+            set_region(31, 5, 32, 16, false), // 08
             // if parenthesized
-            set_region(36, 50, 37, 16, false),
+            set_region(36, 50, 37, 16, false), // 09
             // if binary
-            set_region(41, 43, 42, 16, false),
+            set_region(41, 43, 42, 16, false), // 10
             // if unary
-            set_region(46, 22, 47, 16, false),
+            set_region(46, 22, 47, 16, false), // 11
             // unary defined expression
-            set_region(51, 66, 52, 16, false),
+            set_region(51, 66, 52, 16, false), // 12
             // region depending on region
-            set_region(56, 25, 57, 35, false),
-            set_region(59, 28, 60, 34, false),
+            set_region(56, 25, 57, 35, false), // 13
+            set_region(59, 28, 60, 34, false), // 14
             // included macro
-            set_region(64, 26, 65, 34, false),
+            set_region(64, 26, 65, 34, false), // 15
         ];
         assert!(preprocessor.regions.len() == expected_regions.len());
         for region_index in 0..preprocessor.regions.len() {

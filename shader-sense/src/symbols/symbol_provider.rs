@@ -1,7 +1,7 @@
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
-    include::IncludeHandler,
+    include::{canonicalize, IncludeHandler},
     shader::ShadingLanguageTag,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
 };
@@ -35,16 +35,15 @@ pub type SymbolIncludeCallback<'a> = dyn FnMut(
         ShaderPreprocessorInclude,
         &mut ShaderPreprocessorContext,
         &mut IncludeHandler,
-    ) -> Result<ShaderPreprocessorContext, ShaderError>
+    ) -> Result<(), ShaderError>
     + 'a;
 
 pub fn default_include_callback<T: ShadingLanguageTag>(
     include: ShaderPreprocessorInclude,
     context: &mut ShaderPreprocessorContext,
     include_handler: &mut IncludeHandler,
-) -> Result<ShaderPreprocessorContext, ShaderError> {
-    let mut visited_dependencies = context.visited_dependencies.clone();
-    if visited_dependencies.insert(include.absolute_path.clone()) {
+) -> Result<(), ShaderError> {
+    if !context.has_visited(&include.absolute_path) {
         let mut language = ShaderLanguage::new(T::get_language());
         let symbol_provider = language.create_symbol_provider();
         let include_module = language.create_module(
@@ -53,20 +52,16 @@ pub fn default_include_callback<T: ShadingLanguageTag>(
                 .unwrap()
                 .as_str(),
         )?;
-        let include_preprocessor = symbol_provider.query_preprocessor(
+        let _include_preprocessor = symbol_provider.query_preprocessor(
             &include_module,
             context,
             include_handler,
             &mut default_include_callback::<T>,
         )?;
-        Ok(ShaderPreprocessorContext::from_include_handler(
-            include_preprocessor.defines,
-            visited_dependencies,
-            &include_handler,
-        ))
+        Ok(())
     } else {
-        // Avoid stack overflow by recomputing same file infinitely.
-        Ok(ShaderPreprocessorContext::default())
+        // Avoid stack overflow by not recomputing same file infinitely.
+        Ok(())
     }
 }
 
@@ -167,6 +162,13 @@ impl SymbolProvider {
         include_handler: &mut IncludeHandler,
         include_callback: &'a mut SymbolIncludeCallback<'a>,
     ) -> Result<ShaderPreprocessor, ShaderError> {
+        // Update context.
+        context
+            .visited_dependencies
+            .insert(symbol_tree.file_path.clone());
+        if let Some(parent) = symbol_tree.file_path.parent() {
+            context.directory_stack.push(canonicalize(parent).unwrap());
+        }
         let mut preprocessor = ShaderPreprocessor::new(context.clone());
         for parser in &self.preprocessor_parsers {
             let mut query_cursor = QueryCursor::new();

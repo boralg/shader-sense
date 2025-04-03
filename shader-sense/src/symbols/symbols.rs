@@ -6,7 +6,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::{include::IncludeHandler, shader::ShaderStage, shader_error::ShaderDiagnostic};
+use crate::{shader::ShaderStage, shader_error::ShaderDiagnostic};
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderParameter {
@@ -248,25 +248,22 @@ impl ShaderPreprocessorContext {
             visited_dependencies: HashSet::new(),
         }
     }
-    pub fn from_include_handler(
+    pub fn from_config(
         defines: Vec<ShaderPreprocessorDefine>,
         visited_dependencies: HashSet<PathBuf>,
-        include_handler: &IncludeHandler,
+        directory_stack: Vec<PathBuf>,
     ) -> Self {
         Self {
             defines: defines
                 .into_iter()
                 .map(|define| (define.name, define.value.unwrap_or("".into())))
                 .collect(),
-            directory_stack: include_handler.get_directory_stack().clone(),
+            directory_stack: directory_stack,
             visited_dependencies: visited_dependencies,
         }
     }
-    pub fn visit(&mut self, path: &Path) -> bool {
-        !self.visited_dependencies.insert(path.into())
-    }
-    pub fn append(&mut self, context: ShaderPreprocessorContext) {
-        self.defines.extend(context.defines);
+    pub fn has_visited(&self, path: &Path) -> bool {
+        self.visited_dependencies.contains(path)
     }
     pub fn append_defines(&mut self, defines: Vec<ShaderPreprocessorDefine>) {
         for define in defines {

@@ -392,8 +392,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         .collect::<Vec<ShaderPreprocessorDefine>>();
                     context.append_defines(define_before_include);
                     // https://stevedonovan.github.io/rustifications/2018/08/18/rust-closures-are-hard.html
-                    let included_context = include_callback(include, context, include_handler)?;
-                    context.append(included_context);
+                    include_callback(include, context, include_handler)?;
                 }
                 // Process regions
                 let (is_active_region, region_start) = match cursor.node().kind() {
@@ -621,9 +620,21 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 .cloned()
                 .collect::<Vec<ShaderPreprocessorDefine>>();
             context.append_defines(define_before_include);
-            let included_context = include_callback(include, context, include_handler)?;
-            context.append(included_context);
+            include_callback(include, context, include_handler)?;
         }
+        let define_after_last_include = preprocessor
+            .defines
+            .iter()
+            .filter(|define| match &define.range {
+                Some(range) => match preprocessor.includes.last() {
+                    Some(last_include) => range.start > last_include.range.end,
+                    None => true, // No include in file
+                },
+                None => true, // Global
+            })
+            .cloned()
+            .collect::<Vec<ShaderPreprocessorDefine>>();
+        context.append_defines(define_after_last_include);
 
         Ok(regions)
     }
