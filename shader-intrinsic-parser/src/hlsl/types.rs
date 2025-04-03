@@ -1,6 +1,8 @@
 use shader_sense::{
     shader::ShaderStage,
-    symbols::symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolList},
+    symbols::symbols::{
+        ShaderParameter, ShaderSignature, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
+    },
 };
 
 use super::HlslIntrinsicParser;
@@ -16,7 +18,15 @@ pub fn new_hlsl_scalar(label: &str, description: &str, version: &str) -> ShaderS
                 .into(),
         ),
         data: ShaderSymbolData::Types {
-            constructors: vec![],
+            constructors: vec![ShaderSignature {
+                returnType: "".into(),
+                description: format!("Constructor for type {}", label),
+                parameters: vec![ShaderParameter {
+                    ty: label.into(),
+                    label: "value".into(),
+                    description: "".into(),
+                }],
+            }],
         },
         range: None,
         scope_stack: None,
