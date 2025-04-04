@@ -83,13 +83,17 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
                     version: "".into(),
                     stages: vec![],
                     link: None,
-                    data: ShaderSymbolData::Variables { ty: ty.clone() },
+                    data: ShaderSymbolData::Variables {
+                        ty: ty.clone(),
+                        count: None,
+                    },
                     range: Some(ShaderRange::from_range(w[1].node.range(), file_path)),
                     scope_stack: Some(parameter_scope_stack.clone()),
                 });
                 ShaderParameter {
                     ty: ty,
                     label: label,
+                    count: None,
                     description: "".into(),
                 }
             })
@@ -212,8 +216,13 @@ impl SymbolTreeParser for HlslStructTreeParser {
                     .iter()
                     .map(|f| ShaderMember {
                         label: f.label.clone(),
-                        ty: if let ShaderSymbolData::Variables { ty } = &f.data {
+                        ty: if let ShaderSymbolData::Variables { ty, count: _ } = &f.data {
                             ty.clone()
+                        } else {
+                            panic!("Invalid variable type");
+                        },
+                        count: if let ShaderSymbolData::Variables { ty: _, count } = &f.data {
+                            count.clone()
                         } else {
                             panic!("Invalid variable type");
                         },
@@ -249,12 +258,24 @@ impl SymbolTreeParser for HlslVariableTreeParser {
         let field_prestring = if self.is_field { "field_" } else { "" };
         format!(
             r#"({}declaration
+            (qualifiers)?
             type: (_) @variable.type
-            declarator: [(init_declarator
-                declarator: (identifier) @variable.label
-                value: (_) @variable.value
-            ) 
-            ({}identifier) @variable.label
+            declarator: [
+                (init_declarator
+                    declarator: [
+                        (identifier) @variable.label
+                        (array_declarator
+                            declarator: (identifier) @variable.label
+                            size: (_) @variable.size
+                        )
+                    ]
+                    value: (_)
+                ) 
+                (array_declarator
+                    declarator: (identifier) @variable.label
+                    size: (_) @variable.size
+                )
+                ({}identifier) @variable.label
             ]
         )"#,
             field_prestring, field_prestring
@@ -268,21 +289,27 @@ impl SymbolTreeParser for HlslVariableTreeParser {
         scopes: &Vec<ShaderScope>,
         symbol_builder: &mut ShaderSymbolListBuilder,
     ) {
+        let type_node = matches.captures[0].node;
         let label_node = matches.captures[1].node;
+        let size_node = if matches.captures.len() == 3 {
+            Some(matches.captures[2].node)
+        } else {
+            None
+        };
         let range = ShaderRange::from_range(label_node.range(), file_path.into());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
-        // Check if its parameter or struct element.
-        let _type_qualifier = get_name(shader_content, matches.captures[0].node);
-        // TODO: handle values & qualifiers..
-        //let _value = get_name(shader_content, matche.captures[2].node);
         symbol_builder.add_variable(ShaderSymbol {
-            label: get_name(shader_content, matches.captures[1].node).into(),
+            label: get_name(shader_content, label_node).into(),
             description: "".into(),
             version: "".into(),
             stages: vec![],
             link: None,
             data: ShaderSymbolData::Variables {
-                ty: get_name(shader_content, matches.captures[0].node).into(),
+                ty: get_name(shader_content, type_node).into(),
+                count: size_node.map(|s| match get_name(shader_content, s).parse::<u32>() {
+                    Ok(value) => value,
+                    Err(_) => 0, // TODO: Need to resolve the parameter. Could use proxy tree same as for region conditions. For now, simply return zero.
+                }),
             },
             range: Some(range),
             scope_stack: Some(scope_stack),

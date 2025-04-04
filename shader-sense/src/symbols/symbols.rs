@@ -12,6 +12,7 @@ use crate::{shader::ShaderStage, shader_error::ShaderDiagnostic};
 pub struct ShaderParameter {
     pub ty: String,
     pub label: String,
+    pub count: Option<u32>,
     pub description: String,
 }
 
@@ -416,6 +417,7 @@ impl ShaderMember {
             link: None,
             data: ShaderSymbolData::Variables {
                 ty: self.ty.clone(),
+                count: self.count,
             },
             range: None, // Should have a position ?
             scope_stack: None,
@@ -465,6 +467,7 @@ pub enum ShaderSymbolData {
     // Mostly runtime, but GLSL has global variable in builtin that need serial.
     Variables {
         ty: String,
+        count: Option<u32>,
     },
     #[serde(skip)] // This is runtime only. No serialization.
     CallExpression {
@@ -901,7 +904,7 @@ impl ShaderSymbol {
                 qualifier: _,
                 value: _,
             } => Some(ShaderSymbolType::Constants),
-            ShaderSymbolData::Variables { ty: _ } => Some(ShaderSymbolType::Variables),
+            ShaderSymbolData::Variables { ty: _, count: _ } => Some(ShaderSymbolType::Variables),
             ShaderSymbolData::CallExpression {
                 label: _,
                 range: _,
@@ -927,7 +930,10 @@ impl ShaderSymbol {
                 qualifier,
                 value,
             } => format!("{} {} {} = {};", qualifier, ty, self.label.clone(), value),
-            ShaderSymbolData::Variables { ty } => format!("{} {}", ty, self.label),
+            ShaderSymbolData::Variables { ty, count } => match count {
+                Some(count) => format!("{} {}[{}]", ty, self.label, count),
+                None => format!("{} {}", ty, self.label),
+            },
             ShaderSymbolData::CallExpression {
                 label,
                 range: _,

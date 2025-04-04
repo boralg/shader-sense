@@ -77,6 +77,7 @@ impl SymbolTreeParser for GlslFunctionTreeParser {
                         .map(|w| ShaderParameter {
                             ty: get_name(shader_content, w[0].node).into(),
                             label: get_name(shader_content, w[1].node).into(),
+                            count: None,
                             description: "".into(),
                         })
                         .collect::<Vec<ShaderParameter>>(),
@@ -131,6 +132,7 @@ impl SymbolTreeParser for GlslUniformBlock {
                         .map(|w| ShaderParameter {
                             ty: get_name(shader_content, w[0].node).into(),
                             label: get_name(shader_content, w[1].node).into(),
+                            count: None,
                             description: "".into(),
                         })
                         .collect::<Vec<ShaderParameter>>(),
@@ -150,6 +152,7 @@ impl SymbolTreeParser for GlslUniformBlock {
                 link: None,
                 data: ShaderSymbolData::Variables {
                     ty: get_name(shader_content, identifier_node).into(),
+                    count: None,
                 },
                 range: Some(variable_range),
                 scope_stack: None, // Uniform are global stack in GLSL.
@@ -168,6 +171,7 @@ impl SymbolTreeParser for GlslUniformBlock {
                     link: None,
                     data: ShaderSymbolData::Variables {
                         ty: get_name(shader_content, uniform_value[0].node).into(),
+                        count: None,
                     },
                     range: Some(range),
                     scope_stack: None, // Uniform are global stack in GLSL.
@@ -208,6 +212,7 @@ impl SymbolTreeParser for GlslStructTreeParser {
             .map(|w| ShaderParameter {
                 ty: get_name(shader_content, w[0].node).into(),
                 label: get_name(shader_content, w[1].node).into(),
+                count: None,
                 description: "".into(),
             })
             .collect::<Vec<ShaderParameter>>();
@@ -274,6 +279,7 @@ impl SymbolTreeParser for GlslVariableTreeParser {
             link: None,
             data: ShaderSymbolData::Variables {
                 ty: get_name(shader_content, matches.captures[0].node).into(),
+                count: None,
             },
             range: Some(range),
             scope_stack: Some(scope_stack),

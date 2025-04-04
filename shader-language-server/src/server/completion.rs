@@ -72,7 +72,9 @@ impl ServerLanguage {
                         let mut current_symbol = match chain_list.next() {
                             Some(next_item) => match symbol_list.find_symbol(&next_item.0) {
                                 Some(symbol) => {
-                                    if let ShaderSymbolData::Variables { ty } = &symbol.data {
+                                    if let ShaderSymbolData::Variables { ty, count: _ } =
+                                        &symbol.data
+                                    {
                                         match symbol_list.find_type_symbol(ty) {
                                             Some(ty_symbol) => ty_symbol,
                                             None => {
@@ -109,7 +111,7 @@ impl ServerLanguage {
                                     }
                                 };
                             // find next element
-                            if let ShaderSymbolData::Variables { ty } = &symbol.data {
+                            if let ShaderSymbolData::Variables { ty, count: _ } = &symbol.data {
                                 match symbol_list.find_type_symbol(ty) {
                                     Some(ty_symbol) => current_symbol = ty_symbol,
                                     None => {

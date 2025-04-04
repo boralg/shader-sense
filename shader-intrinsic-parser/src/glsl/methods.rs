@@ -58,6 +58,7 @@ impl GlslIntrinsicParser {
                                         Some(ShaderParameter {
                                             ty: param_type.trim().into(),
                                             label: param_name.trim().into(),
+                                            count: None,
                                             description: "".into(),
                                         })
                                     }
@@ -168,7 +169,10 @@ impl GlslIntrinsicParser {
                     version: "".to_string(),
                     stages: Vec::new(),
                     link: Some(link.clone()),
-                    data: ShaderSymbolData::Variables { ty: ty.into() },
+                    data: ShaderSymbolData::Variables {
+                        ty: ty.into(),
+                        count: None,
+                    },
                     range: None,
                     scope_stack: None,
                 });

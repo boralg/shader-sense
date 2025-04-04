@@ -49,6 +49,7 @@ impl SymbolTreeParser for WgslStructTreeParser {
                     .map(|w| ShaderParameter {
                         ty: get_name(shader_content, w[1].node).into(),
                         label: get_name(shader_content, w[0].node).into(),
+                        count: None,
                         description: "".into(),
                     })
                     .collect::<Vec<ShaderParameter>>(),

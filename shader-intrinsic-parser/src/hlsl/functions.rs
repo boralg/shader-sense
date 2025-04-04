@@ -39,6 +39,7 @@ impl HlslIntrinsicParser {
                         returnType: v.format(),
                         description: "".into(),
                         parameters: vec![ShaderParameter {
+                            count: None,
                             ty: v.format(),
                             label: "x".into(),
                             description: "The specified value.".into(),
@@ -59,6 +60,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value. Each component should be a floating-point value within the range of -1 to 1.".into(),
@@ -77,6 +79,7 @@ impl HlslIntrinsicParser {
                 returnType: "bool".into(),
                 description: "True if all components of the x parameter are non-zero; otherwise, false.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -95,6 +98,7 @@ impl HlslIntrinsicParser {
                 returnType: "bool".into(),
                 description: "True if any components of the x parameter are non-zero; otherwise, false.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -145,11 +149,13 @@ impl HlslIntrinsicParser {
                     description: "The input (two 32-bit values) recast as a double.".into(),
                     parameters: vec![
                         ShaderParameter {
+                            count: None,
                             ty: "in uint".into(),
                             label: "lowbits".into(),
                             description: "The low 32-bit pattern of the input value.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "in uint".into(),
                             label: "highbits".into(),
                             description: "The high 32-bit pattern of the input value.".into(),
@@ -170,6 +176,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format_with_type("float"),
                 description: "The input interpreted as a floating-point number.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The input value.".into(),
@@ -188,6 +195,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format_with_type("int"),
                 description: "The input interpreted as an integer.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The input value.".into(),
@@ -206,6 +214,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format_with_type("uint"),
                 description: "The input interpreted as an unsigned integer.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The input value.".into(),
@@ -224,6 +233,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The arcsine of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -242,6 +252,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The arctangent of the x parameter. This value is within the range of -π/2 to π/2.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -260,11 +271,13 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The arctangent of (y,x).".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "y".into(),
                     description: "The y value.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The x value.".into(),
@@ -281,6 +294,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The smallest integer value (returned as a floating-point type) that is greater than or equal to the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -299,6 +313,7 @@ impl HlslIntrinsicParser {
                 returnType: "bool".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "uint".into(),
                     label: "status".into(),
                     description: "The status value that is returned from a Sample, Gather, or Load operation. Because you can't access this status value directly, you need to pass it to CheckAccessFullyMapped.".into(),
@@ -317,16 +332,19 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "A value to clamp.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "min".into(),
                     description: " The specified minimum range.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "max".into(),
                     description: " The specified maximum range.".into(),
@@ -345,6 +363,7 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "bool".into(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -369,6 +388,7 @@ impl HlslIntrinsicParser {
                         returnType: v.format(),
                         description: "The cosine of the x parameter.".into(),
                         parameters: vec![ShaderParameter {
+                            count: None,
                             ty: v.format(),
                             label: "x".into(),
                             description: "The specified value, in radians.".into(),
@@ -395,6 +415,7 @@ impl HlslIntrinsicParser {
                         returnType: v.format(),
                         description: "The hyperbolic cosine of the x parameter.".into(),
                         parameters: vec![ShaderParameter {
+                            count: None,
                             ty: v.format(),
                             label: "x".into(),
                             description: "The specified value, in radians.".into(),
@@ -421,6 +442,7 @@ impl HlslIntrinsicParser {
                         returnType: v.format(),
                         description: "The number of bits.".into(),
                         parameters: vec![ShaderParameter {
+                            count: None,
                             ty: v.format(),
                             label: "value".into(),
                             description: "The input value.".into(),
@@ -441,11 +463,13 @@ impl HlslIntrinsicParser {
                 returnType: "float3".into(),
                 description: "The cross product of the x parameter and the y parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float3".into(),
                     label: "x".into(),
                     description: "The first floating-point, 3D vector.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float3".into(),
                     label: "y".into(),
                     description: "The second floating-point, 3D vector.".into(),
@@ -464,6 +488,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The partial derivative of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -482,6 +507,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The low precision partial derivative of value.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -500,6 +526,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The high precision partial derivative of value.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -518,6 +545,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The partial derivative of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -536,6 +564,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The low precision partial derivative of value.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -554,6 +583,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The high precision partial derivative of value.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -572,6 +602,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The result of converting the x parameter from radians to degrees.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -590,6 +621,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format_as_scalar(),
                 description: "The floating-point, scalar value that represents the determinant of the m parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -636,11 +668,13 @@ impl HlslIntrinsicParser {
                 returnType: v.format_as_scalar(),
                 description: "A floating-point, scalar value that represents the distance between the x parameter and the y parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The first floating-point vector to compare.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "y".into(),
                     description: "The second floating-point vector to compare.".into(),
@@ -667,11 +701,13 @@ impl HlslIntrinsicParser {
                             .into(),
                         parameters: vec![
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "x".into(),
                                 description: "The first vector.".into(),
                             },
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "y".into(),
                                 description: "The second vector.".into(),
@@ -700,11 +736,13 @@ impl HlslIntrinsicParser {
                         description: "The computed distance vector.".into(),
                         parameters: vec![
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "x".into(),
                                 description: "The first vector.".into(),
                             },
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "y".into(),
                                 description: "The second vector.".into(),
@@ -730,11 +768,13 @@ impl HlslIntrinsicParser {
                     description: "".into(),
                     parameters: vec![
                         ShaderParameter {
+                            count: None,
                             ty: "string".into(),
                             label: "message".into(),
                             description: "The format string.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "...".into(),
                             description: "Optional arguments.".into(),
@@ -755,6 +795,7 @@ impl HlslIntrinsicParser {
                 returnType: "attrib".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "attrib".into(),
                     label: "value".into(),
                     description: "The input value.".into(),
@@ -773,11 +814,13 @@ impl HlslIntrinsicParser {
                 returnType: "attrib".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "attrib".into(),
                     label: "value".into(),
                     description: "The input value.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "uint".into(),
                     label: "sampleindex".into(),
                     description: "The sample location.".into(),
@@ -796,11 +839,13 @@ impl HlslIntrinsicParser {
                 returnType: "attrib".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "attrib".into(),
                     label: "value".into(),
                     description: "The input value.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "int2".into(),
                     label: "offset".into(),
                     description: "A 2D offset from the pixel center using a 16x16 grid.".into(),
@@ -825,6 +870,7 @@ impl HlslIntrinsicParser {
                         returnType: v.format(),
                         description: "The base-e exponential of the x parameter.".into(),
                         parameters: vec![ShaderParameter {
+                            count: None,
                             ty: v.format(),
                             label: "x".into(),
                             description: "The input value.".into(),
@@ -845,6 +891,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The base 2 exponential of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The input value.".into(),
@@ -869,6 +916,7 @@ impl HlslIntrinsicParser {
                         returnType: v.format_with_type("float"),
                         description: "The converted value.".into(),
                         parameters: vec![ShaderParameter {
+                            count: None,
                             ty: v.format(),
                             label: "x".into(),
                             description: "The input value.".into(),
@@ -894,6 +942,7 @@ impl HlslIntrinsicParser {
                         returnType: v.format_with_type("uint"),
                         description: "The converted value.".into(),
                         parameters: vec![ShaderParameter {
+                            count: None,
                             ty: v.format(),
                             label: "x".into(),
                             description: "The input value.".into(),
@@ -914,14 +963,17 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "A floating-point, surface normal vector that is facing the view direction.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "n".into(),
                     description: "The resulting floating-point surface-normal vector.".into(),
                 },ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "i".into(),
                     description: "A floating-point, incident vector that points from the view position to the shading position.".into(),
                 },ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "ng".into(),
                     description: "A floating-point surface-normal vector.".into(),
@@ -940,6 +992,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The location of the first set bit.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "value".into(),
                     description: "The input value.".into(),
@@ -958,6 +1011,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The location of the first set bit.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "value".into(),
                     description: "The input value.".into(),
@@ -976,6 +1030,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The largest integer value (returned as a floating-point type) that is less than or equal to the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "value".into(),
                     description: "The input value.".into(),
@@ -994,16 +1049,19 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The double-precision fused multiply-addition of parameters a * b + c. The returned value must be accurate to 0.5 units of least precision (ULP).".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "a".into(),
                     description: "The first value in the fused multiply-addition.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "b".into(),
                     description: "The second value in the fused multiply-addition.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "c".into(),
                     description: "The third value in the fused multiply-addition.".into(),
@@ -1022,11 +1080,13 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The floating-point remainder of the x parameter divided by the y parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: " The floating-point dividend.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "y".into(),
                     description: "The floating-point divisor.".into(),
@@ -1045,6 +1105,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The fractional part of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -1063,11 +1124,13 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The mantissa of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified floating-point value. If the x parameter is 0, this function returns 0 for both the mantissa and the exponent.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     // TODO: should add qualifier field.
                     ty: format!("out {}", v.format()),
                     label: "exp".into(),
@@ -1087,6 +1150,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The absolute value of the partial derivatives of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -1119,6 +1183,7 @@ impl HlslIntrinsicParser {
                 returnType: "float2".into(),
                 description: "The (x,y) position of the given sample.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "int".into(),
                     label: "index".into(),
                     description: "".into() 
@@ -1171,16 +1236,19 @@ impl HlslIntrinsicParser {
                     description: "".into(),
                     parameters: vec![
                         ShaderParameter {
+                            count: None,
                             ty: "R".into(),
                             label: "dest".into(),
                             description: "The destination address.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "value".into(),
                             description: "The input value.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "original_value".into(),
                             description: "Optional. The original input value.".into(),
@@ -1206,16 +1274,19 @@ impl HlslIntrinsicParser {
                     description: "".into(),
                     parameters: vec![
                         ShaderParameter {
+                            count: None,
                             ty: "R".into(),
                             label: "dest".into(),
                             description: "The destination address.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "value".into(),
                             description: "The input value.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "original_value".into(),
                             description: "Optional. The original input value.".into(),
@@ -1236,21 +1307,25 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "R".into(),
                     label: "dest".into(),
                     description: "The destination address.".into() 
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "compare_value".into(),
                     description: "The comparison value.".into() 
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "value".into(),
                     description: "The input value.".into() 
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "original_value".into(),
                     description: "Optional. The original input value.".into() 
@@ -1269,16 +1344,19 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "R".into(),
                     label: "dest".into(),
                     description: "The destination address.".into() 
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "value".into(),
                     description: "The input value.".into() 
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "original_value".into(),
                     description: "Optional. The original input value.".into() 
@@ -1302,16 +1380,19 @@ impl HlslIntrinsicParser {
                     description: "".into(),
                     parameters: vec![
                         ShaderParameter {
+                            count: None,
                             ty: "R".into(),
                             label: "dest".into(),
                             description: "The destination address.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "value".into(),
                             description: "The input value.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "original_value".into(),
                             description: "Optional. The original input value.".into(),
@@ -1337,16 +1418,19 @@ impl HlslIntrinsicParser {
                     description: "".into(),
                     parameters: vec![
                         ShaderParameter {
+                            count: None,
                             ty: "R".into(),
                             label: "dest".into(),
                             description: "The destination address.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "value".into(),
                             description: "The input value.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "original_value".into(),
                             description: "Optional. The original input value.".into(),
@@ -1372,16 +1456,19 @@ impl HlslIntrinsicParser {
                     description: "".into(),
                     parameters: vec![
                         ShaderParameter {
+                            count: None,
                             ty: "R".into(),
                             label: "dest".into(),
                             description: "The destination address.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "value".into(),
                             description: "The input value.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "original_value".into(),
                             description: "Optional. The original input value.".into(),
@@ -1406,16 +1493,19 @@ impl HlslIntrinsicParser {
                     description: "".into(),
                     parameters: vec![
                         ShaderParameter {
+                            count: None,
                             ty: "R".into(),
                             label: "dest".into(),
                             description: "The destination address.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "value".into(),
                             description: "The input value.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "original_value".into(),
                             description: "Optional. The original input value.".into(),
@@ -1441,16 +1531,19 @@ impl HlslIntrinsicParser {
                     description: "".into(),
                     parameters: vec![
                         ShaderParameter {
+                            count: None,
                             ty: "R".into(),
                             label: "dest".into(),
                             description: "The destination address.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "value".into(),
                             description: "The input value.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "original_value".into(),
                             description: "Optional. The original input value.".into(),
@@ -1471,6 +1564,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format_with_type("bool"),
                 description: "Returns a value of the same size as the input, with a value set to True if the x parameter is finite; otherwise False.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -1489,6 +1583,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format_with_type("bool"),
                 description: "Returns a value of the same size as the input, with a value set to True if the x parameter is +INF or -INF. Otherwise, False.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -1507,6 +1602,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format_with_type("bool"),
                 description: "Returns a value of the same size as the input, with a value set to True if the x parameter is NAN or QNAN. Otherwise, False.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -1525,11 +1621,13 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The result of multiplying the x parameter by two, raised to the power of the exp parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "exp".into(),
                     description: "The specified exponent.".into(),
@@ -1548,6 +1646,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "A floating-point scalar that represents the length of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format_as_scalar(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -1566,16 +1665,19 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The result of the linear interpolation.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The first-floating point value.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The second-floating point value.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "s".into(),
                     description: "A value that linearly interpolates between the x parameter and the y parameter.".into(),
@@ -1594,16 +1696,19 @@ impl HlslIntrinsicParser {
                 returnType: "float4".into(),
                 description: "The lighting coefficient vector.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "n_dot_l".into(),
                     description: "The dot product of the normalized surface normal and the light vector.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "n_dot_h".into(),
                     description: "The dot product of the half-angle vector and the surface normal.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "m".into(),
                     description: "A specular exponent.".into(),
@@ -1622,6 +1727,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The base-e logarithm of the x parameter. If the x parameter is negative, this function returns indefinite. If the x parameter is 0, this function returns -INF.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -1640,6 +1746,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The base-10 logarithm of the x parameter. If the x parameter is negative, this function returns indefinite. If the x is 0, this function returns -INF.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -1658,6 +1765,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The base-2 logarithm of the x parameter. If the x parameter is negative, this function returns indefinite. If the x is 0, this function returns +INF.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -1680,16 +1788,19 @@ impl HlslIntrinsicParser {
                         description: "The result of mvalue * avalue + bvalue.".into(),
                         parameters: vec![
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "m".into(),
                                 description: "The multiplication value.".into(),
                             },
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "a".into(),
                                 description: "The first addition value.".into(),
                             },
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "b".into(),
                                 description: "The second addition value..".into(),
@@ -1718,11 +1829,13 @@ impl HlslIntrinsicParser {
                         description: "The x or y parameter, whichever is the largest value.".into(),
                         parameters: vec![
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "x".into(),
                                 description: "The x input value.".into(),
                             },
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "y".into(),
                                 description: "The y input value.".into(),
@@ -1752,11 +1865,13 @@ impl HlslIntrinsicParser {
                             .into(),
                         parameters: vec![
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "x".into(),
                                 description: "The x input value.".into(),
                             },
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "y".into(),
                                 description: "The y input value.".into(),
@@ -1778,11 +1893,13 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The signed-fractional portion of x.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The x input value.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "ip".into(),
                     description: "The integer portion of x.".into(),
@@ -1801,16 +1918,19 @@ impl HlslIntrinsicParser {
                 returnType: "uint4".into(),
                 description: "A vector of 4 sums. Each sum corresponds to the masked sum of absolute differences of different byte alignments between the reference value and the source value. msad4 doesn't include a difference in the sum if that difference is masked (that is, the reference byte is 0).".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "uint".into(),
                     label: "reference".into(),
                     description: "The reference array of 4 bytes in one uint value.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "uint2".into(),
                     label: "source".into(),
                     description: "The source array of 8 bytes in two uint2 values.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "uint4".into(),
                     label: "accum".into(),
                     description: "A vector of 4 values. msad4 adds this vector to the masked sum of absolute differences of the different byte alignments between the reference value and the source value.".into(),
@@ -1830,11 +1950,13 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The result of x times y. The result has the dimension x-rows x y-columns.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The x input value. If x is a vector, it treated as a row vector.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "y".into(),
                     description: " The y input value. If y is a vector, it treated as a column vector.".into(),
@@ -1853,6 +1975,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format_as_scalar(),
                 description: "The Perlin noise value within a range between -1 and 1.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "A floating-point vector from which to generate Perlin noise.".into(),
@@ -1871,6 +1994,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format_as_scalar(),
                 description: "The normalized x parameter. If the length of the x parameter is 0, the result is indefinite.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified floating-point vector.".into(),
@@ -1897,11 +2021,13 @@ impl HlslIntrinsicParser {
                             .into(),
                         parameters: vec![
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "x".into(),
                                 description: "The specified value.".into(),
                             },
                             ShaderParameter {
+                                count: None,
                                 ty: v.format(),
                                 label: "y".into(),
                                 description: "The specified power.".into(),
@@ -1927,11 +2053,13 @@ impl HlslIntrinsicParser {
                     description: "".into(),
                     parameters: vec![
                         ShaderParameter {
+                            count: None,
                             ty: "string".into(),
                             label: "message".into(),
                             description: "The format string.".into(),
                         },
                         ShaderParameter {
+                            count: None,
                             ty: "T".into(),
                             label: "...".into(),
                             description: "Optional arguments.".into(),
@@ -1952,26 +2080,31 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RawEdgeFactors".into(),
                     description: "The edge tessellation factors, passed into the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "InsideScale".into(),
                     description: "The scale factor applied to the UV tessellation factors computed by the tessellation stage. The allowable range for InsideScale is 0.0 to 1.0.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RoundedEdgeTessFactors".into(),
                     description: "The rounded edge-tessellation factors calculated by the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "RoundedInsideTessFactors".into(),
                     description: "The rounded tessellation factors calculated by the tessellator stage for inside edges.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "UnroundedInsideTessFactors".into(),
                     description: "The tessellation factors calculated by the tessellator stage for inside edges.".into(),
@@ -1990,26 +2123,31 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RawEdgeFactors".into(),
                     description: "The edge tessellation factors, passed into the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "InsideScale".into(),
                     description: "The scale factor applied to the UV tessellation factors computed by the tessellation stage. The allowable range for InsideScale is 0.0 to 1.0.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RoundedEdgeTessFactors".into(),
                     description: "The rounded edge-tessellation factors calculated by the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "RoundedInsideTessFactors".into(),
                     description: "The rounded tessellation factors calculated by the tessellator stage for inside edges.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "UnroundedInsideTessFactors".into(),
                     description: "The tessellation factors calculated by the tessellator stage for inside edges.".into(),
@@ -2028,26 +2166,31 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RawEdgeFactors".into(),
                     description: "The edge tessellation factors, passed into the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "InsideScale".into(),
                     description: "The scale factor applied to the UV tessellation factors computed by the tessellation stage. The allowable range for InsideScale is 0.0 to 1.0.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RoundedEdgeTessFactors".into(),
                     description: "The rounded edge-tessellation factors calculated by the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "RoundedInsideTessFactors".into(),
                     description: "The rounded tessellation factors calculated by the tessellator stage for inside edges.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "UnroundedInsideTessFactors".into(),
                     description: "The tessellation factors calculated by the tessellator stage for inside edges.".into(),
@@ -2066,21 +2209,25 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "RawDetailFactor".into(),
                     description: "The desired detail factor.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "RawDensityFactor".into(),
                     description: "The desired density factor.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "RoundedDetailFactor".into(),
                     description: "The rounded detail factor clamped to a range that can be used by the tessellator.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "RoundedDensityFactor".into(),
                     description: "The rounded density factor clamped to a rangethat can be used by the tessellator.".into(),
@@ -2099,26 +2246,31 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RawEdgeFactors".into(),
                     description: "The edge tessellation factors, passed into the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "InsideScale".into(),
                     description: "The scale factor applied to the UV tessellation factors computed by the tessellation stage. The allowable range for InsideScale is 0.0 to 1.0.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RoundedEdgeTessFactors".into(),
                     description: "The rounded edge-tessellation factors calculated by the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "RoundedInsideTessFactors".into(),
                     description: "The rounded tessellation factors calculated by the tessellator stage for inside edges.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "UnroundedInsideTessFactors".into(),
                     description: "The tessellation factors calculated by the tessellator stage for inside edges.".into(),
@@ -2137,26 +2289,31 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RawEdgeFactors".into(),
                     description: "The edge tessellation factors, passed into the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "InsideScale".into(),
                     description: "The scale factor applied to the UV tessellation factors computed by the tessellation stage. The allowable range for InsideScale is 0.0 to 1.0.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RoundedEdgeTessFactors".into(),
                     description: "The rounded edge-tessellation factors calculated by the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "RoundedInsideTessFactors".into(),
                     description: "The rounded tessellation factors calculated by the tessellator stage for inside edges.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "UnroundedInsideTessFactors".into(),
                     description: "The tessellation factors calculated by the tessellator stage for inside edges.".into(),
@@ -2175,26 +2332,31 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RawEdgeFactors".into(),
                     description: "The edge tessellation factors, passed into the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "InsideScale".into(),
                     description: "The scale factor applied to the UV tessellation factors computed by the tessellation stage. The allowable range for InsideScale is 0.0 to 1.0.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RoundedEdgeTessFactors".into(),
                     description: "The rounded edge-tessellation factors calculated by the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "RoundedInsideTessFactors".into(),
                     description: "The rounded tessellation factors calculated by the tessellator stage for inside edges.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float2".into(),
                     label: "UnroundedInsideTessFactors".into(),
                     description: "The tessellation factors calculated by the tessellator stage for inside edges.".into(),
@@ -2213,26 +2375,31 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RawEdgeFactors".into(),
                     description: "The edge tessellation factors, passed into the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "InsideScale".into(),
                     description: "The scale factor applied to the UV tessellation factors computed by the tessellation stage. The allowable range for InsideScale is 0.0 to 1.0.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float3".into(),
                     label: "RoundedEdgeTessFactors".into(),
                     description: "The rounded edge-tessellation factors calculated by the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "RoundedInsideTessFactors".into(),
                     description: "The rounded tessellation factors calculated by the tessellator stage for inside edges.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "UnroundedInsideTessFactors".into(),
                     description: "The tessellation factors calculated by the tessellator stage for inside edges.".into(),
@@ -2251,26 +2418,31 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RawEdgeFactors".into(),
                     description: "The edge tessellation factors, passed into the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "InsideScale".into(),
                     description: "The scale factor applied to the UV tessellation factors computed by the tessellation stage. The allowable range for InsideScale is 0.0 to 1.0.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float3".into(),
                     label: "RoundedEdgeTessFactors".into(),
                     description: "The rounded edge-tessellation factors calculated by the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "RoundedInsideTessFactors".into(),
                     description: "The rounded tessellation factors calculated by the tessellator stage for inside edges.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "UnroundedInsideTessFactors".into(),
                     description: "The tessellation factors calculated by the tessellator stage for inside edges.".into(),
@@ -2289,26 +2461,31 @@ impl HlslIntrinsicParser {
                 returnType: "void".into(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "float4".into(),
                     label: "RawEdgeFactors".into(),
                     description: "The edge tessellation factors, passed into the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "InsideScale".into(),
                     description: "The scale factor applied to the UV tessellation factors computed by the tessellation stage. The allowable range for InsideScale is 0.0 to 1.0.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float3".into(),
                     label: "RoundedEdgeTessFactors".into(),
                     description: "The rounded edge-tessellation factors calculated by the tessellator stage.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "RoundedInsideTessFactors".into(),
                     description: "The rounded tessellation factors calculated by the tessellator stage for inside edges.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "float".into(),
                     label: "UnroundedInsideTessFactors".into(),
                     description: "The tessellation factors calculated by the tessellator stage for inside edges.".into(),
@@ -2327,6 +2504,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The x parameter converted from degrees to radians.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -2348,6 +2526,7 @@ impl HlslIntrinsicParser {
                         returnType: v.format(),
                         description: "The reciprocal of the x parameter.".into(),
                         parameters: vec![ShaderParameter {
+                            count: None,
                             ty: v.format(),
                             label: "x".into(),
                             description: "The specified value.".into(),
@@ -2368,11 +2547,13 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "A floating-point, reflection vector.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "i".into(),
                     description: "A floating-point, incident vector.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "n".into(),
                     description: "A floating-point, normal vector.".into(),
@@ -2391,16 +2572,19 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "A floating-point, refraction vector. If the angle between the entering ray i and the surface normal n is too great for a given refraction index ?, the return value is (0,0,0).".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "i".into(),
                     description: "A floating-point, ray direction vector.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "n".into(),
                     description: "A floating-point, surface normal vector.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format_as_scalar(),
                     label: "f".into(),
                     description: "A floating-point, refraction index scalar.".into(),
@@ -2424,6 +2608,7 @@ impl HlslIntrinsicParser {
                         returnType: v.format(),
                         description: "The input value, with the bit order reversed.".into(),
                         parameters: vec![ShaderParameter {
+                            count: None,
                             ty: v.format(),
                             label: "value".into(),
                             description: "The input value.".into(),
@@ -2444,6 +2629,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The x parameter, rounded to the nearest integer within a floating-point type.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -2462,6 +2648,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The reciprocal of the square root of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -2480,6 +2667,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The x parameter, clamped within the range of 0 to 1.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value.".into(),
@@ -2498,6 +2686,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "Returns -1 if x is less than zero; 0 if x equals zero; and 1 if x is greater than zero.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The input value.".into(),
@@ -2522,6 +2711,7 @@ impl HlslIntrinsicParser {
                         returnType: v.format(),
                         description: "The sine of the x parameter.".into(),
                         parameters: vec![ShaderParameter {
+                            count: None,
                             ty: v.format(),
                             label: "x".into(),
                             description: "The input value.".into(),
@@ -2542,16 +2732,19 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value, in radians.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: format!("out {}", v.format()),
                     label: "s".into(),
                     description: "Returns the sine of x.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: format!("out {}", v.format()),
                     label: "c".into(),
                     description: "Returns the cosine of x.".into(),
@@ -2570,6 +2763,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The hyperbolic sine of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value, in radians.".into(),
@@ -2588,16 +2782,19 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "Returns 0 if x is less than min; 1 if x is greater than max; otherwise, a value between 0 and 1 if x is in the range [min, max].".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "min".into(),
                     description: "The minimum range of the x parameter.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "max".into(),
                     description: "The maximum range of the x parameter.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value to be interpolated.".into(),
@@ -2616,6 +2813,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The square root of the x parameter, per component.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified floating-point value.".into(),
@@ -2634,11 +2832,13 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "1 if the x parameter is greater than or equal to the y parameter; otherwise, 0.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "y".into(),
                     description: "The first floating-point value to compare.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The second floating-point value to compare.".into(),
@@ -2663,6 +2863,7 @@ impl HlslIntrinsicParser {
                         returnType: v.format(),
                         description: "The tangent of the x parameter.".into(),
                         parameters: vec![ShaderParameter {
+                            count: None,
                             ty: v.format(),
                             label: "x".into(),
                             description: "The specified value, in radians.".into(),
@@ -2683,6 +2884,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The hyperbolic tangent of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified value, in radians.".into(),
@@ -2708,11 +2910,13 @@ impl HlslIntrinsicParser {
                     returnType: "float4".into(),
                     description: "The value of the texture data.".into(),
                     parameters: vec![ShaderParameter {
+                    count: None,
                         ty: format!("sampler{}", dim_text),
                         label: "s".into(),
                         description: "The sampler state.".into(),
                     },
                     ShaderParameter {
+                    count: None,
                         ty: format!("float{}", dim),
                         label: "t".into(),
                         description: "The texture coordinate.".into(),
@@ -2731,21 +2935,25 @@ impl HlslIntrinsicParser {
                     returnType: "float4".into(),
                     description: "The value of the texture data.".into(),
                     parameters: vec![ShaderParameter {
+                    count: None,
                         ty: format!("sampler{}", dim_text),
                         label: "s".into(),
                         description: "The sampler state.".into(),
                     },
                     ShaderParameter {
+                    count: None,
                         ty: format!("float{}", dim),
                         label: "t".into(),
                         description: "The texture coordinate.".into(),
                     },
                     ShaderParameter {
+                    count: None,
                         ty: format!("float{}", dim),
                         label: "ddx".into(),
                         description: "Rate of change of the surface geometry in the x direction.".into(),
                     },
                     ShaderParameter {
+                    count: None,
                         ty: format!("float{}", dim),
                         label: "ddy".into(),
                         description: "Rate of change of the surface geometry in the y direction.".into(),
@@ -2764,11 +2972,13 @@ impl HlslIntrinsicParser {
                     returnType: "float4".into(),
                     description: "The value of the texture data.".into(),
                     parameters: vec![ShaderParameter {
+                    count: None,
                         ty: format!("sampler{}", dim_text),
                         label: "s".into(),
                         description: "The sampler state.".into(),
                     },
                     ShaderParameter {
+                    count: None,
                         ty: format!("float{}", dim),
                         label: "t".into(),
                         description: "The texture coordinate.".into(),
@@ -2787,21 +2997,25 @@ impl HlslIntrinsicParser {
                     returnType: "float4".into(),
                     description: "The value of the texture data.".into(),
                     parameters: vec![ShaderParameter {
+                    count: None,
                         ty: format!("sampler{}", dim_text),
                         label: "s".into(),
                         description: "The sampler state.".into(),
                     },
                     ShaderParameter {
+                    count: None,
                         ty: format!("float{}", dim),
                         label: "t".into(),
                         description: "The texture coordinate.".into(),
                     },
                     ShaderParameter {
+                    count: None,
                         ty: format!("float{}", dim),
                         label: "ddx".into(),
                         description: "Rate of change of the surface geometry in the x direction.".into(),
                     },
                     ShaderParameter {
+                    count: None,
                         ty: format!("float{}", dim),
                         label: "ddy".into(),
                         description: "Rate of change of the surface geometry in the y direction.".into(),
@@ -2820,11 +3034,13 @@ impl HlslIntrinsicParser {
                     returnType: "float4".into(),
                     description: "The value of the texture data.".into(),
                     parameters: vec![ShaderParameter {
+                    count: None,
                         ty: format!("sampler{}", dim_text),
                         label: "s".into(),
                         description: "The sampler state.".into(),
                     },
                     ShaderParameter {
+                    count: None,
                         ty: "float4".into(),
                         label: "t".into(),
                         description: "The texture coordinate.".into(),
@@ -2843,11 +3059,13 @@ impl HlslIntrinsicParser {
                     returnType: "float4".into(),
                     description: "The value of the texture data.".into(),
                     parameters: vec![ShaderParameter {
+                    count: None,
                         ty: format!("sampler{}", dim_text),
                         label: "s".into(),
                         description: "The sampler state.".into(),
                     },
                     ShaderParameter {
+                    count: None,
                         ty: "float4".into(),
                         label: "t".into(),
                         description: "The texture coordinate.".into(),
@@ -2867,6 +3085,7 @@ impl HlslIntrinsicParser {
                 returnType: "float".into(),
                 description: "The transposed value of the x parameter.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "s".into(),
                     description: "The specified matrix.".into(),
@@ -2885,6 +3104,7 @@ impl HlslIntrinsicParser {
                 returnType: "float".into(),
                 description: "The input value truncated to an integer component.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "x".into(),
                     description: "The specified input.".into(),
@@ -2904,6 +3124,7 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The specified local value which is read from the diagonally opposite lane in this quad.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "localValue".into(),
                     description: "The requested type.".into(),
@@ -2922,10 +3143,12 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The specified source value. The result of this function is uniform across the quad. If the source lane is inactive, the results are undefined.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "localValue".into(),
                     description: "The requested type.".into(),
                 }, ShaderParameter {
+                    count: None,
                     ty: "uint".into(),
                     label: "quadLaneID".into(),
                     description: "The lane ID; this will be a value from 0 to 3.".into(),
@@ -2944,6 +3167,7 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The specified local value. If the source lane is inactive, the results are undefined.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "localValue".into(),
                     description: "The requested type.".into(),
@@ -2962,6 +3186,7 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The specified local value. If the source lane is inactive, the results are undefined.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "localValue".into(),
                     description: "The requested type.".into(),
@@ -2980,6 +3205,7 @@ impl HlslIntrinsicParser {
                 returnType: "booln".into(),
                 description: "Returns true for each component of expr that is the same for every active lane in the current wave.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "expr".into(),
                     description: "The expression to evaluate. type can be a basic scalar, vector, or matrix type.".into(),
@@ -2998,6 +3224,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The bitwise AND value.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "expr".into(),
                     description: "The expression to evaluate.".into(),
@@ -3016,6 +3243,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The bitwise OR value.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "expr".into(),
                     description: "The expression to evaluate.".into(),
@@ -3034,6 +3262,7 @@ impl HlslIntrinsicParser {
                 returnType: v.format(),
                 description: "The bitwise XOR value.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: v.format(),
                     label: "expr".into(),
                     description: "The expression to evaluate.".into(),
@@ -3052,6 +3281,7 @@ impl HlslIntrinsicParser {
                 returnType: "uint".into(),
                 description: "The number of lanes for which the boolean variable evaluates to true, across all active lanes in the current wave.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "bool".into(),
                     label: "bBit".into(),
                     description: "The boolean variables to evaluate. Providing an explicit true Boolean value returns the number of active lanes.".into(),
@@ -3070,6 +3300,7 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The maximum value.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "expr".into(),
                     description: "The expression to evaluate.".into(),
@@ -3088,6 +3319,7 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The minimum value.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "expr".into(),
                     description: "The expression to evaluate.".into(),
@@ -3106,6 +3338,7 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The product value.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "expr".into(),
                     description: "The expression to evaluate.".into(),
@@ -3124,6 +3357,7 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The sum value.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "expr".into(),
                     description: "The expression to evaluate.".into(),
@@ -3147,6 +3381,7 @@ impl HlslIntrinsicParser {
                     returnType: "bool".into(),
                     description: "True if the expression is true in all lanes.".into(),
                     parameters: vec![ShaderParameter {
+                        count: None,
                         ty: "bool".into(),
                         label: "expr".into(),
                         description: "The expression to evaluate.".into(),
@@ -3166,6 +3401,7 @@ impl HlslIntrinsicParser {
                 returnType: "bool".into(),
                 description: "True if the expression is true in any lane.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "bool".into(),
                     label: "expr".into(),
                     description: "The expression to evaluate.".into(),
@@ -3184,6 +3420,7 @@ impl HlslIntrinsicParser {
                 returnType: "uint4".into(),
                 description: "A uint4 containing a bitmask of the evaluation of the Boolean expression for all active lanes in the current wave. The least-significant bit corresponds to the lane with index zero. The bits corresponding to inactive lanes will be zero. The bits that are greater than or equal to WaveGetLaneCount will be zero.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "bool".into(),
                     label: "expr".into(),
                     description: "The boolean expression to evaluate.".into(),
@@ -3253,6 +3490,7 @@ impl HlslIntrinsicParser {
                 returnType: "uint".into(),
                 description: "The sum of all the specified Boolean variables set to true across all active lanes with indices smaller than the current lane.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "bool".into(),
                     label: "bBit".into(),
                     description: "The specified boolean variables.".into(),
@@ -3271,6 +3509,7 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The product of all the values.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "value".into(),
                     description: "The value to multiply.".into(),
@@ -3289,6 +3528,7 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The sum of the values.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "value".into(),
                     description: "The value to sum up.".into(),
@@ -3307,6 +3547,7 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The resulting value is uniform across the wave.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "expr".into(),
                     description: "The expression to evaluate.".into(),
@@ -3325,11 +3566,13 @@ impl HlslIntrinsicParser {
                 returnType: "T".into(),
                 description: "The resulting value is the result of expr. It will be uniform if laneIndex is uniform.".into(),
                 parameters: vec![ShaderParameter {
+                    count: None,
                     ty: "T".into(),
                     label: "expr".into(),
                     description: "The expression to evaluate.".into(),
                 },
                 ShaderParameter {
+                    count: None,
                     ty: "uint".into(),
                     label: "laneIndex".into(),
                     description: "The index of the lane for which the expr result will be returned.".into(),

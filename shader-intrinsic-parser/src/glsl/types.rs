@@ -20,6 +20,7 @@ impl GlslIntrinsicParser {
                         parameters: vec![ShaderParameter {
                             ty: label.into(),
                             label: "value".into(),
+                            count: None,
                             description: "".into(),
                         }],
                     }],

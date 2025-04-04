@@ -24,6 +24,7 @@ pub fn new_hlsl_scalar(label: &str, description: &str, version: &str) -> ShaderS
                 parameters: vec![ShaderParameter {
                     ty: label.into(),
                     label: "value".into(),
+                    count: None,
                     description: "".into(),
                 }],
             }],

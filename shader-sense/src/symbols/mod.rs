@@ -262,7 +262,7 @@ mod tests {
             .iter()
             .find(|e| e.label == "u_accessor"
                 && match &e.data {
-                    ShaderSymbolData::Variables { ty } => ty == "MatrixHidden",
+                    ShaderSymbolData::Variables { ty, count: _ } => ty == "MatrixHidden",
                     _ => false,
                 })
             .is_some());
