@@ -144,7 +144,6 @@ impl ServerLanguageFileCache {
         context: &mut ShaderPreprocessorContext,
     ) {
         let cached_file = RefCell::borrow(&cached_file);
-        debug!("OUI: {:#?}", cached_file.included_data);
         let data = cached_file.included_data.get(&includer_uri).unwrap();
         context.append_defines(data.preprocessor_cache.defines.clone());
         let file_path = uri.to_file_path().unwrap();
