@@ -61,8 +61,21 @@ void main() {
     #error "Should not be reached"
 #endif
 
-// included macro
+// macro included before
 #ifndef OTHER_CUSTOM_MACRO
     #error "Should not be reached"
 #endif
+
+// macro defined after
+#ifdef MACRO_LATER
+    #error "Should not be reached"
+#endif
+
+// macro included after
+#ifdef OTHER_OTHER_CUSTOM_MACRO
+    #error "Should not be reached"
+#endif
 }
+// Some post region definitions here.
+#include "macro_other.hlsl"
+#define MACRO_LATER 1

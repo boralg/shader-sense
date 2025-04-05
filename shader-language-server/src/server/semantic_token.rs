@@ -30,8 +30,14 @@ impl ServerLanguage {
                         if range.start.file_path == file_path {
                             range.start.to_byte_offset(content).unwrap()
                         } else {
-                            // TODO: should check where include is to get offset.
-                            0 // Included from another file.
+                            match RefCell::borrow(&cached_file)
+                                .find_root_include_of_dependency(&range.start.file_path)
+                            {
+                                Some(include) => {
+                                    include.range.start.to_byte_offset(content).unwrap()
+                                }
+                                None => 0, // Included from another file, but not found...
+                            }
                         }
                     }
                     None => 0, // No range means its everywhere

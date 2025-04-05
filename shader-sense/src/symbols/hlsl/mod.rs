@@ -107,8 +107,12 @@ mod tests {
             // region depending on region
             set_region(56, 25, 57, 35, false), // 13
             set_region(59, 28, 60, 34, false), // 14
-            // included macro
+            // macro included before
             set_region(64, 26, 65, 34, false), // 15
+            // macro defined after
+            set_region(69, 18, 70, 34, false), // 16
+            // macro included after
+            set_region(74, 31, 75, 34, false), // 17
         ];
         assert!(preprocessor.regions.len() == expected_regions.len());
         for region_index in 0..preprocessor.regions.len() {

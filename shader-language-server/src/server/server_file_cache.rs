@@ -23,8 +23,8 @@ use shader_sense::{
         symbol_provider::SymbolProvider,
         symbol_tree::SymbolTree,
         symbols::{
-            ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine, ShaderSymbol,
-            ShaderSymbolData, ShaderSymbolList,
+            ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine,
+            ShaderPreprocessorInclude, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
         },
     },
     validator::validator::Validator,
@@ -50,11 +50,97 @@ pub struct ServerFileCache {
     pub included_data: HashMap<Url, ServerFileCacheData>, // Data per entry point for context, data might change depending on it, and file might be included multiple times.
 }
 
+impl ServerFileCache {
+    // Find the direct dependency from which this dependency is included.
+    // None means its not included.
+    pub fn find_root_include_of_dependency(
+        &self,
+        dependency_to_find_path: &Path,
+    ) -> Option<&ShaderPreprocessorInclude> {
+        let includer_uri = Url::from_file_path(&self.symbol_tree.file_path).unwrap();
+        match self
+            .data
+            .preprocessor_cache
+            .includes
+            .iter()
+            .find(|e| e.absolute_path == *dependency_to_find_path)
+        {
+            Some(include) => Some(include),
+            None => {
+                let mut visited_dependencies = HashSet::new();
+                for (dependency_url, dependency_file) in &self.data.dependencies {
+                    if RefCell::borrow(dependency_file)
+                        .included_data
+                        .get(&includer_uri)
+                        .unwrap()
+                        .has_dependency(
+                            dependency_to_find_path,
+                            &includer_uri,
+                            &mut visited_dependencies,
+                        )
+                    {
+                        let dependency_path = dependency_url.to_file_path().unwrap();
+                        match self
+                            .data
+                            .preprocessor_cache
+                            .includes
+                            .iter()
+                            .find(|i| i.absolute_path == dependency_path)
+                        {
+                            Some(include) => return Some(include),
+                            None => panic!(
+                                "Dependency {} is registered but not found in preproc cache",
+                                dependency_path.display()
+                            ),
+                        }
+                    }
+                }
+                None
+            }
+        }
+    }
+}
+
 impl ServerFileCacheData {
     pub fn get_symbols(&self) -> ShaderSymbolList {
         let mut symbols = self.symbol_cache.clone();
         self.preprocessor_cache.preprocess_symbols(&mut symbols);
         symbols
+    }
+    fn has_dependency(
+        &self,
+        dependency_to_find_path: &Path,
+        includer_uri: &Url,
+        visited_dependencies: &mut HashSet<Url>,
+    ) -> bool {
+        match self
+            .preprocessor_cache
+            .includes
+            .iter()
+            .find(|e| e.absolute_path == *dependency_to_find_path)
+        {
+            Some(_) => true,
+            None => {
+                for (dependency_url, dependency_file) in &self.dependencies {
+                    if !visited_dependencies.contains(dependency_url) {
+                        visited_dependencies.insert(dependency_url.clone());
+                        if RefCell::borrow(dependency_file)
+                            .included_data
+                            .get(includer_uri)
+                            .unwrap()
+                            .has_dependency(
+                                dependency_to_find_path,
+                                includer_uri,
+                                visited_dependencies,
+                            )
+                        {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+        }
     }
     fn dump_dependency_node(
         &self,

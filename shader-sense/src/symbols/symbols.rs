@@ -548,6 +548,7 @@ impl ShaderSymbolList {
                             if e.label == *label {
                                 match &e.range {
                                     Some(range) => {
+                                        // TODO: should filter from other file with include range, but no access to it from there...
                                         *position > range.start
                                             || range.start.file_path != position.file_path
                                     }
