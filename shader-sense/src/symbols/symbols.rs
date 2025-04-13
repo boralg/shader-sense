@@ -1,12 +1,14 @@
 use std::{
     cmp::Ordering,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
 
 use crate::{shader::ShaderStage, shader_error::ShaderDiagnostic};
+
+use super::symbol_tree::ShaderSymbols;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderParameter {
@@ -170,7 +172,7 @@ impl ShaderPosition {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ShaderRange {
     pub start: ShaderPosition,
     pub end: ShaderPosition,
@@ -214,11 +216,6 @@ impl ShaderRange {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct ShaderSymbolParams {
-    pub defines: HashMap<String, String>,
-}
-
-#[derive(Debug, Default, Clone)]
 pub struct ShaderRegion {
     pub range: ShaderRange,
     // Could add some ShaderRegionType::Condition / ShaderRegionType::User...
@@ -235,10 +232,17 @@ impl ShaderRegion {
 pub struct ShaderPreprocessorContext {
     pub defines: HashMap<String, String>,
     pub directory_stack: Vec<PathBuf>,
-    pub visited_dependencies: HashSet<PathBuf>,
+    pub visited_dependencies: HashMap<PathBuf, bool>,
 }
 
 impl ShaderPreprocessorContext {
+    pub fn from_defines(defines: HashMap<String, String>) -> Self {
+        Self {
+            defines: defines,
+            directory_stack: Vec::new(),
+            visited_dependencies: HashMap::new(),
+        }
+    }
     pub fn main(defines: Vec<ShaderPreprocessorDefine>) -> Self {
         Self {
             defines: defines
@@ -246,12 +250,12 @@ impl ShaderPreprocessorContext {
                 .map(|define| (define.name, define.value.unwrap_or("".into())))
                 .collect(),
             directory_stack: Vec::new(),
-            visited_dependencies: HashSet::new(),
+            visited_dependencies: HashMap::new(),
         }
     }
     pub fn from_config(
         defines: Vec<ShaderPreprocessorDefine>,
-        visited_dependencies: HashSet<PathBuf>,
+        visited_dependencies: HashMap<PathBuf, bool>,
         directory_stack: Vec<PathBuf>,
     ) -> Self {
         Self {
@@ -262,9 +266,6 @@ impl ShaderPreprocessorContext {
             directory_stack: directory_stack,
             visited_dependencies: visited_dependencies,
         }
-    }
-    pub fn has_visited(&self, path: &Path) -> bool {
-        self.visited_dependencies.contains(path)
     }
     pub fn append_defines(&mut self, defines: Vec<ShaderPreprocessorDefine>) {
         for define in defines {
@@ -283,6 +284,7 @@ pub struct ShaderPreprocessorInclude {
     pub relative_path: String,
     pub absolute_path: PathBuf,
     pub range: ShaderRange,
+    pub cache: Option<ShaderSymbols>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -317,6 +319,7 @@ impl ShaderPreprocessorInclude {
             relative_path,
             absolute_path,
             range,
+            cache: None,
         }
     }
 }

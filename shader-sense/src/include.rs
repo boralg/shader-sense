@@ -66,9 +66,6 @@ impl IncludeHandler {
             path_remapping: path_remapping,
         }
     }
-    pub fn get_directory_stack(&self) -> &Vec<PathBuf> {
-        &self.directory_stack
-    }
     pub fn search_in_includes(
         &mut self,
         relative_path: &Path,

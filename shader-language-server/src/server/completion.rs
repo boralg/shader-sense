@@ -11,7 +11,7 @@ use shader_sense::{
     symbols::symbols::{ShaderPosition, ShaderSymbol, ShaderSymbolData, ShaderSymbolType},
 };
 
-use super::{ServerFileCacheHandle, ServerLanguage};
+use super::ServerLanguage;
 
 impl ServerLanguage {
     fn list_members_and_methods(&self, symbol: &ShaderSymbol) -> Vec<ShaderSymbol> {
@@ -35,19 +35,18 @@ impl ServerLanguage {
     pub fn recolt_completion(
         &mut self,
         uri: &Url,
-        cached_file: ServerFileCacheHandle,
         position: Position,
         trigger_character: Option<String>,
     ) -> Result<Vec<CompletionItem>, ShaderError> {
-        let cached_file_borrowed = RefCell::borrow(&cached_file);
+        let cached_file = self.watched_files.get_file(uri).unwrap();
         let language_data = self
             .language_data
-            .get_mut(&cached_file_borrowed.shading_language)
+            .get_mut(&cached_file.shading_language)
             .unwrap();
         let file_path = uri.to_file_path().unwrap();
-        let symbol_list =
-            self.watched_files
-                .get_all_symbols(uri, &cached_file, &language_data.language);
+        let symbol_list = self
+            .watched_files
+            .get_all_symbols(uri, &language_data.language);
         let shader_position = ShaderPosition {
             file_path: file_path.clone(),
             line: position.line as u32,
@@ -64,7 +63,7 @@ impl ServerLanguage {
                 match language_data
                     .symbol_provider
                     .get_word_chain_range_at_position(
-                        &cached_file_borrowed.symbol_tree,
+                        &RefCell::borrow(&cached_file.shader_module),
                         &shader_position,
                     ) {
                     Ok(chain) => {
@@ -136,7 +135,7 @@ impl ServerLanguage {
                                     CompletionItemKind::VARIABLE
                                 };
                                 convert_completion_item(
-                                    cached_file_borrowed.shading_language,
+                                    cached_file.shading_language,
                                     s,
                                     completion_kind,
                                 )
@@ -160,7 +159,7 @@ impl ServerLanguage {
                         .into_iter()
                         .map(|s| {
                             convert_completion_item(
-                                cached_file_borrowed.shading_language,
+                                cached_file.shading_language,
                                 s,
                                 match ty {
                                     ShaderSymbolType::Types => CompletionItemKind::TYPE_PARAMETER,

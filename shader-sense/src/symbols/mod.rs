@@ -25,6 +25,7 @@ mod tests {
         shader_error::ShaderError,
         symbols::{
             shader_language::ShaderLanguage,
+            symbol_provider::ShaderSymbolParams,
             symbols::{ShaderPosition, ShaderSymbolData},
         },
     };
@@ -78,29 +79,27 @@ mod tests {
         let deps = find_dependencies(&mut include_handler, &shader_content);
         let mut all_symbols = language.get_intrinsics_symbol().clone();
         let symbol_tree = language.create_module(file_path, shader_content).unwrap();
-        let preprocessor = symbol_provider
-            .query_preprocessor(
+        let symbols = symbol_provider
+            .query_symbols(
                 &symbol_tree,
-                &mut ShaderPreprocessorContext::default(),
-                &mut IncludeHandler::default(file_path),
-                &mut default_include_callback::<T>,
+                ShaderSymbolParams::default(),
+                &mut default_include_callback::<GlslShadingLanguageTag>,
+                None,
             )
             .unwrap();
-        let mut symbols = symbol_provider.query_file_symbols(&symbol_tree)?;
-        preprocessor.preprocess_symbols(&mut symbols);
+        let symbols = symbols.get_all_symbols();
         all_symbols.append(symbols);
         for dep in deps {
             let symbol_tree = language.create_module(&dep.1, &dep.0).unwrap();
-            let preprocessor = symbol_provider
-                .query_preprocessor(
+            let symbols = symbol_provider
+                .query_symbols(
                     &symbol_tree,
-                    &mut ShaderPreprocessorContext::default(),
-                    &mut IncludeHandler::default(file_path),
-                    &mut default_include_callback::<T>,
+                    ShaderSymbolParams::default(),
+                    &mut default_include_callback::<GlslShadingLanguageTag>,
+                    None,
                 )
                 .unwrap();
-            let mut symbols = symbol_provider.query_file_symbols(&symbol_tree)?;
-            preprocessor.preprocess_symbols(&mut symbols);
+            let symbols = symbols.get_all_symbols();
             all_symbols.append(symbols);
         }
         Ok(all_symbols)
@@ -135,16 +134,15 @@ mod tests {
         let mut language = ShaderLanguage::new(ShadingLanguage::Glsl);
         let symbol_provider = language.create_symbol_provider();
         let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
-        let preprocessor = symbol_provider
-            .query_preprocessor(
+        let symbols = symbol_provider
+            .query_symbols(
                 &symbol_tree,
-                &mut ShaderPreprocessorContext::default(),
-                &mut IncludeHandler::default(file_path),
+                ShaderSymbolParams::default(),
                 &mut default_include_callback::<GlslShadingLanguageTag>,
+                None,
             )
             .unwrap();
-        let mut symbols = symbol_provider.query_file_symbols(&symbol_tree).unwrap();
-        preprocessor.preprocess_symbols(&mut symbols);
+        let symbols = symbols.get_all_symbols();
         assert!(!symbols.functions.is_empty());
     }
     #[test]
@@ -155,16 +153,15 @@ mod tests {
         let mut language = ShaderLanguage::new(ShadingLanguage::Hlsl);
         let symbol_provider = language.create_symbol_provider();
         let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
-        let preprocessor = symbol_provider
-            .query_preprocessor(
+        let symbols = symbol_provider
+            .query_symbols(
                 &symbol_tree,
-                &mut ShaderPreprocessorContext::default(),
-                &mut IncludeHandler::default(file_path),
-                &mut default_include_callback::<HlslShadingLanguageTag>,
+                ShaderSymbolParams::default(),
+                &mut default_include_callback::<GlslShadingLanguageTag>,
+                None,
             )
             .unwrap();
-        let mut symbols = symbol_provider.query_file_symbols(&symbol_tree).unwrap();
-        preprocessor.preprocess_symbols(&mut symbols);
+        let symbols = symbols.get_all_symbols();
         assert!(!symbols.functions.is_empty());
     }
     #[test]
@@ -175,16 +172,15 @@ mod tests {
         let mut language = ShaderLanguage::new(ShadingLanguage::Wgsl);
         let symbol_provider = language.create_symbol_provider();
         let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
-        let preprocessor = symbol_provider
-            .query_preprocessor(
+        let symbols = symbol_provider
+            .query_symbols(
                 &symbol_tree,
-                &mut ShaderPreprocessorContext::default(),
-                &mut IncludeHandler::default(file_path),
-                &mut default_include_callback::<WgslShadingLanguageTag>,
+                ShaderSymbolParams::default(),
+                &mut default_include_callback::<GlslShadingLanguageTag>,
+                None,
             )
             .unwrap();
-        let mut symbols = symbol_provider.query_file_symbols(&symbol_tree).unwrap();
-        preprocessor.preprocess_symbols(&mut symbols);
+        let symbols = symbols.get_all_symbols();
         assert!(symbols.functions.is_empty());
     }
     #[test]
@@ -242,16 +238,15 @@ mod tests {
         let mut language = ShaderLanguage::new(ShadingLanguage::Glsl);
         let symbol_provider = language.create_symbol_provider();
         let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
-        let preprocessor = symbol_provider
-            .query_preprocessor(
+        let symbols = symbol_provider
+            .query_symbols(
                 &symbol_tree,
-                &mut ShaderPreprocessorContext::default(),
-                &mut IncludeHandler::default(file_path),
+                ShaderSymbolParams::default(),
                 &mut default_include_callback::<GlslShadingLanguageTag>,
+                None,
             )
             .unwrap();
-        let mut symbols = symbol_provider.query_file_symbols(&symbol_tree).unwrap();
-        preprocessor.preprocess_symbols(&mut symbols);
+        let symbols = symbols.get_all_symbols();
         assert!(symbols
             .types
             .iter()

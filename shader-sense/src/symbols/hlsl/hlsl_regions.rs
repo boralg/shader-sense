@@ -1,14 +1,14 @@
-use std::{collections::HashSet, num::ParseIntError, path::PathBuf};
+use std::{cell::RefCell, collections::HashSet, num::ParseIntError, path::PathBuf};
 
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
-    include::IncludeHandler,
-    shader_error::{ShaderDiagnosticSeverity, ShaderError},
+    include::{canonicalize, IncludeHandler},
+    shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
         symbol_parser::{get_name, SymbolRegionFinder},
-        symbol_provider::SymbolIncludeCallback,
-        symbol_tree::SymbolTree,
+        symbol_provider::{SymbolIncludeCallback, SymbolProvider},
+        symbol_tree::{ShaderModuleHandle, ShaderSymbols, SymbolTree},
         symbols::{
             ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext,
             ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderRange, ShaderRegion,
@@ -340,12 +340,148 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
     fn query_regions_in_node<'a>(
         &self,
         symbol_tree: &SymbolTree,
+        symbol_provider: &SymbolProvider,
         node: tree_sitter::Node,
         preprocessor: &mut ShaderPreprocessor,
         context: &'a mut ShaderPreprocessorContext,
         include_handler: &'a mut IncludeHandler,
         include_callback: &'a mut SymbolIncludeCallback<'a>,
+        mut old_symbols: Option<ShaderSymbols>,
     ) -> Result<Vec<ShaderRegion>, ShaderError> {
+        fn update_context_for_include(
+            symbol_tree: &SymbolTree,
+            include: &ShaderPreprocessorInclude,
+            context: &mut ShaderPreprocessorContext,
+            preprocessor: &ShaderPreprocessor,
+        ) {
+            let define_before_include = preprocessor
+                .defines
+                .iter()
+                .filter(|define| match &define.range {
+                    Some(range) => range.end < include.range.start,
+                    None => true, // Global
+                })
+                .cloned()
+                .collect::<Vec<ShaderPreprocessorDefine>>();
+            // Update context.
+            context
+                .visited_dependencies
+                .insert(symbol_tree.file_path.clone(), preprocessor.once);
+            if let Some(parent) = symbol_tree.file_path.parent() {
+                context.directory_stack.push(canonicalize(parent).unwrap());
+            }
+            context.append_defines(define_before_include);
+        }
+        fn process_include<'a>(
+            module_handle: ShaderModuleHandle,
+            symbol_provider: &SymbolProvider,
+            context: &mut ShaderPreprocessorContext,
+            include_handler: &mut IncludeHandler,
+            include: &mut ShaderPreprocessorInclude,
+            include_callback: &'a mut SymbolIncludeCallback<'a>,
+            old_symbols: &mut Option<ShaderSymbols>,
+        ) -> Result<(), ShaderError> {
+            // Include found, deal with it.
+            let module = RefCell::borrow(&module_handle);
+            // Check if we need to update.
+            let (is_dirty, include_old_cache) = match old_symbols {
+                Some(old_symbol) => match old_symbol
+                    .preprocessor
+                    .includes
+                    .iter_mut()
+                    .find(|i| i.absolute_path == include.absolute_path)
+                {
+                    Some(old_include) => match old_include.cache.take() {
+                        Some(old_cache) => {
+                            if old_cache.get_preprocessor().context.is_dirty(&context) {
+                                (true, Some(old_cache))
+                            } else {
+                                (false, Some(old_cache))
+                            }
+                        }
+                        None => (true, None), // No cache.
+                    },
+                    None => (true, None), // No cache in old_symbol.
+                },
+                None => (true, None), // No old_symbol.
+            };
+            // Check for pragma once.
+            let is_once = match context.visited_dependencies.get(&include.absolute_path) {
+                Some(once) => *once,
+                None => false,
+            };
+            if !is_once {
+                // Update include symbols if dirty, or simply move from old symbols.
+                if is_dirty {
+                    include.cache = Some(ShaderSymbols {
+                        preprocessor: symbol_provider.query_preprocessor(
+                            &module,
+                            context,
+                            include_handler,
+                            include_callback,
+                            include_old_cache,
+                        )?,
+                        symbol_list: symbol_provider.query_file_symbols(&module)?,
+                    })
+                } else {
+                    assert!(include_old_cache.is_some(), "Not dirty, but missing cache.");
+                    include.cache = include_old_cache;
+                    let cache = include.cache.as_ref().unwrap();
+                    // Add include context.
+                    match include_callback(include)? {
+                        Some(shader_module) => {
+                            update_context_for_include(
+                                &RefCell::borrow(&shader_module),
+                                include,
+                                context,
+                                &cache.preprocessor,
+                            );
+                            // Recurse all childs & copy their defines & co.
+                            cache.visit_includes(&mut |included_include| {
+                                // Update context.
+                                if let Ok(result) = include_callback(included_include) {
+                                    match result {
+                                        Some(included_shader_module) => {
+                                            let included_cache =
+                                                included_include.cache.as_ref().unwrap();
+                                            update_context_for_include(
+                                                &RefCell::borrow(&included_shader_module),
+                                                included_include,
+                                                context,
+                                                &included_cache.preprocessor,
+                                            );
+                                        }
+                                        None => {}
+                                    }
+                                } else {
+                                    // Include not found. Ignore it.
+                                }
+                            });
+                        }
+                        None => {
+                            return Err(ShaderError::SymbolQueryError(
+                                format!("Failed to find include {}", include.relative_path),
+                                include.range.clone(),
+                            ));
+                        }
+                    }
+                }
+            } else {
+                // File already included & marked as once.
+                include.cache = Some(ShaderSymbols::default());
+            }
+            assert!(
+                include.cache.is_some(),
+                "Failed to compute cache for file {}",
+                include.absolute_path.display()
+            );
+            Ok(())
+        }
+        // Add context just to be sure
+        context
+            .visited_dependencies
+            .insert(symbol_tree.file_path.clone(), preprocessor.once);
+        // Query regions
         let mut query_cursor = QueryCursor::new();
         let mut regions = Vec::new();
         let mut processed_includes = HashSet::new();
@@ -354,12 +490,14 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         {
             fn parse_region<'a>(
                 symbol_tree: &SymbolTree,
+                symbol_provider: &SymbolProvider,
                 preprocessor: &mut ShaderPreprocessor,
                 cursor: &mut tree_sitter::TreeCursor,
                 found_active_region: bool,
                 context: &mut ShaderPreprocessorContext,
                 include_handler: &mut IncludeHandler,
                 include_callback: &mut SymbolIncludeCallback<'a>,
+                old_symbols: &mut Option<ShaderSymbols>,
                 processed_includes: &mut HashSet<PathBuf>,
             ) -> Result<Vec<ShaderRegion>, ShaderError> {
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
@@ -370,29 +508,50 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 );
                 // Find include before this region that defines its context.
                 // Need to filter already processed includes.
-                let include_before = preprocessor
+                let includes_before = preprocessor
                     .includes
                     .iter()
                     .filter(|include| {
                         include.range.end < region_start
                             && !processed_includes.contains(&include.absolute_path)
                     })
-                    .cloned()
-                    .collect::<Vec<ShaderPreprocessorInclude>>();
-                for include in include_before {
-                    processed_includes.insert(include.absolute_path.clone());
-                    let define_before_include = preprocessor
-                        .defines
+                    .map(|include| (include.absolute_path.clone(), include.range.clone()))
+                    .collect::<Vec<(PathBuf, ShaderRange)>>();
+                for (include_path, include_range) in includes_before {
+                    let include = preprocessor
+                        .includes
                         .iter()
-                        .filter(|define| match &define.range {
-                            Some(range) => range.end < include.range.start,
-                            None => true, // Global
-                        })
-                        .cloned()
-                        .collect::<Vec<ShaderPreprocessorDefine>>();
-                    context.append_defines(define_before_include);
+                        .find(|e| e.absolute_path == include_path && e.range == include_range)
+                        .unwrap();
+                    processed_includes.insert(include.absolute_path.clone());
+                    update_context_for_include(symbol_tree, &include, context, preprocessor);
                     // https://stevedonovan.github.io/rustifications/2018/08/18/rust-closures-are-hard.html
-                    include_callback(include, context, include_handler)?;
+                    match include_callback(&include)? {
+                        Some(module_handle) => {
+                            let include_mut = preprocessor
+                                .includes
+                                .iter_mut()
+                                .find(|e| e.absolute_path == include_path)
+                                .unwrap();
+                            process_include(
+                                module_handle,
+                                symbol_provider,
+                                context,
+                                include_handler,
+                                include_mut,
+                                include_callback,
+                                old_symbols,
+                            )?;
+                        }
+                        None => {
+                            // Include not found.
+                            preprocessor.diagnostics.push(ShaderDiagnostic {
+                                severity: ShaderDiagnosticSeverity::Warning,
+                                error: format!("Failed to find include {}", include.relative_path),
+                                range: include.range.clone(),
+                            });
+                        }
+                    };
                 }
                 // Process regions
                 let (is_active_region, region_start) = match cursor.node().kind() {
@@ -487,9 +646,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             position,
                         )
                     }
-                    "#elifdef" => {
-                        todo!();
-                    }
+                    //"#elifdef" => {}
                     child => {
                         return Err(ShaderError::SymbolQueryError(
                             format!("preproc operator not implemented: {}", child),
@@ -530,12 +687,14 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
 
                                 let mut next_region = parse_region(
                                     symbol_tree,
+                                    symbol_provider,
                                     preprocessor,
                                     cursor,
                                     (is_active_region != 0) || found_active_region,
                                     context,
                                     include_handler,
                                     include_callback,
+                                    old_symbols,
                                     processed_includes,
                                 )?;
                                 regions.append(&mut next_region);
@@ -592,12 +751,14 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             let mut cursor = node.walk();
             regions.append(&mut parse_region(
                 symbol_tree,
+                symbol_provider,
                 preprocessor,
                 &mut cursor,
                 false,
                 context,
                 include_handler,
                 include_callback,
+                &mut old_symbols,
                 &mut processed_includes,
             )?)
         }
@@ -606,21 +767,42 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             .includes
             .iter()
             .filter(|include| !processed_includes.contains(&include.absolute_path))
-            .cloned()
-            .collect::<Vec<ShaderPreprocessorInclude>>();
-        for include in include_left {
+            .map(|include| include.absolute_path.clone())
+            .collect::<Vec<PathBuf>>();
+        for include_path in include_left {
             //processed_includes.insert(include.absolute_path.clone());
-            let define_before_include = preprocessor
-                .defines
+            let include = preprocessor
+                .includes
                 .iter()
-                .filter(|define| match &define.range {
-                    Some(range) => range.end < include.range.start,
-                    None => true, // Global
-                })
-                .cloned()
-                .collect::<Vec<ShaderPreprocessorDefine>>();
-            context.append_defines(define_before_include);
-            include_callback(include, context, include_handler)?;
+                .find(|i| i.absolute_path == include_path)
+                .unwrap();
+            update_context_for_include(symbol_tree, include, context, preprocessor);
+            match include_callback(&include)? {
+                Some(module_handle) => {
+                    let include_mut = preprocessor
+                        .includes
+                        .iter_mut()
+                        .find(|i| i.absolute_path == include_path)
+                        .unwrap();
+                    process_include(
+                        module_handle,
+                        symbol_provider,
+                        context,
+                        include_handler,
+                        include_mut,
+                        include_callback,
+                        &mut old_symbols,
+                    )?;
+                }
+                None => {
+                    // Include not found.
+                    preprocessor.diagnostics.push(ShaderDiagnostic {
+                        severity: ShaderDiagnosticSeverity::Warning,
+                        error: format!("Failed to find include {}", include.relative_path),
+                        range: include.range.clone(),
+                    });
+                }
+            };
         }
         let define_after_last_include = preprocessor
             .defines

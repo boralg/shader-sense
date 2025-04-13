@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::str::FromStr;
 
 mod common;
@@ -54,7 +53,7 @@ use lsp_server::{ErrorCode, Message};
 use serde_json::Value;
 use server_config::ServerConfig;
 use server_connection::ServerConnection;
-use server_file_cache::{ServerFileCacheHandle, ServerLanguageFileCache};
+use server_file_cache::ServerLanguageFileCache;
 use server_language_data::ServerLanguageData;
 use shader_variant::{DidChangeShaderVariant, DidChangeShaderVariantParams};
 
@@ -198,9 +197,10 @@ impl ServerLanguage {
                     params
                 );
                 let uri = clean_url(&params.text_document.uri);
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        match self.recolt_diagnostic(&uri, &cached_file) {
+                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        match self.recolt_diagnostic(&uri) {
                             Ok(mut diagnostics) => {
                                 let main_diagnostic = match diagnostics.remove(&uri) {
                                     Some(diag) => diag,
@@ -257,10 +257,11 @@ impl ServerLanguage {
                 let params: GotoDefinitionParams = serde_json::from_value(req.params)?;
                 profile_scope!("Received gotoDefinition request #{}: {:#?}", req.id, params);
                 let uri = clean_url(&params.text_document_position_params.text_document.uri);
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
+                        assert!(cached_file.is_main_file(), "Not a main file.");
                         let position = params.text_document_position_params.position;
-                        match self.recolt_goto(&uri, Rc::clone(&cached_file), position) {
+                        match self.recolt_goto(&uri, position) {
                             Ok(value) => self
                                 .connection
                                 .send_response::<GotoDefinition>(req.id.clone(), value),
@@ -281,11 +282,11 @@ impl ServerLanguage {
                 let params: CompletionParams = serde_json::from_value(req.params)?;
                 profile_scope!("Received completion request #{}: {:#?}", req.id, params);
                 let uri = clean_url(&params.text_document_position.text_document.uri);
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
+                        assert!(cached_file.is_main_file(), "Not a main file.");
                         match self.recolt_completion(
                             &uri,
-                            Rc::clone(&cached_file),
                             params.text_document_position.position,
                             match &params.context {
                                 Some(context) => context.trigger_character.clone(),
@@ -313,13 +314,12 @@ impl ServerLanguage {
                 let params: SignatureHelpParams = serde_json::from_value(req.params)?;
                 profile_scope!("Received completion request #{}: {:#?}", req.id, params);
                 let uri = clean_url(&params.text_document_position_params.text_document.uri);
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        match self.recolt_signature(
-                            &uri,
-                            Rc::clone(&cached_file),
-                            params.text_document_position_params.position,
-                        ) {
+                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        match self
+                            .recolt_signature(&uri, params.text_document_position_params.position)
+                        {
                             Ok(value) => self
                                 .connection
                                 .send_response::<SignatureHelpRequest>(req.id.clone(), value),
@@ -340,10 +340,11 @@ impl ServerLanguage {
                 let params: HoverParams = serde_json::from_value(req.params)?;
                 profile_scope!("Received hover request #{}: {:#?}", req.id, params);
                 let uri = clean_url(&params.text_document_position_params.text_document.uri);
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
+                        assert!(cached_file.is_main_file(), "Not a main file.");
                         let position = params.text_document_position_params.position;
-                        match self.recolt_hover(&uri, Rc::clone(&cached_file), position) {
+                        match self.recolt_hover(&uri, position) {
                             Ok(value) => self
                                 .connection
                                 .send_response::<HoverRequest>(req.id.clone(), value),
@@ -364,16 +365,21 @@ impl ServerLanguage {
                 let params: InlayHintParams = serde_json::from_value(req.params)?;
                 profile_scope!("Received inlay hint request #{}: {:#?}", req.id, params);
                 let uri = clean_url(&params.text_document.uri);
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        match self.recolt_inlay_hint(&uri, cached_file, &params.range) {
+                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        match self.recolt_inlay_hint(&uri, &params.range) {
                             Ok(inlay_hints) => {
                                 self.connection.send_response::<InlayHintRequest>(
                                     req.id.clone(),
                                     Some(inlay_hints),
                                 );
                             }
-                            Err(_) => todo!(),
+                            Err(err) => self.connection.send_response_error(
+                                req.id.clone(),
+                                ErrorCode::InvalidParams,
+                                format!("Failed to compute inlay hint : {:#?}", err),
+                            ),
                         }
                     }
                     None => self.connection.send_notification_error(format!(
@@ -387,13 +393,16 @@ impl ServerLanguage {
                 let params: FoldingRangeParams = serde_json::from_value(req.params)?;
                 profile_scope!("Received folding range request #{}: {:#?}", req.id, params);
                 let uri = clean_url(&params.text_document.uri);
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        let cached_file = RefCell::borrow(&cached_file);
+                        assert!(cached_file.is_main_file(), "Not a main file.");
                         // Adding regions
                         let mut folding_ranges: Vec<FoldingRange> = cached_file
                             .data
-                            .preprocessor_cache
+                            .as_ref()
+                            .unwrap()
+                            .symbol_cache
+                            .get_preprocessor()
                             .regions
                             .iter()
                             .map(|region| FoldingRange {
@@ -411,7 +420,8 @@ impl ServerLanguage {
                             .get(&cached_file.shading_language)
                             .unwrap()
                             .symbol_provider;
-                        let scopes = symbol_provider.query_file_scopes(&cached_file.symbol_tree);
+                        let scopes = symbol_provider
+                            .query_file_scopes(&RefCell::borrow(&cached_file.shader_module));
                         let mut folded_scopes: Vec<FoldingRange> = scopes
                             .iter()
                             .map(|s| FoldingRange {
@@ -467,18 +477,21 @@ impl ServerLanguage {
                     params
                 );
                 let uri = clean_url(&params.text_document.uri);
-                match self.watched_files.get(&uri) {
-                    Some(cached_file) => match self.recolt_document_symbol(&uri, &cached_file) {
-                        Ok(symbols) => self.connection.send_response::<DocumentSymbolRequest>(
-                            req.id.clone(),
-                            Some(DocumentSymbolResponse::Flat(symbols)),
-                        ),
-                        Err(err) => self.connection.send_notification_error(format!(
-                            "Failed to compute symbols for file {} : {}",
-                            uri,
-                            err.to_string()
-                        )),
-                    },
+                match self.watched_files.get_file(&uri) {
+                    Some(cached_file) => {
+                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        match self.recolt_document_symbol(&uri) {
+                            Ok(symbols) => self.connection.send_response::<DocumentSymbolRequest>(
+                                req.id.clone(),
+                                Some(DocumentSymbolResponse::Flat(symbols)),
+                            ),
+                            Err(err) => self.connection.send_notification_error(format!(
+                                "Failed to compute symbols for file {} : {}",
+                                uri,
+                                err.to_string()
+                            )),
+                        }
+                    }
                     None => self.connection.send_notification_error(format!(
                         "Trying to visit file that is not watched : {}",
                         uri
@@ -490,9 +503,10 @@ impl ServerLanguage {
                 let params: DumpAstParams = serde_json::from_value(req.params)?;
                 profile_scope!("Received dump ast request #{}: {:#?}", req.id, params);
                 let uri = clean_url(&params.text_document.uri);
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        let ast = RefCell::borrow(&cached_file).symbol_tree.dump_ast();
+                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        let ast = RefCell::borrow(&cached_file.shader_module).dump_ast();
                         self.connection
                             .send_response::<DumpAstRequest>(req.id.clone(), Some(ast));
                     }
@@ -510,11 +524,15 @@ impl ServerLanguage {
                     params
                 );
                 let uri = clean_url(&params.text_document.uri);
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        let deps_tree = RefCell::borrow(&cached_file)
+                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        let deps_tree = cached_file
                             .data
-                            .dump_dependency_tree(&uri);
+                            .as_ref()
+                            .unwrap()
+                            .symbol_cache
+                            .dump_dependency_tree(&uri.to_file_path().unwrap());
                         self.connection.send_response::<DumpDependencyRequest>(
                             req.id.clone(),
                             Some(deps_tree),
@@ -530,19 +548,22 @@ impl ServerLanguage {
                 let params: SemanticTokensParams = serde_json::from_value(req.params)?;
                 profile_scope!("Received semantic token request #{}: {:#?}", req.id, params);
                 let uri = clean_url(&params.text_document.uri);
-                match self.watched_files.get(&uri) {
-                    Some(cached_file) => match self.recolt_semantic_tokens(&uri, cached_file) {
-                        Ok(semantic_tokens) => {
-                            self.connection.send_response::<SemanticTokensFullRequest>(
-                                req.id.clone(),
-                                Some(semantic_tokens),
-                            )
+                match self.watched_files.get_file(&uri) {
+                    Some(cached_file) => {
+                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        match self.recolt_semantic_tokens(&uri) {
+                            Ok(semantic_tokens) => {
+                                self.connection.send_response::<SemanticTokensFullRequest>(
+                                    req.id.clone(),
+                                    Some(semantic_tokens),
+                                )
+                            }
+                            Err(err) => self.connection.send_notification_error(format!(
+                                "Failed to recolt semantic tokens for {}: {}",
+                                uri, err
+                            )),
                         }
-                        Err(err) => self.connection.send_notification_error(format!(
-                            "Failed to recolt semantic tokens for {}: {}",
-                            uri, err
-                        )),
-                    },
+                    }
                     None => self.connection.send_notification_error(format!(
                         "Trying to visit file that is not watched : {}",
                         uri
@@ -594,14 +615,10 @@ impl ServerLanguage {
                             language_data.validator.as_mut(),
                             &self.config,
                         ) {
-                            Ok(cached_file) => {
+                            Ok(_) => {
                                 // Should compute following after variant received.
                                 // + it seems variant are coming too early on client and too late here...
-                                self.publish_diagnostic(
-                                    &uri,
-                                    &cached_file,
-                                    Some(params.text_document.version),
-                                );
+                                self.publish_diagnostic(&uri, Some(params.text_document.version));
                             }
                             Err(error) => self.connection.send_notification_error(format!(
                                 "Failed to watch file {}: {}",
@@ -622,25 +639,24 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 profile_scope!("got did save text document: {:#?}", uri);
                 // File content is updated through DidChangeTextDocument.
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
+                        assert!(cached_file.is_main_file(), "Not a main file.");
                         assert!(
                             params.text.is_none()
                                 || (params.text.is_some()
-                                    && RefCell::borrow(&cached_file).symbol_tree.content
+                                    && RefCell::borrow(&cached_file.shader_module).content
                                         == *params.text.as_ref().unwrap())
                         );
                         // Only update cache if content changed.
                         match params.text {
                             Some(text) => {
-                                if text != RefCell::borrow(&cached_file).symbol_tree.content {
-                                    let shading_language =
-                                        RefCell::borrow_mut(&cached_file).shading_language;
+                                if text != RefCell::borrow(&cached_file.shader_module).content {
+                                    let shading_language = cached_file.shading_language;
                                     let language_data =
                                         self.language_data.get_mut(&shading_language).unwrap();
                                     match self.watched_files.update_file(
                                         &uri,
-                                        &cached_file,
                                         &mut language_data.language,
                                         None,
                                         None,
@@ -648,16 +664,13 @@ impl ServerLanguage {
                                         // Cache once all changes have been applied.
                                         Ok(_) => match self.watched_files.cache_file_data(
                                             &uri,
-                                            &cached_file,
                                             language_data.validator.as_mut(),
                                             &mut language_data.language,
                                             &language_data.symbol_provider,
                                             self.watched_files.variants.get(&uri).cloned(),
                                             &self.config,
                                         ) {
-                                            Ok(_) => {
-                                                self.publish_diagnostic(&uri, &cached_file, None)
-                                            }
+                                            Ok(_) => self.publish_diagnostic(&uri, None),
                                             Err(err) => self
                                                 .connection
                                                 .send_notification_error(format!("{}", err)),
@@ -696,15 +709,15 @@ impl ServerLanguage {
                     serde_json::from_value(notification.params)?;
                 let uri = clean_url(&params.text_document.uri);
                 profile_scope!("got did change text document: {:#?}", uri);
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        let shading_language = RefCell::borrow_mut(&cached_file).shading_language;
+                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        let shading_language = cached_file.shading_language;
                         let language_data = self.language_data.get_mut(&shading_language).unwrap();
                         // Update all content before caching data.
                         for content in &params.content_changes {
                             match self.watched_files.update_file(
                                 &uri,
-                                &cached_file,
                                 &mut language_data.language,
                                 content.range,
                                 Some(&content.text),
@@ -718,18 +731,15 @@ impl ServerLanguage {
                         // Cache once all changes have been applied.
                         match self.watched_files.cache_file_data(
                             &uri,
-                            &cached_file,
                             language_data.validator.as_mut(),
                             &mut language_data.language,
                             &language_data.symbol_provider,
                             self.watched_files.variants.get(&uri).cloned(),
                             &self.config,
                         ) {
-                            Ok(_) => self.publish_diagnostic(
-                                &uri,
-                                &cached_file,
-                                Some(params.text_document.version),
-                            ),
+                            Ok(_) => {
+                                self.publish_diagnostic(&uri, Some(params.text_document.version))
+                            }
                             Err(err) => self.connection.send_notification_error(format!("{}", err)),
                         }
                     }
@@ -758,13 +768,13 @@ impl ServerLanguage {
                 } else {
                     self.watched_files.remove_variant(uri.clone());
                 }
-                match self.watched_files.get(&uri) {
+                match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        let shading_language = RefCell::borrow_mut(&cached_file).shading_language;
+                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        let shading_language = cached_file.shading_language;
                         let language_data = self.language_data.get_mut(&shading_language).unwrap();
                         match self.watched_files.update_file(
                             &uri,
-                            &cached_file,
                             &mut language_data.language,
                             None,
                             None,
@@ -772,7 +782,6 @@ impl ServerLanguage {
                             // Cache once all changes have been applied.
                             Ok(()) => match self.watched_files.cache_file_data(
                                 &uri,
-                                &cached_file,
                                 language_data.validator.as_mut(),
                                 &mut language_data.language,
                                 &language_data.symbol_provider,
@@ -780,7 +789,7 @@ impl ServerLanguage {
                                 &self.config,
                             ) {
                                 // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
-                                Ok(_) => self.publish_diagnostic(&uri, &cached_file, None),
+                                Ok(_) => self.publish_diagnostic(&uri, None),
                                 Err(err) => {
                                     self.connection.send_notification_error(format!("{}", err))
                                 }
@@ -816,43 +825,39 @@ impl ServerLanguage {
                 server.config = config.clone();
                 // Republish all diagnostics
                 let mut file_to_republish = Vec::new();
-                let watched_files: Vec<(Url, ServerFileCacheHandle)> = server
+                let watched_urls: Vec<(Url, ShadingLanguage)> = server
                     .watched_files
                     .files
                     .iter()
-                    .map(|e| (e.0.clone(), Rc::clone(&e.1)))
+                    .map(|(url, file)| (url.clone(), file.shading_language))
                     .collect();
-                for (url, cached_file) in watched_files {
+                for (url, shading_language) in watched_urls {
                     // Clear diags
                     server.clear_diagnostic(&server.connection, &url);
-                    let shading_language = RefCell::borrow_mut(&cached_file).shading_language;
                     let language_data = server.language_data.get_mut(&shading_language).unwrap();
                     // Update symbols & republish diags.
                     match server.watched_files.update_file(
                         &url,
-                        &cached_file,
                         &mut language_data.language,
                         None,
                         None,
                     ) {
-                        Ok(_) =>
-                        // Cache once all changes have been applied.
-                        {
-                            match server.watched_files.cache_file_data(
-                                &url,
-                                &cached_file,
-                                language_data.validator.as_mut(),
-                                &mut language_data.language,
-                                &language_data.symbol_provider,
-                                server.watched_files.variants.get(&url).cloned(),
-                                &server.config,
-                            ) {
-                                Ok(_) => {
-                                    file_to_republish.push((url.clone(), Rc::clone(&cached_file)))
+                        Ok(_) => {
+                            if server.watched_files.files.get(&url).unwrap().is_main_file() {
+                                // Cache once for main file all changes have been applied.
+                                match server.watched_files.cache_file_data(
+                                    &url,
+                                    language_data.validator.as_mut(),
+                                    &mut language_data.language,
+                                    &language_data.symbol_provider,
+                                    server.watched_files.variants.get(&url).cloned(),
+                                    &server.config,
+                                ) {
+                                    Ok(_) => file_to_republish.push(url.clone()),
+                                    Err(err) => server
+                                        .connection
+                                        .send_notification_error(format!("{}", err)),
                                 }
-                                Err(err) => server
-                                    .connection
-                                    .send_notification_error(format!("{}", err)),
                             }
                         }
                         Err(err) => server
@@ -861,8 +866,8 @@ impl ServerLanguage {
                     };
                 }
                 // Republish all diagnostics with new settings.
-                for (url, cached_file) in &file_to_republish {
-                    server.publish_diagnostic(url, cached_file, None);
+                for url in &file_to_republish {
+                    server.publish_diagnostic(url, None);
                 }
             },
         );

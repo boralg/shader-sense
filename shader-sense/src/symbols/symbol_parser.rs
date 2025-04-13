@@ -9,8 +9,8 @@ use crate::{
 };
 
 use super::{
-    symbol_provider::SymbolIncludeCallback,
-    symbol_tree::SymbolTree,
+    symbol_provider::{SymbolIncludeCallback, SymbolProvider},
+    symbol_tree::{ShaderSymbols, SymbolTree},
     symbols::{
         ShaderPreprocessor, ShaderPreprocessorContext, ShaderRegion, ShaderScope, ShaderSymbol,
     },
@@ -122,11 +122,13 @@ pub trait SymbolRegionFinder {
     fn query_regions_in_node<'a>(
         &self,
         symbol_tree: &SymbolTree,
+        symbol_provider: &SymbolProvider,
         node: tree_sitter::Node,
         preprocessor: &mut ShaderPreprocessor,
         context: &'a mut ShaderPreprocessorContext,
         include_handler: &'a mut IncludeHandler,
         include_callback: &'a mut SymbolIncludeCallback<'a>,
+        old_symbols: Option<ShaderSymbols>,
     ) -> Result<Vec<ShaderRegion>, ShaderError>;
 }
 

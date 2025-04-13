@@ -37,7 +37,7 @@ mod tests {
         },
         symbols::{
             shader_language::ShaderLanguage,
-            symbol_provider::{default_include_callback, SymbolProvider},
+            symbol_provider::{default_include_callback, ShaderSymbolParams, SymbolProvider},
             symbols::{ShaderPosition, ShaderPreprocessorContext, ShaderRange, ShaderRegion},
         },
     };
@@ -62,15 +62,14 @@ mod tests {
         let file_path = Path::new("./test/hlsl/regions.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
-        let preprocessor = symbol_provider
-            .query_preprocessor(
+        let symbols = symbol_provider
+            .query_symbols(
                 &symbol_tree,
-                &mut ShaderPreprocessorContext::default(),
-                &mut IncludeHandler::default(&file_path),
+                ShaderSymbolParams::default(),
                 &mut default_include_callback::<T>,
+                None,
             )
             .unwrap();
-        //let symbols = symbol_provider.query_file_symbols(&symbol_tree, Some(&preprocessor));
         let set_region =
             |start_line: u32, start_pos: u32, end_line: u32, end_pos: u32, active: bool| {
                 ShaderRegion {
@@ -114,26 +113,26 @@ mod tests {
             // macro included after
             set_region(74, 31, 75, 34, false), // 17
         ];
-        assert!(preprocessor.regions.len() == expected_regions.len());
-        for region_index in 0..preprocessor.regions.len() {
+        assert!(symbols.preprocessor.regions.len() == expected_regions.len());
+        for region_index in 0..symbols.preprocessor.regions.len() {
             println!(
                 "region {}: {:#?}",
-                region_index, preprocessor.regions[region_index]
+                region_index, symbols.preprocessor.regions[region_index]
             );
             assert!(
-                preprocessor.regions[region_index].range.start
+                symbols.preprocessor.regions[region_index].range.start
                     == expected_regions[region_index].range.start,
                 "Failed start assert for region {}",
                 region_index
             );
             assert!(
-                preprocessor.regions[region_index].range.end
+                symbols.preprocessor.regions[region_index].range.end
                     == expected_regions[region_index].range.end,
                 "Failed end assert for region {}",
                 region_index
             );
             assert!(
-                preprocessor.regions[region_index].is_active
+                symbols.preprocessor.regions[region_index].is_active
                     == expected_regions[region_index].is_active,
                 "Failed active assert for region {}",
                 region_index

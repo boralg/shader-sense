@@ -1,11 +1,10 @@
 use std::path::Path;
 
 use shader_sense::{
-    include::IncludeHandler,
     shader::{GlslShadingLanguageTag, ShadingLanguage, ShadingLanguageTag},
     symbols::{
-        shader_language::ShaderLanguage, symbol_provider::default_include_callback,
-        symbols::ShaderPreprocessorContext,
+        shader_language::ShaderLanguage,
+        symbol_provider::{default_include_callback, ShaderSymbolParams},
     },
     validator::{create_validator, validator::ValidationParams},
 };
@@ -35,16 +34,15 @@ fn query_all_symbol<T: ShadingLanguageTag>(shader_path: &Path) {
     let shader_content = std::fs::read_to_string(shader_path).unwrap();
     match language.create_module(shader_path, &shader_content) {
         Ok(symbol_tree) => {
-            let preprocessor = symbol_provider
-                .query_preprocessor(
+            let symbols = symbol_provider
+                .query_symbols(
                     &symbol_tree,
-                    &mut ShaderPreprocessorContext::default(),
-                    &mut IncludeHandler::default(shader_path),
-                    &mut default_include_callback::<T>,
+                    ShaderSymbolParams::default(),
+                    &mut default_include_callback::<GlslShadingLanguageTag>,
+                    None,
                 )
                 .unwrap();
-            let mut symbol_list = symbol_provider.query_file_symbols(&symbol_tree).unwrap();
-            preprocessor.preprocess_symbols(&mut symbol_list);
+            let symbol_list = symbols.get_all_symbols();
             println!("Found symbols: {:#?}", symbol_list);
         }
         Err(err) => println!("Failed to create ast: {:#?}", err),

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use shader_sense::{
     shader::{GlslSpirvVersion, GlslTargetClient, HlslShaderModel, HlslVersion},
     shader_error::ShaderDiagnosticSeverity,
+    symbols::symbol_provider::ShaderSymbolParams,
     validator::validator::ValidationParams,
 };
 
@@ -67,6 +68,17 @@ impl ServerConfig {
             hlsl_enable16bit_types: self.hlsl.enable16bit_types,
             glsl_client: self.glsl.target_client,
             glsl_spirv: self.glsl.spirv_version,
+        }
+    }
+    pub fn into_symbol_params(&self) -> ShaderSymbolParams {
+        ShaderSymbolParams {
+            defines: self.defines.clone(),
+            includes: self.includes.clone(),
+            path_remapping: self
+                .path_remapping
+                .iter()
+                .map(|(vp, p)| (vp.into(), p.into()))
+                .collect(),
         }
     }
 }

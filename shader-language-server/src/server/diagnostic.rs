@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::collections::HashMap;
 
 use log::{debug, info};
 use lsp_types::{Diagnostic, DiagnosticSeverity, DiagnosticTag, PublishDiagnosticsParams, Url};
@@ -7,17 +7,12 @@ use shader_sense::shader_error::{ShaderDiagnosticSeverity, ShaderError};
 
 use crate::server::common::shader_range_to_lsp_range;
 
-use super::{ServerConnection, ServerFileCacheHandle, ServerLanguage};
+use super::{ServerConnection, ServerLanguage};
 
 impl ServerLanguage {
-    pub fn publish_diagnostic(
-        &mut self,
-        uri: &Url,
-        cached_file: &ServerFileCacheHandle,
-        version: Option<i32>,
-    ) {
+    pub fn publish_diagnostic(&mut self, uri: &Url, version: Option<i32>) {
         if self.config.validate {
-            match self.recolt_diagnostic(uri, cached_file) {
+            match self.recolt_diagnostic(uri) {
                 Ok(diagnostics) => {
                     info!(
                         "Publishing diagnostic for file {} ({} diags)",
@@ -62,10 +57,10 @@ impl ServerLanguage {
     pub fn recolt_diagnostic(
         &mut self,
         uri: &Url,
-        cached_file: &ServerFileCacheHandle,
     ) -> Result<HashMap<Url, Vec<Diagnostic>>, ShaderError> {
+        let data = self.watched_files.read_data(uri);
         // Diagnostic for included file stored in main cache.
-        let diagnostic_cache = &RefCell::borrow(&cached_file).data.diagnostic_cache;
+        let diagnostic_cache = &data.diagnostic_cache;
 
         let mut diagnostics: HashMap<Url, Vec<Diagnostic>> = HashMap::new();
         for diagnostic in &diagnostic_cache.diagnostics {
@@ -109,16 +104,17 @@ impl ServerLanguage {
             diagnostics.insert(uri.clone(), vec![]);
         }
         // Add empty diagnostics to direct dependencies without errors to clear them.
-        for (dependency_uri, _dependency_file) in &RefCell::borrow(&cached_file).data.dependencies {
-            if diagnostics.get(&dependency_uri).is_none() {
-                info!("Clearing diagnostic for deps file {}", dependency_uri);
-                diagnostics.insert(dependency_uri.clone(), vec![]);
+        for include in &data.symbol_cache.get_preprocessor().includes {
+            let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
+            if diagnostics.get(&include_uri).is_none() {
+                info!("Clearing diagnostic for deps file {}", include_uri);
+                diagnostics.insert(include_uri.clone(), vec![]);
             }
         }
         // Add inactive regions to diag for open file.
-        let mut inactive_diagnostics = RefCell::borrow(cached_file)
-            .data
-            .preprocessor_cache
+        let mut inactive_diagnostics = data
+            .symbol_cache
+            .get_preprocessor()
             .regions
             .iter()
             .filter_map(|region| {

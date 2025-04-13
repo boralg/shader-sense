@@ -15,27 +15,28 @@ use shader_sense::{
     symbols::symbols::{ShaderPosition, ShaderSymbol, ShaderSymbolData},
 };
 
-use super::{ServerFileCacheHandle, ServerLanguage};
+use super::ServerLanguage;
 
 impl ServerLanguage {
     pub fn recolt_signature(
         &mut self,
         uri: &Url,
-        cached_file: ServerFileCacheHandle,
         position: Position,
     ) -> Result<Option<SignatureHelp>, ShaderError> {
-        let cached_file_borrowed = RefCell::borrow(&cached_file);
+        let cached_file = self.watched_files.get_file(uri).unwrap();
         let language_data = self
             .language_data
-            .get(&cached_file_borrowed.shading_language)
+            .get(&cached_file.shading_language)
             .unwrap();
         // TODO: rely on symbol provider for stronger result.
         // Should simply get symbol & read parameters. Need to get parameter index though...
-        let all_symbol_list =
-            self.watched_files
-                .get_all_symbols(uri, &cached_file, &language_data.language);
-        let item_parameter =
-            get_function_parameter_at_position(&cached_file_borrowed.symbol_tree.content, position);
+        let all_symbol_list = self
+            .watched_files
+            .get_all_symbols(uri, &language_data.language);
+        let item_parameter = get_function_parameter_at_position(
+            &RefCell::borrow(&cached_file.shader_module).content,
+            position,
+        );
         debug!("Found requested func name {:?}", item_parameter);
 
         let file_path = uri.to_file_path().unwrap();

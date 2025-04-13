@@ -1,7 +1,9 @@
+use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
+
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
-    include::{canonicalize, IncludeHandler},
+    include::IncludeHandler,
     shader::ShadingLanguageTag,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
 };
@@ -12,12 +14,19 @@ use super::{
         ShaderSymbolListBuilder, SymbolLabelChainProvider, SymbolLabelProvider, SymbolRegionFinder,
         SymbolTreeFilter, SymbolTreeParser, SymbolTreePreprocessorParser,
     },
-    symbol_tree::SymbolTree,
+    symbol_tree::{ShaderModule, ShaderModuleHandle, ShaderSymbols, SymbolTree},
     symbols::{
         ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude,
         ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolList,
     },
 };
+
+#[derive(Default, Debug, Clone)]
+pub struct ShaderSymbolParams {
+    pub defines: HashMap<String, String>,
+    pub includes: Vec<String>,
+    pub path_remapping: HashMap<PathBuf, PathBuf>,
+}
 
 pub struct SymbolProvider {
     symbol_parsers: Vec<(Box<dyn SymbolTreeParser>, tree_sitter::Query)>,
@@ -31,38 +40,20 @@ pub struct SymbolProvider {
     word_provider: Box<dyn SymbolLabelProvider>,
 }
 
-pub type SymbolIncludeCallback<'a> = dyn FnMut(
-        ShaderPreprocessorInclude,
-        &mut ShaderPreprocessorContext,
-        &mut IncludeHandler,
-    ) -> Result<(), ShaderError>
-    + 'a;
+pub type SymbolIncludeCallback<'a> =
+    dyn FnMut(&ShaderPreprocessorInclude) -> Result<Option<ShaderModuleHandle>, ShaderError> + 'a;
 
 pub fn default_include_callback<T: ShadingLanguageTag>(
-    include: ShaderPreprocessorInclude,
-    context: &mut ShaderPreprocessorContext,
-    include_handler: &mut IncludeHandler,
-) -> Result<(), ShaderError> {
-    if !context.has_visited(&include.absolute_path) {
-        let mut language = ShaderLanguage::new(T::get_language());
-        let symbol_provider = language.create_symbol_provider();
-        let include_module = language.create_module(
-            &include.absolute_path,
-            std::fs::read_to_string(&include.absolute_path)
-                .unwrap()
-                .as_str(),
-        )?;
-        let _include_preprocessor = symbol_provider.query_preprocessor(
-            &include_module,
-            context,
-            include_handler,
-            &mut default_include_callback::<T>,
-        )?;
-        Ok(())
-    } else {
-        // Avoid stack overflow by not recomputing same file infinitely.
-        Ok(())
-    }
+    include: &ShaderPreprocessorInclude,
+) -> Result<Option<ShaderModuleHandle>, ShaderError> {
+    let mut language = ShaderLanguage::new(T::get_language());
+    let include_module = language.create_module(
+        &include.absolute_path,
+        std::fs::read_to_string(&include.absolute_path)
+            .unwrap()
+            .as_str(),
+    )?;
+    Ok(Some(Rc::new(RefCell::new(include_module))))
 }
 
 impl SymbolProvider {
@@ -155,20 +146,40 @@ impl SymbolProvider {
         }
         scopes
     }
-    pub fn query_preprocessor<'a>(
+    pub fn query_symbols<'a>(
+        &self,
+        shader_module: &ShaderModule,
+        symbol_params: ShaderSymbolParams,
+        include_callback: &'a mut SymbolIncludeCallback<'a>,
+        old_symbols: Option<ShaderSymbols>,
+    ) -> Result<ShaderSymbols, ShaderError> {
+        let mut context = ShaderPreprocessorContext::from_defines(symbol_params.defines);
+        let mut include_handler = IncludeHandler::new(
+            &shader_module.file_path,
+            symbol_params.includes,
+            symbol_params.path_remapping,
+        );
+        let preprocessor = self.query_preprocessor(
+            shader_module,
+            &mut context,
+            &mut include_handler,
+            include_callback,
+            old_symbols,
+        )?;
+        let symbol_list = self.query_file_symbols(shader_module)?;
+        Ok(ShaderSymbols {
+            preprocessor,
+            symbol_list,
+        })
+    }
+    pub(super) fn query_preprocessor<'a>(
         &self,
         symbol_tree: &SymbolTree,
         context: &'a mut ShaderPreprocessorContext,
         include_handler: &mut IncludeHandler,
         include_callback: &'a mut SymbolIncludeCallback<'a>,
+        old_symbols: Option<ShaderSymbols>,
     ) -> Result<ShaderPreprocessor, ShaderError> {
-        // Update context.
-        context
-            .visited_dependencies
-            .insert(symbol_tree.file_path.clone());
-        if let Some(parent) = symbol_tree.file_path.parent() {
-            context.directory_stack.push(canonicalize(parent).unwrap());
-        }
         let mut preprocessor = ShaderPreprocessor::new(context.clone());
         for parser in &self.preprocessor_parsers {
             let mut query_cursor = QueryCursor::new();
@@ -186,31 +197,23 @@ impl SymbolProvider {
                 );
             }
         }
+        // Mark this shader as once if pragma once is set.
+        if let Some(_) = symbol_tree.content.find("#pragma once") {
+            // Assume regions not affecting it neither does include order.
+            preprocessor.once = true;
+        }
         // Query regions.
         // Will filter includes & defines in inactive regions
         preprocessor.regions = self.region_finder.query_regions_in_node(
             symbol_tree,
+            self,
             symbol_tree.tree.root_node(),
             &mut preprocessor,
             context,
             include_handler,
             include_callback,
+            old_symbols,
         )?;
-        // Mark this shader as once if pragma once is set.
-        if let Some(once_byte_offset) = symbol_tree.content.find("#pragma once") {
-            preprocessor.once = match ShaderPosition::from_byte_offset(
-                &symbol_tree.content,
-                once_byte_offset,
-                &symbol_tree.file_path,
-            ) {
-                Ok(position) => preprocessor
-                    .regions
-                    .iter()
-                    .find(|region| !region.is_active && region.range.contain(&position))
-                    .is_none(),
-                Err(_err) => false,
-            };
-        }
         // Add errors
         let mut query_error_cursor = QueryCursor::new();
         for matches in query_error_cursor.matches(
@@ -230,7 +233,7 @@ impl SymbolProvider {
         }
         Ok(preprocessor)
     }
-    pub fn query_file_symbols(
+    pub(super) fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
     ) -> Result<ShaderSymbolList, ShaderError> {

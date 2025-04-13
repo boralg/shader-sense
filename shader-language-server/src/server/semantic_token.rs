@@ -3,23 +3,22 @@ use std::cell::RefCell;
 use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensResult, Url};
 use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderPosition};
 
-use super::{ServerFileCacheHandle, ServerLanguage};
+use super::ServerLanguage;
 
 impl ServerLanguage {
     pub fn recolt_semantic_tokens(
         &mut self,
         uri: &Url,
-        cached_file: ServerFileCacheHandle,
     ) -> Result<SemanticTokensResult, ShaderError> {
+        let cached_file = self.watched_files.get_file(uri).unwrap();
         // For now, only handle macros as we cant resolve them with textmate.
-        let shading_language = RefCell::borrow(&cached_file).shading_language;
+        let shading_language = cached_file.shading_language;
         let symbols = self.watched_files.get_all_symbols(
             &uri,
-            &cached_file,
             &self.language_data.get(&shading_language).unwrap().language,
         );
         let file_path = uri.to_file_path().unwrap();
-        let content = &RefCell::borrow(&cached_file).symbol_tree.content;
+        let content = &RefCell::borrow(&cached_file.shader_module).content;
         // Find occurences of macros to paint them.
         let mut tokens = symbols
             .macros
@@ -30,8 +29,12 @@ impl ServerLanguage {
                         if range.start.file_path == file_path {
                             range.start.to_byte_offset(content).unwrap()
                         } else {
-                            match RefCell::borrow(&cached_file)
-                                .find_root_include_of_dependency(&range.start.file_path)
+                            match cached_file
+                                .data
+                                .as_ref()
+                                .unwrap()
+                                .symbol_cache
+                                .find_direct_includer(&range.start.file_path)
                             {
                                 Some(include) => {
                                     include.range.start.to_byte_offset(content).unwrap()

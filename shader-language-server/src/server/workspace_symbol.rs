@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use lsp_types::{SymbolInformation, SymbolKind};
 use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderSymbolType};
 
@@ -14,10 +12,9 @@ impl ServerLanguage {
             .files
             .iter()
             .map(|(uri, cached_file)| {
-                let shading_language = RefCell::borrow(&cached_file).shading_language;
+                let shading_language = cached_file.shading_language;
                 let symbols = self.watched_files.get_all_symbols(
                     uri,
-                    cached_file,
                     &self.language_data.get(&shading_language).unwrap().language,
                 );
                 symbols

@@ -1,21 +1,20 @@
-use std::cell::RefCell;
-
 use lsp_types::{SymbolInformation, SymbolKind, Url};
 use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderSymbolType};
 
-use super::{
-    common::shader_range_to_location, server_file_cache::ServerFileCacheHandle, ServerLanguage,
-};
+use super::{common::shader_range_to_location, ServerLanguage};
 
 impl ServerLanguage {
     pub fn recolt_document_symbol(
         &mut self,
-        _uri: &Url,
-        cached_file: &ServerFileCacheHandle,
+        uri: &Url,
     ) -> Result<Vec<SymbolInformation>, ShaderError> {
-        let symbols = RefCell::borrow(&cached_file)
+        let cached_file = self.watched_files.get_file(uri).unwrap();
+        let symbols = cached_file
             .data
-            .get_symbols()
+            .as_ref()
+            .unwrap()
+            .symbol_cache
+            .get_all_symbols()
             .iter()
             .map(|(symbols, ty)| {
                 symbols

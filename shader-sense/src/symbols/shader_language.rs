@@ -8,12 +8,10 @@ use super::{
     glsl::create_glsl_symbol_provider,
     hlsl::create_hlsl_symbol_provider,
     symbol_provider::SymbolProvider,
-    symbol_tree::SymbolTree,
+    symbol_tree::ShaderModule,
     symbols::{ShaderRange, ShaderSymbolList},
     wgsl::create_wgsl_symbol_provider,
 };
-
-pub type ShaderModule = SymbolTree;
 pub struct ShaderLanguage {
     shading_language: ShadingLanguage,
     shader_intrinsics: ShaderSymbolList,

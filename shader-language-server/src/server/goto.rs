@@ -7,19 +7,18 @@ use shader_sense::{
 
 use lsp_types::{GotoDefinitionResponse, Position, Url};
 
-use super::{common::shader_range_to_lsp_range, ServerFileCacheHandle, ServerLanguage};
+use super::{common::shader_range_to_lsp_range, ServerLanguage};
 
 impl ServerLanguage {
     pub fn recolt_goto(
         &mut self,
         uri: &Url,
-        cached_file: ServerFileCacheHandle,
         position: Position,
     ) -> Result<Option<GotoDefinitionResponse>, ShaderError> {
-        let cached_file_borrowed = RefCell::borrow(&cached_file);
+        let cached_file = self.watched_files.get_file(uri).unwrap();
         let language_data = self
             .language_data
-            .get(&cached_file_borrowed.shading_language)
+            .get(&cached_file.shading_language)
             .unwrap();
         let file_path = uri.to_file_path().unwrap();
         let shader_position = ShaderPosition {
@@ -27,13 +26,13 @@ impl ServerLanguage {
             line: position.line as u32,
             pos: position.character as u32,
         };
-        let all_symbol_list =
-            self.watched_files
-                .get_all_symbols(uri, &cached_file, &language_data.language);
-        match language_data
-            .symbol_provider
-            .get_word_range_at_position(&cached_file_borrowed.symbol_tree, &shader_position)
-        {
+        let all_symbol_list = self
+            .watched_files
+            .get_all_symbols(uri, &language_data.language);
+        match language_data.symbol_provider.get_word_range_at_position(
+            &RefCell::borrow(&cached_file.shader_module),
+            &shader_position,
+        ) {
             Ok((word, word_range)) => {
                 let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);
                 let matching_symbols = symbol_list.find_symbols_before(&word, &shader_position);

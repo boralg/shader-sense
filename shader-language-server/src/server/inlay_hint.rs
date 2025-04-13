@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use lsp_types::{InlayHint, InlayHintKind, InlayHintLabel, Range, Url};
 
 use shader_sense::{
@@ -9,23 +7,23 @@ use shader_sense::{
 
 use super::{
     common::{lsp_range_to_shader_range, shader_position_to_lsp_position},
-    ServerFileCacheHandle, ServerLanguage,
+    ServerLanguage,
 };
 
 impl ServerLanguage {
     pub fn recolt_inlay_hint(
         &mut self,
         uri: &Url,
-        cached_file: ServerFileCacheHandle,
         lsp_range: &Range,
     ) -> Result<Vec<InlayHint>, ShaderError> {
+        let cached_file = self.watched_files.get_file(uri).unwrap();
         let language_data = self
             .language_data
-            .get_mut(&RefCell::borrow(&cached_file).shading_language)
+            .get_mut(&cached_file.shading_language)
             .unwrap();
-        let symbols =
-            self.watched_files
-                .get_all_symbols(uri, &cached_file, &language_data.language);
+        let symbols = self
+            .watched_files
+            .get_all_symbols(uri, &language_data.language);
         let inlay_hints = symbols
             .iter()
             .filter(|sl| sl.1 == ShaderSymbolType::CallExpression)
