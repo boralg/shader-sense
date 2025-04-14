@@ -52,8 +52,9 @@ impl ShaderSymbols {
         for include in &self.preprocessor.includes {
             assert!(
                 include.cache.is_some(),
-                "Include {} do not have cache, but is being queried.",
-                include.relative_path
+                "Include {} do not have cache, but is being queried.\n{}",
+                include.relative_path,
+                self.dump_dependency_tree(&PathBuf::from("oui"))
             );
             symbols.append(include.cache.as_ref().unwrap().get_all_symbols());
         }
@@ -143,20 +144,23 @@ impl ShaderSymbols {
         is_last: bool,
     ) -> String {
         let mut dependency_tree = format!(
-            "{}{} {}\n",
+            "{}{} {} ({})\n",
             header,
             if is_last { "└─" } else { "├─" },
-            include.absolute_path.display()
+            include.absolute_path.display(),
+            if include.cache.is_some() {
+                "Cache"
+            } else {
+                "Missing cache"
+            }
         );
         let childs_header = format!("{}{}", header, if is_last { "  " } else { "|  " });
-        let mut deps_iter = include
-            .cache
-            .as_ref()
-            .unwrap()
-            .preprocessor
-            .includes
-            .iter()
-            .peekable();
+        let mut deps_iter = match &include.cache {
+            Some(data) => data.preprocessor.includes.iter().peekable(),
+            None => {
+                return dependency_tree;
+            }
+        };
         while let Some(included_include) = deps_iter.next() {
             dependency_tree.push_str(
                 self.dump_dependency_node(

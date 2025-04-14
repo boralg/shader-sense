@@ -484,7 +484,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         // Query regions
         let mut query_cursor = QueryCursor::new();
         let mut regions = Vec::new();
-        let mut processed_includes = HashSet::new();
+        let mut processed_includes = Vec::new();
         for region_match in
             query_cursor.matches(&self.query_if, node, symbol_tree.content.as_bytes())
         {
@@ -498,7 +498,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 include_handler: &mut IncludeHandler,
                 include_callback: &mut SymbolIncludeCallback<'a>,
                 old_symbols: &mut Option<ShaderSymbols>,
-                processed_includes: &mut HashSet<PathBuf>,
+                processed_includes: &mut Vec<(PathBuf, ShaderRange)>,
             ) -> Result<Vec<ShaderRegion>, ShaderError> {
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
                 // Process includes here as they will impact defines which impact regions.
@@ -513,7 +513,10 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     .iter()
                     .filter(|include| {
                         include.range.end < region_start
-                            && !processed_includes.contains(&include.absolute_path)
+                            && processed_includes
+                                .iter()
+                                .find(|(p, r)| *p == include.absolute_path && *r == include.range)
+                                .is_none()
                     })
                     .map(|include| (include.absolute_path.clone(), include.range.clone()))
                     .collect::<Vec<(PathBuf, ShaderRange)>>();
@@ -523,7 +526,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         .iter()
                         .find(|e| e.absolute_path == include_path && e.range == include_range)
                         .unwrap();
-                    processed_includes.insert(include.absolute_path.clone());
+                    processed_includes.push((include.absolute_path.clone(), include.range.clone()));
                     update_context_for_include(symbol_tree, &include, context, preprocessor);
                     // https://stevedonovan.github.io/rustifications/2018/08/18/rust-closures-are-hard.html
                     match include_callback(&include)? {
@@ -531,7 +534,9 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             let include_mut = preprocessor
                                 .includes
                                 .iter_mut()
-                                .find(|e| e.absolute_path == include_path)
+                                .find(|e| {
+                                    e.absolute_path == include_path && e.range == include_range
+                                })
                                 .unwrap();
                             process_include(
                                 module_handle,
@@ -766,15 +771,20 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         let include_left = preprocessor
             .includes
             .iter()
-            .filter(|include| !processed_includes.contains(&include.absolute_path))
-            .map(|include| include.absolute_path.clone())
-            .collect::<Vec<PathBuf>>();
-        for include_path in include_left {
-            //processed_includes.insert(include.absolute_path.clone());
+            .filter(|include| {
+                processed_includes
+                    .iter()
+                    .find(|(p, r)| *p == include.absolute_path && *r == include.range)
+                    .is_none()
+            })
+            .map(|include| (include.absolute_path.clone(), include.range.clone()))
+            .collect::<Vec<(PathBuf, ShaderRange)>>();
+        for (include_path, include_range) in include_left {
+            //processed_includes.push((include.absolute_path.clone(), include.range.clone()));
             let include = preprocessor
                 .includes
                 .iter()
-                .find(|i| i.absolute_path == include_path)
+                .find(|e| e.absolute_path == include_path && e.range == include_range)
                 .unwrap();
             update_context_for_include(symbol_tree, include, context, preprocessor);
             match include_callback(&include)? {
@@ -782,7 +792,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     let include_mut = preprocessor
                         .includes
                         .iter_mut()
-                        .find(|i| i.absolute_path == include_path)
+                        .find(|e| e.absolute_path == include_path && e.range == include_range)
                         .unwrap();
                     process_include(
                         module_handle,

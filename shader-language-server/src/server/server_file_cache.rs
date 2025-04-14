@@ -466,7 +466,8 @@ impl ServerLanguageFileCache {
                             Some(_) => {} // Nothing to do here.
                             None => {
                                 // Remove deps file to avoid dangling file.
-                                self.files.remove(&include_uri).unwrap();
+                                // Dont unwrap as we might have multiple include to same file. Server will crash.
+                                let _dangling = self.files.remove(&include_uri);
                                 info!(
                                     "Removing {:#?} deps file at {}. {} files in cache.",
                                     cached_file.shading_language,
@@ -489,6 +490,7 @@ impl ServerLanguageFileCache {
     }
     pub fn get_all_symbols(&self, uri: &Url, shader_language: &ShaderLanguage) -> ShaderSymbolList {
         let cached_file = self.files.get(uri).unwrap();
+        assert!(cached_file.data.is_some(), "File {} do not have cache", uri);
         let data = &cached_file.data.as_ref().unwrap();
         // Add main file symbols
         let mut symbol_cache = data.symbol_cache.get_all_symbols();
