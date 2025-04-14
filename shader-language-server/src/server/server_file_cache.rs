@@ -94,9 +94,14 @@ impl ServerLanguageFileCache {
             let shading_language = self.files.get(uri).unwrap().shading_language;
             let shader_module = Rc::clone(&self.files.get(uri).unwrap().shader_module);
             let shader_module = RefCell::borrow(&shader_module);
+            let mut symbol_params = config.into_symbol_params();
+            // Add variant data if some.
+            if let Some(variant) = &shader_variant {
+                symbol_params.defines.extend(variant.defines.clone());
+            }
             match symbol_provider.query_symbols(
                 &shader_module,
-                config.into_symbol_params(),
+                symbol_params,
                 &mut |include| {
                     let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
                     let included_file =

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashSet, num::ParseIntError, path::PathBuf};
+use std::{cell::RefCell, num::ParseIntError, path::PathBuf};
 
 use tree_sitter::{Query, QueryCursor};
 

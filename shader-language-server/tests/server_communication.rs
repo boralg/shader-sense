@@ -63,13 +63,13 @@ fn test_variant() {
             partial_result_token: None,
         },
     };
-    fn has_symbol(response: Option<DocumentSymbolResponse>, symbol: &str) {
+    fn has_symbol(response: Option<DocumentSymbolResponse>, symbol: &str) -> bool {
         let symbols = response.unwrap();
         match symbols {
-            DocumentSymbolResponse::Flat(symbol_informations) => assert!(symbol_informations
+            DocumentSymbolResponse::Flat(symbol_informations) => symbol_informations
                 .iter()
                 .find(|e| e.name == symbol)
-                .is_some()),
+                .is_some(),
             _ => panic!("Should not be reached."),
         }
     }
@@ -80,7 +80,10 @@ fn test_variant() {
         text_document: item.clone(),
     });
     server.send_request::<DocumentSymbolRequest>(&document_symbol_params, |response| {
-        has_symbol(response, "mainError")
+        assert!(
+            has_symbol(response, "mainError"),
+            "Missing symbol mainError for variant"
+        );
     });
     server.send_notification::<DidChangeShaderVariant>(&DidChangeShaderVariantParams {
         text_document: identifier.clone(),
@@ -92,7 +95,10 @@ fn test_variant() {
         }),
     });
     server.send_request::<DocumentSymbolRequest>(&document_symbol_params, |response| {
-        has_symbol(response, "mainOk")
+        assert!(
+            has_symbol(response, "mainOk"),
+            "Missing symbol mainOk for variant"
+        );
     });
     server.send_notification::<DidCloseTextDocument>(&DidCloseTextDocumentParams {
         text_document: identifier.clone(),

@@ -32,7 +32,7 @@ mod tests {
 
     use super::{
         symbol_provider::{default_include_callback, SymbolProvider},
-        symbols::{ShaderPreprocessorContext, ShaderSymbolList},
+        symbols::ShaderSymbolList,
     };
 
     pub fn find_file_dependencies(
@@ -83,7 +83,7 @@ mod tests {
             .query_symbols(
                 &symbol_tree,
                 ShaderSymbolParams::default(),
-                &mut default_include_callback::<GlslShadingLanguageTag>,
+                &mut default_include_callback::<T>,
                 None,
             )
             .unwrap();
@@ -95,7 +95,7 @@ mod tests {
                 .query_symbols(
                     &symbol_tree,
                     ShaderSymbolParams::default(),
-                    &mut default_include_callback::<GlslShadingLanguageTag>,
+                    &mut default_include_callback::<T>,
                     None,
                 )
                 .unwrap();
@@ -157,7 +157,7 @@ mod tests {
             .query_symbols(
                 &symbol_tree,
                 ShaderSymbolParams::default(),
-                &mut default_include_callback::<GlslShadingLanguageTag>,
+                &mut default_include_callback::<HlslShadingLanguageTag>,
                 None,
             )
             .unwrap();
@@ -176,7 +176,7 @@ mod tests {
             .query_symbols(
                 &symbol_tree,
                 ShaderSymbolParams::default(),
-                &mut default_include_callback::<GlslShadingLanguageTag>,
+                &mut default_include_callback::<WgslShadingLanguageTag>,
                 None,
             )
             .unwrap();
