@@ -141,33 +141,29 @@ impl IncludeHandler {
         } else {
             PathBuf::from(virtual_path)
         };
-        if virtual_path.starts_with("/") || virtual_path.starts_with("\\") {
-            // Browse possible mapping & find a match.
-            for (virtual_folder, target_path) in virtual_folders {
-                let mut path_components = virtual_path.components();
-                let mut found = true;
-                for virtual_folder_component in virtual_folder.components() {
-                    match path_components.next() {
-                        Some(component) => {
-                            if component != virtual_folder_component {
-                                found = false;
-                                break;
-                            }
-                        }
-                        None => {
+        // Browse possible mapping & find a match.
+        for (virtual_folder, target_path) in virtual_folders {
+            let mut path_components = virtual_path.components();
+            let mut found = true;
+            for virtual_folder_component in virtual_folder.components() {
+                match path_components.next() {
+                    Some(component) => {
+                        if component != virtual_folder_component {
                             found = false;
                             break;
                         }
                     }
-                }
-                if found {
-                    let resolved_path = target_path.join(path_components.as_path());
-                    return Some(resolved_path.into());
+                    None => {
+                        found = false;
+                        break;
+                    }
                 }
             }
-            None
-        } else {
-            None
+            if found {
+                let resolved_path = target_path.join(path_components.as_path());
+                return Some(resolved_path.into());
+            }
         }
+        None
     }
 }

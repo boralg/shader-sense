@@ -31,14 +31,13 @@ mod tests {
     use std::path::Path;
 
     use crate::{
-        include::IncludeHandler,
         shader::{
             GlslShadingLanguageTag, HlslShadingLanguageTag, ShadingLanguage, ShadingLanguageTag,
         },
         symbols::{
             shader_language::ShaderLanguage,
             symbol_provider::{default_include_callback, ShaderSymbolParams, SymbolProvider},
-            symbols::{ShaderPosition, ShaderPreprocessorContext, ShaderRange, ShaderRegion},
+            symbols::{ShaderPosition, ShaderRange, ShaderRegion},
         },
     };
 
