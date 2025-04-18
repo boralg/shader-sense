@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use log::{debug, info};
+use log::info;
 use lsp_types::{Diagnostic, DiagnosticSeverity, DiagnosticTag, PublishDiagnosticsParams, Url};
 
 use shader_sense::shader_error::{ShaderDiagnosticSeverity, ShaderError};
@@ -37,7 +37,7 @@ impl ServerLanguage {
                 )),
             }
         } else {
-            debug!("Diagnostic disabled. {:?}", self.config);
+            info!("Diagnostic disabled. {:?}", self.config);
         }
     }
 

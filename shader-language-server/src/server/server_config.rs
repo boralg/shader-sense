@@ -23,7 +23,7 @@ pub struct ServerGlslConfig {
     pub spirv_version: GlslSpirvVersion,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ServerTraceLevel {
     #[default]
@@ -36,6 +36,12 @@ pub enum ServerTraceLevel {
 #[serde(rename_all = "camelCase")]
 pub struct ServerTrace {
     server: ServerTraceLevel,
+}
+
+impl ServerTrace {
+    pub fn is_verbose(&self) -> bool {
+        self.server == ServerTraceLevel::Verbose
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -3,7 +3,6 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-use log::debug;
 use lsp_types::{
     MarkupContent, ParameterInformation, ParameterLabel, Position, SignatureHelp,
     SignatureInformation, Url,
@@ -37,7 +36,6 @@ impl ServerLanguage {
             &RefCell::borrow(&cached_file.shader_module).content,
             position,
         );
-        debug!("Found requested func name {:?}", item_parameter);
 
         let file_path = uri.to_file_path().unwrap();
         let completion = all_symbol_list.filter_scoped_symbol(&ShaderPosition {
@@ -100,7 +98,6 @@ impl ServerLanguage {
             .collect::<Vec<Vec<SignatureInformation>>>()
             .concat();
         if signatures.is_empty() {
-            debug!("No signature for symbol {:?} found", shader_symbols);
             Ok(None)
         } else {
             Ok(Some(SignatureHelp {

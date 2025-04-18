@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::str::FromStr;
 
 mod common;
@@ -187,14 +188,21 @@ impl ServerLanguage {
             }
         }
     }
+    fn debug(&self, dbg: &impl Debug) -> String {
+        if self.config.trace.is_verbose() {
+            format!("{:#?}", dbg)
+        } else {
+            "enable trace for more info".into()
+        }
+    }
     fn on_request(&mut self, req: lsp_server::Request) -> Result<(), serde_json::Error> {
         match req.method.as_str() {
             DocumentDiagnosticRequest::METHOD => {
                 let params: DocumentDiagnosticParams = serde_json::from_value(req.params)?;
                 profile_scope!(
-                    "Received document diagnostic request #{}: {:#?}",
+                    "Received document diagnostic request #{}: {}",
                     req.id,
-                    params
+                    self.debug(&params)
                 );
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
@@ -255,7 +263,11 @@ impl ServerLanguage {
             }
             GotoDefinition::METHOD => {
                 let params: GotoDefinitionParams = serde_json::from_value(req.params)?;
-                profile_scope!("Received gotoDefinition request #{}: {:#?}", req.id, params);
+                profile_scope!(
+                    "Received gotoDefinition request #{}: {}",
+                    req.id,
+                    self.debug(&params)
+                );
                 let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
@@ -280,7 +292,11 @@ impl ServerLanguage {
             }
             Completion::METHOD => {
                 let params: CompletionParams = serde_json::from_value(req.params)?;
-                profile_scope!("Received completion request #{}: {:#?}", req.id, params);
+                profile_scope!(
+                    "Received completion request #{}: {}",
+                    req.id,
+                    self.debug(&params)
+                );
                 let uri = clean_url(&params.text_document_position.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
@@ -312,7 +328,11 @@ impl ServerLanguage {
             }
             SignatureHelpRequest::METHOD => {
                 let params: SignatureHelpParams = serde_json::from_value(req.params)?;
-                profile_scope!("Received completion request #{}: {:#?}", req.id, params);
+                profile_scope!(
+                    "Received completion request #{}: {}",
+                    req.id,
+                    self.debug(&params)
+                );
                 let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
@@ -338,7 +358,11 @@ impl ServerLanguage {
             }
             HoverRequest::METHOD => {
                 let params: HoverParams = serde_json::from_value(req.params)?;
-                profile_scope!("Received hover request #{}: {:#?}", req.id, params);
+                profile_scope!(
+                    "Received hover request #{}: {}",
+                    req.id,
+                    self.debug(&params)
+                );
                 let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
@@ -363,7 +387,11 @@ impl ServerLanguage {
             }
             InlayHintRequest::METHOD => {
                 let params: InlayHintParams = serde_json::from_value(req.params)?;
-                profile_scope!("Received inlay hint request #{}: {:#?}", req.id, params);
+                profile_scope!(
+                    "Received inlay hint request #{}: {}",
+                    req.id,
+                    self.debug(&params)
+                );
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
@@ -391,7 +419,11 @@ impl ServerLanguage {
             // Provider not enabled as vscode already does this nicely with grammar files
             FoldingRangeRequest::METHOD => {
                 let params: FoldingRangeParams = serde_json::from_value(req.params)?;
-                profile_scope!("Received folding range request #{}: {:#?}", req.id, params);
+                profile_scope!(
+                    "Received folding range request #{}: {}",
+                    req.id,
+                    self.debug(&params)
+                );
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
@@ -453,9 +485,9 @@ impl ServerLanguage {
             WorkspaceSymbolRequest::METHOD => {
                 let params: WorkspaceSymbolParams = serde_json::from_value(req.params)?;
                 profile_scope!(
-                    "Received workspace symbol request #{}: {:#?}",
+                    "Received workspace symbol request #{}: {}",
                     req.id,
-                    params
+                    self.debug(&params)
                 );
                 let _ = params.query; // Should we filter ?
                 match self.recolt_workspace_symbol() {
@@ -472,9 +504,9 @@ impl ServerLanguage {
             DocumentSymbolRequest::METHOD => {
                 let params: DocumentSymbolParams = serde_json::from_value(req.params)?;
                 profile_scope!(
-                    "Received document symbol request #{}: {:#?}",
+                    "Received document symbol request #{}: {}",
                     req.id,
-                    params
+                    self.debug(&params)
                 );
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
@@ -501,7 +533,11 @@ impl ServerLanguage {
             // Debug request
             DumpAstRequest::METHOD => {
                 let params: DumpAstParams = serde_json::from_value(req.params)?;
-                profile_scope!("Received dump ast request #{}: {:#?}", req.id, params);
+                profile_scope!(
+                    "Received dump ast request #{}: {}",
+                    req.id,
+                    self.debug(&params)
+                );
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
@@ -519,9 +555,9 @@ impl ServerLanguage {
             DumpDependencyRequest::METHOD => {
                 let params: DumpDependencyParams = serde_json::from_value(req.params)?;
                 profile_scope!(
-                    "Received dump dependency request #{}: {:#?}",
+                    "Received dump dependency request #{}: {}",
                     req.id,
-                    params
+                    self.debug(&params)
                 );
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
@@ -546,7 +582,11 @@ impl ServerLanguage {
             }
             SemanticTokensFullRequest::METHOD => {
                 let params: SemanticTokensParams = serde_json::from_value(req.params)?;
-                profile_scope!("Received semantic token request #{}: {:#?}", req.id, params);
+                profile_scope!(
+                    "Received semantic token request #{}: {}",
+                    req.id,
+                    self.debug(&params)
+                );
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
@@ -588,11 +628,15 @@ impl ServerLanguage {
         &mut self,
         notification: lsp_server::Notification,
     ) -> Result<(), serde_json::Error> {
-        profile_scope!("Received notification: {}", notification.method);
         match notification.method.as_str() {
             DidOpenTextDocument::METHOD => {
                 let params: DidOpenTextDocumentParams =
                     serde_json::from_value(notification.params)?;
+                profile_scope!(
+                    "Received did open text document notification for {}:{}",
+                    params.text_document.uri,
+                    self.debug(&params)
+                );
                 let uri = clean_url(&params.text_document.uri);
 
                 // Skip non file uri.
@@ -637,7 +681,11 @@ impl ServerLanguage {
                 let params: DidSaveTextDocumentParams =
                     serde_json::from_value(notification.params)?;
                 let uri = clean_url(&params.text_document.uri);
-                profile_scope!("got did save text document: {:#?}", uri);
+                profile_scope!(
+                    "Received did save text document notification for file {}:{}",
+                    params.text_document.uri,
+                    self.debug(&params)
+                );
                 // File content is updated through DidChangeTextDocument.
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
@@ -694,7 +742,11 @@ impl ServerLanguage {
                 let params: DidCloseTextDocumentParams =
                     serde_json::from_value(notification.params)?;
                 let uri = clean_url(&params.text_document.uri);
-                profile_scope!("got did close text document: {:#?}", uri);
+                profile_scope!(
+                    "Received did close text document notification for file {}: {}",
+                    params.text_document.uri,
+                    self.debug(&params)
+                );
                 match self.watched_files.remove_file(&uri) {
                     Ok(removed_urls) => {
                         for removed_url in removed_urls {
@@ -708,7 +760,11 @@ impl ServerLanguage {
                 let params: DidChangeTextDocumentParams =
                     serde_json::from_value(notification.params)?;
                 let uri = clean_url(&params.text_document.uri);
-                profile_scope!("got did change text document: {:#?}", uri);
+                profile_scope!(
+                    "Received did change text document notification for file {}: {}",
+                    params.text_document.uri,
+                    self.debug(&params)
+                );
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(cached_file.is_main_file(), "Not a main file.");
@@ -752,7 +808,10 @@ impl ServerLanguage {
             DidChangeConfiguration::METHOD => {
                 let params: DidChangeConfigurationParams =
                     serde_json::from_value(notification.params)?;
-                profile_scope!("Received did change configuration: {:#?}", params);
+                profile_scope!(
+                    "Received did change configuration notification: {}",
+                    self.debug(&params)
+                );
                 // Here config received is empty. we need to request it to user.
                 //let config : ServerConfig = serde_json::from_value(params.settings)?;
                 self.request_configuration();
@@ -761,7 +820,10 @@ impl ServerLanguage {
                 let params: DidChangeShaderVariantParams =
                     serde_json::from_value(notification.params)?;
                 let uri = clean_url(&params.text_document.uri);
-                profile_scope!("Received did change shader variant: {:#?}", params);
+                profile_scope!(
+                    "Received did change shader variant notification: {}",
+                    self.debug(&params)
+                );
                 // Store it in cache
                 if let Some(shader_variant) = params.shader_variant {
                     self.watched_files.set_variant(uri.clone(), shader_variant);
@@ -803,7 +865,11 @@ impl ServerLanguage {
                     None => {} // Not watched, no need to update.
                 }
             }
-            _ => info!("Received unhandled notification: {:#?}", notification),
+            _ => info!(
+                "Received unhandled notification {}: {}",
+                notification.method,
+                self.debug(&notification)
+            ),
         }
         Ok(())
     }
@@ -821,7 +887,7 @@ impl ServerLanguage {
                 let mut parsed_config: Vec<Option<ServerConfig>> =
                     serde_json::from_value(value).expect("Failed to parse received config");
                 let config = parsed_config.remove(0).unwrap_or_default();
-                profile_scope!("Updating server config: {:#?}", config);
+                profile_scope!("Updating server config: {}", server.debug(&config));
                 server.config = config.clone();
                 // Republish all diagnostics
                 let mut file_to_republish = Vec::new();
@@ -832,6 +898,7 @@ impl ServerLanguage {
                     .map(|(url, file)| (url.clone(), file.shading_language))
                     .collect();
                 for (url, shading_language) in watched_urls {
+                    profile_scope!("Updating server config for file: {}", url);
                     // Clear diags
                     server.clear_diagnostic(&server.connection, &url);
                     let language_data = server.language_data.get_mut(&shading_language).unwrap();

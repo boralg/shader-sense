@@ -52,27 +52,3 @@ impl Request for ShaderVariantRequest {
     type Result = ShaderVariantResponse;
     const METHOD: &'static str = "textDocument/shaderVariant";
 }
-
-/*impl ServerLanguage {
-    pub fn request_variants(&mut self, uri: &Url) {
-        self.connection.send_request::<ShaderVariantRequest>(
-            ShaderVariantParams {
-                text_document: TextDocumentIdentifier { uri: uri.clone() },
-            },
-            |_server: &mut ServerLanguage, value: Value| {
-                let params: ShaderVariantResponse = serde_json::from_value(value).unwrap();
-                // This seems to be received after textDocument notification, this might be an issue...
-                debug!("Received variant {:?}", params);
-
-                match server.watched_files.get(&uri) {
-                    Some(cached_file) => {
-                    }
-                    None => server.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                }
-            },
-        );
-    }
-}*/

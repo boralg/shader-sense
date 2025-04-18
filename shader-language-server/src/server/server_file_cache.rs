@@ -7,7 +7,7 @@ use crate::{
         common::{lsp_range_to_shader_range, read_string_lossy},
     },
 };
-use log::{info, warn};
+use log::{debug, info, warn};
 use lsp_types::Url;
 use shader_sense::{
     shader::ShadingLanguage,
@@ -90,7 +90,7 @@ impl ServerLanguageFileCache {
         let old_data = self.files.get_mut(&uri).unwrap().data.take();
         // Get symbols for main file.
         let (symbols, symbol_diagnostics) = if config.symbols {
-            profile_scope!("Recursing symbols for file {}", uri);
+            profile_scope!("Querying symbols for file {}", uri);
             let shading_language = self.files.get(uri).unwrap().shading_language;
             let shader_module = Rc::clone(&self.files.get(uri).unwrap().shader_module);
             let shader_module = RefCell::borrow(&shader_module);
@@ -327,15 +327,15 @@ impl ServerLanguageFileCache {
         match self.files.get(&uri) {
             Some(file) => {
                 if file.is_main_file() {
-                    info!(
+                    debug!(
                         "Starting watching {:#?} main file as deps at {}. {} files in cache.",
                         lang,
                         file_path.display(),
                         self.files.len(),
                     );
                 } else {
-                    info!(
-                        "Starting rewatching {:#?} deps file at {}. {} files in cache.",
+                    debug!(
+                        "Already watched {:#?} deps file at {}. {} files in cache.",
                         lang,
                         file_path.display(),
                         self.files.len(),
