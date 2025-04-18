@@ -34,7 +34,7 @@ impl ServerLanguage {
                         .watched_files
                         .get_all_symbols(uri, &language_data.language);
                     let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);
-                    let matching_symbols = symbol_list.find_symbols_before(&word, &shader_position);
+                    let matching_symbols = symbol_list.find_symbols_at(&word, &shader_position);
                     if matching_symbols.len() == 0 {
                         Ok(None)
                     } else {

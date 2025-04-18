@@ -331,6 +331,7 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
                             (number_literal)
                             (call_expression)
                             (unary_expression)
+                            (field_expression)
                             (binary_expression)
                         ] @call.parameter
                     (",")?)*

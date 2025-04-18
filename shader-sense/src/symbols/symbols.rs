@@ -538,11 +538,7 @@ impl ShaderSymbolList {
         serde_json::from_str::<ShaderSymbolList>(&file_content)
             .expect("Failed to parse ShaderSymbolList")
     }
-    pub fn find_symbols_before(
-        &self,
-        label: &String,
-        position: &ShaderPosition,
-    ) -> Vec<&ShaderSymbol> {
+    pub fn find_symbols_at(&self, label: &String, position: &ShaderPosition) -> Vec<&ShaderSymbol> {
         self.iter()
             .map(|(sl, ty)| {
                 if !ty.is_transient() {

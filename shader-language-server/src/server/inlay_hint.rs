@@ -44,14 +44,12 @@ impl ServerLanguage {
                             parameters,
                         } => {
                             // Find label from expression.
-                            let symbols = symbols.find_symbols_before(&label, &range.start);
-                            if symbols.len() == 0 {
-                                vec![]
-                            } else {
+                            // TODO: this add all includes no matter the position.
+                            // Should filter them but cannot access include in SymbolsList. Need SymbolTree
+                            let symbols = symbols.find_symbols_at(&label, &range.start);
+                            for symbol in symbols {
                                 // NOTE: inlay hints have a limit of 43 char per line in vscode, after which, they are truncated.
                                 // https://github.com/microsoft/vscode/pull/201190
-                                // TODO: could solve parameter type to pick correct signature.
-                                let symbol = symbols[0]; // Just pick first one now.
                                 let functions = match &symbol.data {
                                     ShaderSymbolData::Functions { signatures } => signatures,
                                     ShaderSymbolData::Struct {
@@ -64,28 +62,34 @@ impl ServerLanguage {
                                 };
                                 match functions
                                     .iter()
+                                    // TODO: could solve parameter type to pick correct signature.
                                     .find(|s| s.parameters.len() == parameters.len())
                                 {
-                                    Some(signature) => parameters
-                                        .iter()
-                                        .enumerate()
-                                        .map(|(i, (_, range))| InlayHint {
-                                            position: shader_position_to_lsp_position(&range.start),
-                                            label: InlayHintLabel::String(format!(
-                                                "{}:",
-                                                signature.parameters[i].label
-                                            )),
-                                            kind: Some(InlayHintKind::PARAMETER),
-                                            text_edits: None,
-                                            tooltip: None,
-                                            padding_left: None,
-                                            padding_right: Some(true),
-                                            data: None,
-                                        })
-                                        .collect::<Vec<InlayHint>>(),
-                                    None => vec![],
-                                }
+                                    Some(signature) => {
+                                        return parameters
+                                            .iter()
+                                            .enumerate()
+                                            .map(|(i, (_, range))| InlayHint {
+                                                position: shader_position_to_lsp_position(
+                                                    &range.start,
+                                                ),
+                                                label: InlayHintLabel::String(format!(
+                                                    "{}:",
+                                                    signature.parameters[i].label
+                                                )),
+                                                kind: Some(InlayHintKind::PARAMETER),
+                                                text_edits: None,
+                                                tooltip: None,
+                                                padding_left: None,
+                                                padding_right: Some(true),
+                                                data: None,
+                                            })
+                                            .collect::<Vec<InlayHint>>();
+                                    }
+                                    None => continue,
+                                };
                             }
+                            return vec![];
                         }
                         _ => unreachable!("Should be filtered out"),
                     })
