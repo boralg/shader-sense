@@ -628,6 +628,18 @@ impl HlslIntrinsicParser {
             "sm6",
         ));
         // TODO: -enable16bnit float16_t + uint16_t
+        fn get_vector_component_label(index: u32) -> String {
+            match index {
+                0 => "x".into(),
+                1 => "y".into(),
+                2 => "z".into(),
+                3 => "w".into(),
+                _ => unreachable!(""),
+            }
+        }
+        fn get_matrix_component_label(index_col: u32, index_row: u32) -> String {
+            format!("m{}{}", index_col, index_row)
+        }
         for component_col in 1..=4 {
             // Vectors
             for scalar in &scalar_types {
@@ -636,7 +648,28 @@ impl HlslIntrinsicParser {
                     label: fmt.clone(),
                     description: format!("Vector with {} components of {}", component_col, scalar.label),
                     link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-vector".into()),
-                    data: ShaderSymbolData::Types { constructors: vec![] },
+                    data: ShaderSymbolData::Types { constructors: vec![
+                        ShaderSignature {
+                            returnType: fmt.clone(),
+                            description: format!("Constructor for type {}", fmt),
+                            parameters: vec![ShaderParameter {
+                                ty: fmt.clone(),
+                                label: "value".into(),
+                                count: None,
+                                description: "".into(),
+                            }],
+                        },
+                        ShaderSignature {
+                            returnType: fmt.clone(),
+                            description: format!("Constructor for type {}", fmt),
+                            parameters: (0..component_col).map(|parameter_index| ShaderParameter {
+                                ty: scalar.label.clone(),
+                                label: get_vector_component_label(parameter_index),
+                                count: None,
+                                description: "".into(),
+                            }).collect(),
+                        }
+                    ]},
                     version: "".into(),
                     stages: vec![],
                     range: None,
@@ -656,7 +689,30 @@ impl HlslIntrinsicParser {
                         label: fmt.clone(),
                         description: format!("Matrice with {} rows and {} columns of {}", component_row, component_col, scalar.label),
                         link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-matrix".into()),
-                        data: ShaderSymbolData::Types { constructors: vec![] },
+                        data: ShaderSymbolData::Types { constructors: vec![
+                            ShaderSignature {
+                                returnType: fmt.clone(),
+                                description: format!("Constructor for type {}", fmt),
+                                parameters: vec![ShaderParameter {
+                                    ty: fmt.clone(),
+                                    label: "value".into(),
+                                    count: None,
+                                    description: "".into(),
+                                }],
+                            },
+                            ShaderSignature {
+                                returnType: fmt.clone(),
+                                description: format!("Constructor for type {}", fmt),
+                                parameters: (0..component_col).map(|col_index|
+                                    (0..component_row).map(|row_index| ShaderParameter {
+                                        ty: scalar.label.clone(),
+                                        label: get_matrix_component_label(col_index, row_index),
+                                        count: None,
+                                        description: "".into(),
+                                    }).collect::<Vec<ShaderParameter>>()
+                                ).collect::<Vec<Vec<ShaderParameter>>>().concat(),
+                            }
+                        ] },
                         version: "".into(),
                         stages: vec![],
                         range: None,
