@@ -22,6 +22,10 @@ pub struct Dxc {
 
     #[allow(dead_code)] // Need to keep dxc alive while dependencies created
     dxc: hassle_rs::wrapper::Dxc,
+
+    // Cache regex for parsing.
+    diagnostic_regex: regex::Regex,
+    internal_diagnostic_regex: regex::Regex,
 }
 
 struct DxcIncludeHandler<'a> {
@@ -81,39 +85,49 @@ impl Dxc {
             library,
             dxil,
             validator,
+            diagnostic_regex: regex::Regex::new(r"(?m)^(.*?:\d+:\d+: .*:.*?)$").unwrap(),
+            internal_diagnostic_regex: regex::Regex::new(r"(?s)^(.*?):(\d+):(\d+): (.*?):(.*)")
+                .unwrap(),
         })
     }
     fn parse_dxc_errors(
+        &self,
         errors: &String,
         file_path: &Path,
-        includes: &Vec<String>,
-        path_remapping: HashMap<PathBuf, PathBuf>,
+        params: &ValidationParams,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         let mut shader_error_list = ShaderDiagnosticList::empty();
-
-        let reg = regex::Regex::new(r"(?m)^(.*?:\d+:\d+: .*:.*?)$")?;
         let mut starts = Vec::new();
-        for capture in reg.captures_iter(errors.as_str()) {
+        for capture in self.diagnostic_regex.captures_iter(errors.as_str()) {
             if let Some(pos) = capture.get(0) {
                 starts.push(pos.start());
             }
         }
-        starts.push(errors.len());
-        let internal_reg = regex::Regex::new(r"(?s)^(.*?):(\d+):(\d+): (.*?):(.*)")?;
-        let mut include_handler = IncludeHandler::new(file_path, includes.clone(), path_remapping);
+        starts.push(errors.len()); // Push the end.
+        let mut include_handler = IncludeHandler::new(
+            file_path,
+            params.includes.clone(),
+            params.path_remapping.clone(),
+        );
+        // Cache includes as its a heavy operation.
+        let mut include_cache: HashMap<String, PathBuf> = HashMap::new();
         for start in 0..starts.len() - 1 {
-            let first = starts[start];
-            let length = starts[start + 1] - starts[start];
-            let block: String = errors.chars().skip(first).take(length).collect();
-            if let Some(capture) = internal_reg.captures(block.as_str()) {
+            let begin = starts[start];
+            let end = starts[start + 1];
+            let block = &errors[begin..end];
+            if let Some(capture) = self.internal_diagnostic_regex.captures(block) {
                 let relative_path = capture.get(1).map_or("", |m| m.as_str());
                 let line = capture.get(2).map_or("", |m| m.as_str());
                 let pos = capture.get(3).map_or("", |m| m.as_str());
                 let level = capture.get(4).map_or("", |m| m.as_str());
                 let msg = capture.get(5).map_or("", |m| m.as_str());
-                let file_path = include_handler
-                    .search_path_in_includes(Path::new(relative_path))
-                    .unwrap_or(file_path.into());
+                let file_path = include_cache
+                    .entry(relative_path.into())
+                    .or_insert_with(|| {
+                        include_handler
+                            .search_path_in_includes(Path::new(&relative_path))
+                            .unwrap_or(file_path.into())
+                    });
                 shader_error_list.push(ShaderDiagnostic {
                     severity: match level {
                         "error" => ShaderDiagnosticSeverity::Error,
@@ -155,12 +169,7 @@ impl Dxc {
         params: &ValidationParams,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         match error {
-            HassleError::CompileError(err) => Dxc::parse_dxc_errors(
-                &err,
-                file_path,
-                &params.includes,
-                params.path_remapping.clone(),
-            ),
+            HassleError::CompileError(err) => self.parse_dxc_errors(&err, file_path, &params),
             HassleError::ValidationError(err) => Ok(ShaderDiagnosticList::from(ShaderDiagnostic {
                 severity: ShaderDiagnosticSeverity::Error,
                 error: err.to_string(),

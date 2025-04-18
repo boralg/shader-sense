@@ -39,22 +39,30 @@ impl Into<glslang::ShaderStage> for ShaderStage {
 pub struct Glslang {
     hlsl: bool,
     compiler: &'static Compiler,
+
+    // Cache regex for parsing.
+    diagnostic_regex: regex::Regex,
+    internal_diagnostic_regex: regex::Regex,
 }
 
 impl Glslang {
     #[allow(dead_code)] // Only used for WASI (alternative to DXC)
     pub fn hlsl() -> Self {
-        let compiler = Compiler::acquire().expect("Failed to create glslang compiler");
-        Self {
-            hlsl: true,
-            compiler,
-        }
+        Self::new(true)
     }
     pub fn glsl() -> Self {
+        Self::new(false)
+    }
+    fn new(hlsl: bool) -> Self {
         let compiler = Compiler::acquire().expect("Failed to create glslang compiler");
         Self {
-            hlsl: false,
+            hlsl: hlsl,
             compiler,
+            diagnostic_regex: regex::Regex::new(r"(?m)^(.*?:(?:  \d+:\d+:)?)").unwrap(),
+            internal_diagnostic_regex: regex::Regex::new(
+                r"(?s)^(.*?):(?: ((?:[a-zA-Z]:)?[\d\w\.\/\\\-]+):(\d+):(\d+):)?(.+)",
+            )
+            .unwrap(),
         }
     }
 }
@@ -101,34 +109,36 @@ impl glslang::include::IncludeHandler for GlslangIncludeHandler<'_> {
 
 impl Glslang {
     fn parse_errors(
+        &self,
         errors: &String,
         file_path: &Path,
-        includes: &Vec<String>,
-        path_remapping: HashMap<PathBuf, PathBuf>,
+        params: &ValidationParams,
         offset_first_line: bool,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         let mut shader_error_list = ShaderDiagnosticList::empty();
 
-        let reg = regex::Regex::new(r"(?m)^(.*?:(?:  \d+:\d+:)?)")?;
         let mut starts = Vec::new();
-        for capture in reg.captures_iter(errors.as_str()) {
+        for capture in self.diagnostic_regex.captures_iter(errors.as_str()) {
             if let Some(pos) = capture.get(0) {
                 starts.push(pos.start());
             }
         }
         starts.push(errors.len());
-        let internal_reg = regex::Regex::new(
-            r"(?s)^(.*?):(?: ((?:[a-zA-Z]:)?[\d\w\.\/\\\-]+):(\d+):(\d+):)?(.+)",
-        )?;
-        let mut include_handler = IncludeHandler::new(file_path, includes.clone(), path_remapping);
+        let mut include_handler = IncludeHandler::new(
+            file_path,
+            params.includes.clone(),
+            params.path_remapping.clone(),
+        );
+        // Cache includes as its a heavy operation.
+        let mut include_cache: HashMap<String, PathBuf> = HashMap::new();
         for start in 0..starts.len() - 1 {
-            let first = starts[start];
-            let length = starts[start + 1] - starts[start];
-            let block: String = errors.chars().skip(first).take(length).collect();
+            let begin = starts[start];
+            let end = starts[start + 1];
+            let block = &errors[begin..end];
             if block.contains("compilation errors.  No code generated.") {
                 continue; // Skip this useless string.
             }
-            if let Some(capture) = internal_reg.captures(block.as_str()) {
+            if let Some(capture) = self.internal_diagnostic_regex.captures(block) {
                 let level = capture.get(1).map_or("", |m| m.as_str());
                 let relative_path = capture.get(2).map_or("", |m| m.as_str());
                 let line = capture.get(3).map_or("", |m| m.as_str());
@@ -140,11 +150,14 @@ impl Glslang {
                         if relative_path.is_empty() {
                             file_path.into()
                         } else {
-                            match include_handler.search_path_in_includes(Path::new(relative_path))
-                            {
-                                Some(value) => value,
-                                None => file_path.into(),
-                            }
+                            include_cache
+                                .entry(relative_path.into())
+                                .or_insert_with(|| {
+                                    include_handler
+                                        .search_path_in_includes(Path::new(&relative_path))
+                                        .unwrap_or(file_path.into())
+                                })
+                                .clone()
                         }
                     }
                 };
@@ -193,27 +206,15 @@ impl Glslang {
         offset_first_line: bool,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         match err {
-            GlslangError::PreprocessError(error) => Glslang::parse_errors(
-                &error,
-                file_path,
-                &params.includes,
-                params.path_remapping.clone(),
-                offset_first_line,
-            ),
-            GlslangError::ParseError(error) => Glslang::parse_errors(
-                &error,
-                file_path,
-                &params.includes,
-                params.path_remapping.clone(),
-                offset_first_line,
-            ),
-            GlslangError::LinkError(error) => Glslang::parse_errors(
-                &error,
-                file_path,
-                &params.includes,
-                params.path_remapping.clone(),
-                offset_first_line,
-            ),
+            GlslangError::PreprocessError(error) => {
+                self.parse_errors(&error, file_path, &params, offset_first_line)
+            }
+            GlslangError::ParseError(error) => {
+                self.parse_errors(&error, file_path, &params, offset_first_line)
+            }
+            GlslangError::LinkError(error) => {
+                self.parse_errors(&error, file_path, &params, offset_first_line)
+            }
             GlslangError::ShaderStageNotFound(stage) => Err(ShaderError::InternalErr(format!(
                 "Shader stage not found: {:#?}",
                 stage
