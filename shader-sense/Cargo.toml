@@ -1,6 +1,6 @@
 [package]
 name = "shader-sense"
-description = "Library for runtime shader validation and representation"
+description = "Library for runtime shader validation and symbol inspection"
 repository = "https://github.com/antaalt/shader-sense"
 keywords = ["shader", "validate", "hlsl", "glsl", "wgsl"]
 categories = ["development-tools", "graphics"]
