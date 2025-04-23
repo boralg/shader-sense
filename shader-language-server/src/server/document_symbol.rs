@@ -14,7 +14,7 @@ impl ServerLanguage {
             .as_ref()
             .unwrap()
             .symbol_cache
-            .get_all_symbols()
+            .get_local_symbols()
             .iter()
             .map(|(symbols, ty)| {
                 symbols

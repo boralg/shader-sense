@@ -11,6 +11,7 @@ impl ServerLanguage {
             .watched_files
             .files
             .iter()
+            .filter(|(_uri, cached_file)| cached_file.is_main_file())
             .map(|(uri, cached_file)| {
                 let shading_language = cached_file.shading_language;
                 let symbols = self.watched_files.get_all_symbols(
