@@ -10,9 +10,7 @@ impl ServerLanguage {
     ) -> Result<Vec<SymbolInformation>, ShaderError> {
         let cached_file = self.watched_files.get_file(uri).unwrap();
         let symbols = cached_file
-            .data
-            .as_ref()
-            .unwrap()
+            .get_data()
             .symbol_cache
             .get_local_symbols()
             .iter()

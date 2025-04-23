@@ -58,7 +58,8 @@ impl ServerLanguage {
         &mut self,
         uri: &Url,
     ) -> Result<HashMap<Url, Vec<Diagnostic>>, ShaderError> {
-        let data = self.watched_files.read_data(uri);
+        let cached_file = self.watched_files.get_file(uri).unwrap();
+        let data = cached_file.get_data();
         // Diagnostic for included file stored in main cache.
         let diagnostic_cache = &data.diagnostic_cache;
 

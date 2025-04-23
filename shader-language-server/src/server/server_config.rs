@@ -9,6 +9,8 @@ use shader_sense::{
     validator::validator::ValidationParams,
 };
 
+use super::shader_variant::ShaderVariant;
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerHlslConfig {
@@ -60,10 +62,23 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
-    pub fn into_validation_params(&self) -> ValidationParams {
+    pub fn into_validation_params(&self, variant: Option<ShaderVariant>) -> ValidationParams {
+        let (mut defines, mut includes) = match variant {
+            Some(variant) => (
+                variant.defines.clone(),
+                variant
+                    .includes
+                    .into_iter()
+                    .map(|e| e.into_os_string().into_string().unwrap())
+                    .collect::<Vec<String>>(),
+            ),
+            None => (HashMap::new(), Vec::new()),
+        };
+        defines.extend(self.defines.clone());
+        includes.extend(self.includes.clone());
         ValidationParams {
-            includes: self.includes.clone(),
-            defines: self.defines.clone(),
+            defines: defines,
+            includes: includes,
             path_remapping: self
                 .path_remapping
                 .iter()
@@ -76,10 +91,23 @@ impl ServerConfig {
             glsl_spirv: self.glsl.spirv_version,
         }
     }
-    pub fn into_symbol_params(&self) -> ShaderSymbolParams {
+    pub fn into_symbol_params(&self, variant: Option<ShaderVariant>) -> ShaderSymbolParams {
+        let (mut defines, mut includes) = match variant {
+            Some(variant) => (
+                variant.defines.clone(),
+                variant
+                    .includes
+                    .into_iter()
+                    .map(|e| e.into_os_string().into_string().unwrap())
+                    .collect::<Vec<String>>(),
+            ),
+            None => (HashMap::new(), Vec::new()),
+        };
+        defines.extend(self.defines.clone());
+        includes.extend(self.includes.clone());
         ShaderSymbolParams {
-            defines: self.defines.clone(),
-            includes: self.includes.clone(),
+            defines: defines,
+            includes: includes,
             path_remapping: self
                 .path_remapping
                 .iter()

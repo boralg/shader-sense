@@ -1,12 +1,10 @@
 use std::path::Path;
 
-use crate::{
-    include::IncludeHandler,
+use crate::symbols::{
+    symbol_parser::{get_name, SymbolTreePreprocessorParser},
     symbols::{
-        symbol_parser::{get_name, SymbolTreePreprocessorParser},
-        symbols::{
-            ShaderPreprocessor, ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderRange,
-        },
+        ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine,
+        ShaderPreprocessorInclude, ShaderRange,
     },
 };
 
@@ -40,7 +38,7 @@ impl SymbolTreePreprocessorParser for GlslIncludeTreePreprocessorParser {
         file_path: &Path,
         shader_content: &str,
         preprocessor: &mut ShaderPreprocessor,
-        include_handler: &mut IncludeHandler,
+        context: &mut ShaderPreprocessorContext,
     ) {
         let include_node = matches.captures[0].node;
         let range = ShaderRange::from_range(include_node.range(), file_path.into());
@@ -48,7 +46,7 @@ impl SymbolTreePreprocessorParser for GlslIncludeTreePreprocessorParser {
         let relative_path = &relative_path[1..relative_path.len() - 1]; // TODO: use string_content instead
 
         // Only add symbol if path can be resolved.
-        match include_handler.search_path_in_includes(Path::new(relative_path)) {
+        match context.search_path_in_includes(Path::new(relative_path)) {
             Some(absolute_path) => {
                 preprocessor.includes.push(ShaderPreprocessorInclude::new(
                     relative_path.into(),
@@ -77,7 +75,7 @@ impl SymbolTreePreprocessorParser for GlslDefineTreePreprocessorParser {
         file_path: &Path,
         shader_content: &str,
         symbols: &mut ShaderPreprocessor,
-        _include_handler: &mut IncludeHandler,
+        _context: &mut ShaderPreprocessorContext,
     ) {
         let identifier_node = matches.captures[0].node;
         let range = ShaderRange::from_range(identifier_node.range(), file_path.into());

@@ -6,9 +6,9 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::{shader::ShaderStage, shader_error::ShaderDiagnostic};
+use crate::{include::IncludeHandler, shader::ShaderStage, shader_error::ShaderDiagnostic};
 
-use super::symbol_tree::ShaderSymbols;
+use super::{symbol_provider::ShaderSymbolParams, symbol_tree::ShaderSymbols};
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderParameter {
@@ -230,42 +230,32 @@ impl ShaderRegion {
 
 #[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessorContext {
-    pub defines: HashMap<String, String>,
+    pub defines: HashMap<String, String>, // TODO: Should store position aswell... At least target file path.
     pub directory_stack: Vec<PathBuf>,
     pub visited_dependencies: HashMap<PathBuf, bool>,
+    include_handler: IncludeHandler,
 }
 
 impl ShaderPreprocessorContext {
-    pub fn from_defines(defines: HashMap<String, String>) -> Self {
+    pub fn main(file_path: &Path, symbol_params: ShaderSymbolParams) -> Self {
+        let stack: Vec<PathBuf> = symbol_params.includes.iter().map(|i| i.into()).collect();
+        let visited_dependencies = HashMap::new();
+        // Need some additional info for this. Added in query_preprocessor
+        //stack.push(file_path.into());
+        //visited_dependencies.insert(file_path, false);
         Self {
-            defines: defines,
-            directory_stack: Vec::new(),
-            visited_dependencies: HashMap::new(),
-        }
-    }
-    pub fn main(defines: Vec<ShaderPreprocessorDefine>) -> Self {
-        Self {
-            defines: defines
-                .into_iter()
-                .map(|define| (define.name, define.value.unwrap_or("".into())))
-                .collect(),
-            directory_stack: Vec::new(),
-            visited_dependencies: HashMap::new(),
-        }
-    }
-    pub fn from_config(
-        defines: Vec<ShaderPreprocessorDefine>,
-        visited_dependencies: HashMap<PathBuf, bool>,
-        directory_stack: Vec<PathBuf>,
-    ) -> Self {
-        Self {
-            defines: defines
-                .into_iter()
-                .map(|define| (define.name, define.value.unwrap_or("".into())))
-                .collect(),
-            directory_stack: directory_stack,
+            defines: symbol_params.defines,
+            directory_stack: stack,
             visited_dependencies: visited_dependencies,
+            include_handler: IncludeHandler::new(
+                &file_path,
+                symbol_params.includes,
+                symbol_params.path_remapping,
+            ),
         }
+    }
+    pub fn search_path_in_includes(&mut self, path: &Path) -> Option<PathBuf> {
+        self.include_handler.search_path_in_includes(path)
     }
     pub fn append_defines(&mut self, defines: Vec<ShaderPreprocessorDefine>) {
         for define in defines {
@@ -321,6 +311,9 @@ impl ShaderPreprocessorInclude {
             range,
             cache: None,
         }
+    }
+    pub fn get_cache(&self) -> &ShaderSymbols {
+        self.cache.as_ref().unwrap()
     }
 }
 
@@ -548,6 +541,7 @@ impl ShaderSymbolList {
                                 match &e.range {
                                     Some(range) => {
                                         // TODO: should filter from other file with include range, but no access to it from there...
+                                        // TODO: handle scopes aswell... (& remove duplicate filter_scoped_symbol) + splat function.
                                         *position > range.start
                                             || range.start.file_path != position.file_path
                                     }

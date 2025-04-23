@@ -10,8 +10,7 @@ use super::{
     shader_language::ShaderLanguage,
     symbol_provider::ShaderSymbolParams,
     symbols::{
-        ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine,
-        ShaderPreprocessorInclude, ShaderSymbolList,
+        ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude, ShaderSymbolList,
     },
 };
 
@@ -31,18 +30,11 @@ pub struct ShaderSymbols {
     pub(super) symbol_list: ShaderSymbolList,
 }
 impl ShaderSymbols {
-    pub fn from_params(symbol_params: ShaderSymbolParams) -> Self {
+    pub fn new(file_path: &Path, symbol_params: ShaderSymbolParams) -> Self {
         Self {
             preprocessor: ShaderPreprocessor::new(ShaderPreprocessorContext::main(
-                symbol_params
-                    .defines
-                    .iter()
-                    .map(|e| ShaderPreprocessorDefine {
-                        name: e.0.clone(),
-                        range: None,
-                        value: Some(e.1.clone()),
-                    })
-                    .collect(),
+                file_path,
+                symbol_params,
             )),
             symbol_list: ShaderSymbolList::default(),
         }
@@ -56,7 +48,7 @@ impl ShaderSymbols {
                 include.relative_path,
                 self.dump_dependency_tree(&PathBuf::from("oui"))
             );
-            symbols.append(include.cache.as_ref().unwrap().get_all_symbols());
+            symbols.append(include.get_cache().get_all_symbols());
         }
         symbols
     }
@@ -75,7 +67,7 @@ impl ShaderSymbols {
     pub fn visit_includes<F: FnMut(&ShaderPreprocessorInclude)>(&self, callback: &mut F) {
         for include in &self.preprocessor.includes {
             callback(&include);
-            include.cache.as_ref().unwrap().visit_includes(callback);
+            include.get_cache().visit_includes(callback);
         }
     }
     pub fn visit_includes_mut<F: FnMut(&mut ShaderPreprocessorInclude)>(
@@ -95,7 +87,7 @@ impl ShaderSymbols {
             if callback(&include) {
                 return Some(vec![&include]);
             } else {
-                match include.cache.as_ref().unwrap().find_include_stack(callback) {
+                match include.get_cache().find_include_stack(callback) {
                     Some(mut stack) => {
                         stack.insert(0, include);
                         return Some(stack);
@@ -114,7 +106,7 @@ impl ShaderSymbols {
             if callback(&include) {
                 return Some(&include);
             } else {
-                match include.cache.as_ref().unwrap().find_include(callback) {
+                match include.get_cache().find_include(callback) {
                     Some(include) => {
                         return Some(&include);
                     }

@@ -3,7 +3,6 @@ use std::path::Path;
 use tree_sitter::{Node, QueryMatch};
 
 use crate::{
-    include::IncludeHandler,
     shader_error::ShaderError,
     symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolList},
 };
@@ -126,7 +125,6 @@ pub trait SymbolRegionFinder {
         node: tree_sitter::Node,
         preprocessor: &mut ShaderPreprocessor,
         context: &'a mut ShaderPreprocessorContext,
-        include_handler: &'a mut IncludeHandler,
         include_callback: &'a mut SymbolIncludeCallback<'a>,
         old_symbols: Option<ShaderSymbols>,
     ) -> Result<Vec<ShaderRegion>, ShaderError>;
@@ -142,7 +140,7 @@ pub trait SymbolTreePreprocessorParser {
         file_path: &Path,
         shader_content: &str,
         preprocessor: &mut ShaderPreprocessor,
-        include_handler: &mut IncludeHandler,
+        context: &mut ShaderPreprocessorContext,
     );
 }
 

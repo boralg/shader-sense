@@ -1,5 +1,4 @@
 use crate::{
-    include::IncludeHandler,
     shader_error::ShaderError,
     symbols::{
         hlsl::HlslSymbolRegionFinder,
@@ -30,7 +29,6 @@ impl SymbolRegionFinder for GlslRegionFinder {
         node: tree_sitter::Node,
         preprocessor: &mut ShaderPreprocessor,
         context: &'a mut ShaderPreprocessorContext,
-        include_handler: &mut IncludeHandler,
         include_callback: &'a mut SymbolIncludeCallback<'a>,
         old_symbols: Option<ShaderSymbols>,
     ) -> Result<Vec<ShaderRegion>, ShaderError> {
@@ -40,7 +38,6 @@ impl SymbolRegionFinder for GlslRegionFinder {
             node,
             preprocessor,
             context,
-            include_handler,
             include_callback,
             old_symbols,
         )

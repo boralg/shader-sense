@@ -715,7 +715,6 @@ impl ServerLanguage {
                                             language_data.validator.as_mut(),
                                             &mut language_data.language,
                                             &language_data.symbol_provider,
-                                            self.watched_files.variants.get(&uri).cloned(),
                                             &self.config,
                                         ) {
                                             Ok(_) => self.publish_diagnostic(&uri, None),
@@ -790,7 +789,6 @@ impl ServerLanguage {
                             language_data.validator.as_mut(),
                             &mut language_data.language,
                             &language_data.symbol_provider,
-                            self.watched_files.variants.get(&uri).cloned(),
                             &self.config,
                         ) {
                             Ok(_) => {
@@ -847,7 +845,6 @@ impl ServerLanguage {
                                 language_data.validator.as_mut(),
                                 &mut language_data.language,
                                 &language_data.symbol_provider,
-                                self.watched_files.variants.get(&uri).cloned(),
                                 &self.config,
                             ) {
                                 // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
@@ -917,7 +914,6 @@ impl ServerLanguage {
                                     language_data.validator.as_mut(),
                                     &mut language_data.language,
                                     &language_data.symbol_provider,
-                                    server.watched_files.variants.get(&url).cloned(),
                                     &server.config,
                                 ) {
                                     Ok(_) => file_to_republish.push(url.clone()),

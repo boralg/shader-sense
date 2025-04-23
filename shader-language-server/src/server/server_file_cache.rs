@@ -16,7 +16,7 @@ use shader_sense::{
         shader_language::ShaderLanguage,
         symbol_provider::SymbolProvider,
         symbol_tree::{ShaderModuleHandle, ShaderSymbols},
-        symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolList},
+        symbols::{ShaderPreprocessorContext, ShaderSymbol, ShaderSymbolData, ShaderSymbolList},
     },
     validator::validator::Validator,
 };
@@ -39,6 +39,14 @@ pub struct ServerFileCache {
 impl ServerFileCache {
     pub fn is_main_file(&self) -> bool {
         self.data.is_some()
+    }
+    pub fn get_data(&self) -> &ServerFileCacheData {
+        assert!(
+            self.is_main_file(),
+            "Trying to get data from file {} which does not have cache.",
+            RefCell::borrow(&self.shader_module).file_path.display()
+        );
+        self.data.as_ref().unwrap()
     }
 }
 
@@ -68,16 +76,12 @@ impl ServerLanguageFileCache {
     pub fn edit_data<F: FnOnce(&mut ServerFileCacheData)>(&mut self, uri: &Url, callback: F) {
         callback(self.files.get_mut(uri).unwrap().data.as_mut().unwrap())
     }
-    pub fn read_data(&self, uri: &Url) -> &ServerFileCacheData {
-        self.files.get(uri).unwrap().data.as_ref().unwrap()
-    }
     pub fn cache_file_data(
         &mut self,
         uri: &Url,
         validator: &mut dyn Validator,
         shader_language: &mut ShaderLanguage,
         symbol_provider: &SymbolProvider,
-        shader_variant: Option<ShaderVariant>,
         config: &ServerConfig,
     ) -> Result<(), ShaderError> {
         assert!(
@@ -86,6 +90,43 @@ impl ServerLanguageFileCache {
             uri
         );
         let file_path = uri.to_file_path().unwrap();
+        let context = if let Some(variant) = self.variants.get(uri) {
+            // If we have an active variant for this file, use it.
+            ShaderPreprocessorContext::main(
+                &file_path,
+                config.into_symbol_params(Some(variant.clone())),
+            )
+        } else {
+            // Else, look for variant that include this file to get its context.
+            let includer_variant =
+                self.variants
+                    .iter()
+                    .find(|(url, _variant)| match self.files.get(url) {
+                        Some(cached_file) => {
+                            cached_file.is_main_file()
+                                && cached_file
+                                    .get_data()
+                                    .symbol_cache
+                                    .has_dependency(&file_path)
+                        }
+                        None => false,
+                    });
+            if let Some((variant_url, _includer_variant)) = includer_variant {
+                let variant_cached_file = self.files.get(variant_url).unwrap();
+                let cached_file_as_include = variant_cached_file
+                    .get_data()
+                    .symbol_cache
+                    .find_include(&mut |i| i.absolute_path == file_path)
+                    .unwrap(); // Is expected.
+                cached_file_as_include
+                    .get_cache()
+                    .get_preprocessor()
+                    .context
+                    .clone()
+            } else {
+                ShaderPreprocessorContext::main(&file_path, config.into_symbol_params(None))
+            }
+        };
         // Reset cache
         let old_data = self.files.get_mut(&uri).unwrap().data.take();
         // Get symbols for main file.
@@ -94,14 +135,9 @@ impl ServerLanguageFileCache {
             let shading_language = self.files.get(uri).unwrap().shading_language;
             let shader_module = Rc::clone(&self.files.get(uri).unwrap().shader_module);
             let shader_module = RefCell::borrow(&shader_module);
-            let mut symbol_params = config.into_symbol_params();
-            // Add variant data if some.
-            if let Some(variant) = &shader_variant {
-                symbol_params.defines.extend(variant.defines.clone());
-            }
-            match symbol_provider.query_symbols(
+            match symbol_provider.query_symbols_with_context(
                 &shader_module,
-                symbol_params,
+                context,
                 &mut |include| {
                     let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
                     let included_file =
@@ -115,7 +151,10 @@ impl ServerLanguageFileCache {
                     // Return this error & store it to display it as a diagnostic & dont prevent linting.
                     match error.into_diagnostic(ShaderDiagnosticSeverity::Warning) {
                         Some(diagnostic) => (
-                            ShaderSymbols::from_params(config.into_symbol_params()),
+                            ShaderSymbols::new(
+                                &file_path,
+                                config.into_symbol_params(self.variants.get(uri).cloned()),
+                            ),
                             ShaderDiagnosticList {
                                 diagnostics: vec![diagnostic],
                             },
@@ -132,16 +171,11 @@ impl ServerLanguageFileCache {
             profile_scope!("Validating file {}", uri);
             let shading_language = self.files.get(uri).unwrap().shading_language;
             let shader_module = Rc::clone(&self.files.get(uri).unwrap().shader_module);
-            let mut validation_params = config.into_validation_params();
-            if let Some(variant) = &shader_variant {
-                for (variable, value) in &variant.defines {
-                    validation_params
-                        .defines
-                        .insert(variable.clone(), value.clone());
-                }
-            }
+
             let mut diagnostic_list = {
                 profile_scope!("Raw validation");
+                let validation_params =
+                    config.into_validation_params(self.variants.get(uri).cloned());
                 validator.validate_shader(
                     &RefCell::borrow(&shader_module).content,
                     RefCell::borrow(&shader_module).file_path.as_path(),
@@ -305,14 +339,7 @@ impl ServerLanguageFileCache {
             }
         };
         // Cache file data from new context.
-        self.cache_file_data(
-            uri,
-            validator,
-            shader_language,
-            symbol_provider,
-            self.variants.get(&uri).cloned(),
-            config,
-        )?;
+        self.cache_file_data(uri, validator, shader_language, symbol_provider, config)?;
         Ok(self.files.get(&uri).unwrap())
     }
     pub fn watch_dependency(
@@ -496,7 +523,7 @@ impl ServerLanguageFileCache {
     pub fn get_all_symbols(&self, uri: &Url, shader_language: &ShaderLanguage) -> ShaderSymbolList {
         let cached_file = self.files.get(uri).unwrap();
         assert!(cached_file.data.is_some(), "File {} do not have cache", uri);
-        let data = &cached_file.data.as_ref().unwrap();
+        let data = &cached_file.get_data();
         // Add main file symbols
         let mut symbol_cache = data.symbol_cache.get_all_symbols();
         // Add config symbols

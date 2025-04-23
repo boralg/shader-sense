@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
-    include::IncludeHandler,
+    include::canonicalize,
     shader::ShadingLanguageTag,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
 };
@@ -146,6 +146,22 @@ impl SymbolProvider {
         }
         scopes
     }
+    pub fn query_symbols_with_context<'a>(
+        &self,
+        shader_module: &ShaderModule,
+        mut context: ShaderPreprocessorContext,
+        include_callback: &'a mut SymbolIncludeCallback<'a>,
+        old_symbols: Option<ShaderSymbols>,
+    ) -> Result<ShaderSymbols, ShaderError> {
+        // Either we create it from context, or we store it in context (no need to store 2 ref to it).
+        let preprocessor =
+            self.query_preprocessor(shader_module, &mut context, include_callback, old_symbols)?;
+        let symbol_list = self.query_file_symbols(shader_module)?;
+        Ok(ShaderSymbols {
+            preprocessor,
+            symbol_list,
+        })
+    }
     pub fn query_symbols<'a>(
         &self,
         shader_module: &ShaderModule,
@@ -153,19 +169,9 @@ impl SymbolProvider {
         include_callback: &'a mut SymbolIncludeCallback<'a>,
         old_symbols: Option<ShaderSymbols>,
     ) -> Result<ShaderSymbols, ShaderError> {
-        let mut context = ShaderPreprocessorContext::from_defines(symbol_params.defines);
-        let mut include_handler = IncludeHandler::new(
-            &shader_module.file_path,
-            symbol_params.includes,
-            symbol_params.path_remapping,
-        );
-        let preprocessor = self.query_preprocessor(
-            shader_module,
-            &mut context,
-            &mut include_handler,
-            include_callback,
-            old_symbols,
-        )?;
+        let mut context = ShaderPreprocessorContext::main(&shader_module.file_path, symbol_params);
+        let preprocessor =
+            self.query_preprocessor(shader_module, &mut context, include_callback, old_symbols)?;
         let symbol_list = self.query_file_symbols(shader_module)?;
         Ok(ShaderSymbols {
             preprocessor,
@@ -176,11 +182,18 @@ impl SymbolProvider {
         &self,
         symbol_tree: &SymbolTree,
         context: &'a mut ShaderPreprocessorContext,
-        include_handler: &mut IncludeHandler,
         include_callback: &'a mut SymbolIncludeCallback<'a>,
         old_symbols: Option<ShaderSymbols>,
     ) -> Result<ShaderPreprocessor, ShaderError> {
         let mut preprocessor = ShaderPreprocessor::new(context.clone());
+
+        // Update context.
+        context
+            .visited_dependencies
+            .insert(symbol_tree.file_path.clone(), preprocessor.once);
+        if let Some(parent) = symbol_tree.file_path.parent() {
+            context.directory_stack.push(canonicalize(parent).unwrap());
+        }
         for parser in &self.preprocessor_parsers {
             let mut query_cursor = QueryCursor::new();
             for matches in query_cursor.matches(
@@ -193,7 +206,7 @@ impl SymbolProvider {
                     &symbol_tree.file_path,
                     &symbol_tree.content,
                     &mut preprocessor,
-                    include_handler,
+                    context,
                 );
             }
         }
@@ -210,7 +223,6 @@ impl SymbolProvider {
             symbol_tree.tree.root_node(),
             &mut preprocessor,
             context,
-            include_handler,
             include_callback,
             old_symbols,
         )?;

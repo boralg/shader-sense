@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[derive(Debug, Default, Clone)]
 pub struct IncludeHandler {
     includes: Vec<String>,
     directory_stack: Vec<PathBuf>, // Vec for keeping insertion order. Might own duplicate.
