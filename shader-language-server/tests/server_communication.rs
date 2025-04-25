@@ -1,3 +1,7 @@
+// Skip all these test on WASI.
+// WASI cannot spawn a server so test on pc with WASMTIME runner instead.
+#![cfg(not(target_os = "wasi"))]
+
 use core::panic;
 use std::collections::HashMap;
 use std::{
@@ -16,8 +20,6 @@ use test_server::{TestFile, TestServer};
 mod test_server;
 
 #[test]
-// Run on PC only to test WASI through WASMTIME
-#[cfg(not(target_os = "wasi"))]
 fn test_server_wasi_runtime() {
     use test_server::TestServer;
 
@@ -38,7 +40,6 @@ fn desktop_server() -> &'static Mutex<TestServer> {
 }
 
 #[test]
-#[cfg(not(target_os = "wasi"))]
 fn test_variant() {
     use lsp_types::{
         request::DocumentSymbolRequest, DocumentSymbolParams, DocumentSymbolResponse,
