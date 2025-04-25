@@ -766,7 +766,7 @@ impl ServerLanguage {
                 );
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(cached_file.is_main_file(), "{} is not a main file.", uri);
                         let shading_language = cached_file.shading_language;
                         let language_data = self.language_data.get_mut(&shading_language).unwrap();
                         // Update all content before caching data.
@@ -830,34 +830,38 @@ impl ServerLanguage {
                 }
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
-                        let shading_language = cached_file.shading_language;
-                        let language_data = self.language_data.get_mut(&shading_language).unwrap();
-                        match self.watched_files.update_file(
-                            &uri,
-                            &mut language_data.language,
-                            None,
-                            None,
-                        ) {
-                            // Cache once all changes have been applied.
-                            Ok(()) => match self.watched_files.cache_file_data(
+                        if cached_file.is_main_file() {
+                            let shading_language = cached_file.shading_language;
+                            let language_data =
+                                self.language_data.get_mut(&shading_language).unwrap();
+                            match self.watched_files.update_file(
                                 &uri,
-                                language_data.validator.as_mut(),
                                 &mut language_data.language,
-                                &language_data.symbol_provider,
-                                &self.config,
+                                None,
+                                None,
                             ) {
-                                // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
-                                Ok(_) => self.publish_diagnostic(&uri, None),
-                                Err(err) => {
-                                    self.connection.send_notification_error(format!("{}", err))
-                                }
-                            },
-                            Err(err) => self.connection.send_notification_error(format!(
-                                "Failed to update file {} after changing variant : {}",
-                                uri, err
-                            )),
-                        };
+                                // Cache once all changes have been applied.
+                                Ok(()) => match self.watched_files.cache_file_data(
+                                    &uri,
+                                    language_data.validator.as_mut(),
+                                    &mut language_data.language,
+                                    &language_data.symbol_provider,
+                                    &self.config,
+                                ) {
+                                    // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
+                                    Ok(_) => self.publish_diagnostic(&uri, None),
+                                    Err(err) => {
+                                        self.connection.send_notification_error(format!("{}", err))
+                                    }
+                                },
+                                Err(err) => self.connection.send_notification_error(format!(
+                                    "Failed to update file {} after changing variant : {}",
+                                    uri, err
+                                )),
+                            };
+                        } else {
+                            // Not main file, no need to update.
+                        }
                     }
                     None => {} // Not watched, no need to update.
                 }

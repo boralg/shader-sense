@@ -437,20 +437,21 @@ impl ServerLanguageFileCache {
             None => None,
         }
     }
-    pub fn remove_file(&mut self, uri: &Url) -> Result<Vec<Url>, ShaderError> {
-        let used_as_deps = self.files.iter().find(|(file_url, file_cache)| {
+    fn is_used_as_dependency(&self, uri: &Url) -> Option<(&Url, &ServerFileCache)> {
+        self.files.iter().find(|(file_url, file_cache)| {
             if *file_url != uri {
-                file_cache.data.is_some()
+                file_cache.is_main_file()
                     && file_cache
-                        .data
-                        .as_ref()
-                        .unwrap()
+                        .get_data()
                         .symbol_cache
                         .has_dependency(&uri.to_file_path().unwrap())
             } else {
                 false
             }
-        });
+        })
+    }
+    pub fn remove_file(&mut self, uri: &Url) -> Result<Vec<Url>, ShaderError> {
+        let used_as_deps = self.is_used_as_dependency(uri);
         let file_count = self.files.len();
         match used_as_deps {
             Some(_) => match self.files.get_mut(&uri) {
@@ -483,30 +484,30 @@ impl ServerLanguageFileCache {
                     );
                     let mut removed_files = Vec::new();
                     data.symbol_cache.visit_includes(&mut |include| {
-                        let include_used_as_deps =
-                            self.files.iter().find(|(_file_url, file_cache)| {
-                                file_cache.data.is_some()
-                                    && file_cache
-                                        .data
-                                        .as_ref()
-                                        .unwrap()
-                                        .symbol_cache
-                                        .has_dependency(&include.absolute_path)
-                            });
                         let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
+                        let include_used_as_deps = self.is_used_as_dependency(&include_uri);
                         match include_used_as_deps {
-                            Some(_) => {} // Nothing to do here.
-                            None => {
-                                // Remove deps file to avoid dangling file.
-                                // Dont unwrap as we might have multiple include to same file. Server will crash.
-                                let _dangling = self.files.remove(&include_uri);
-                                info!(
-                                    "Removing {:#?} deps file at {}. {} files in cache.",
-                                    cached_file.shading_language,
-                                    include_uri,
-                                    self.files.len()
-                                );
-                                removed_files.push(include_uri);
+                            Some(_) => {} // Still used, nothing to do here.
+                            None => match self.files.get(&include_uri) {
+                                Some(file) => if !file.is_main_file() {
+                                    // Remove deps file to avoid dangling file only if not a main file.
+                                    match self.files.remove(&include_uri) {
+                                        Some(removed_file) => {
+                                            info!(
+                                                "Removing {:#?} deps file at {}. {} files in cache.",
+                                                removed_file.shading_language,
+                                                include_uri,
+                                                self.files.len()
+                                            );
+                                            removed_files.push(include_uri);
+                                        },
+                                        None => {}, // File already removed.
+                                    }
+                                } else {
+                                    // TODO: Mark as dirty as context is changing. Cant update here
+                                    //self.cache_file_data(&include_uri, validator, shader_language, symbol_provider, config)
+                                },
+                                None => {}, // File already removed
                             }
                         }
                     });
