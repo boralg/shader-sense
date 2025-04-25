@@ -2,14 +2,47 @@ use core::panic;
 use std::{
     env,
     io::{BufReader, Read},
+    path::Path,
     process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio},
 };
 
 use lsp_types::{
     notification::{Exit, Initialized},
     request::{Initialize, Shutdown, WorkspaceConfiguration},
-    InitializeParams, InitializedParams,
+    InitializeParams, InitializedParams, TextDocumentIdentifier, TextDocumentItem, Url,
 };
+use shader_sense::{include::canonicalize, shader::ShadingLanguage};
+
+pub struct TestFile {
+    pub url: Url,
+    pub shading_language: ShadingLanguage,
+    pub content: String,
+}
+impl TestFile {
+    pub fn new(relative_path: &Path, shading_language: ShadingLanguage) -> Self {
+        let file_path = canonicalize(relative_path).unwrap();
+        let content = std::fs::read_to_string(&file_path).unwrap();
+        let uri = Url::from_file_path(&file_path).unwrap();
+        Self {
+            url: uri,
+            shading_language: shading_language,
+            content: content,
+        }
+    }
+    pub fn item(&self) -> TextDocumentItem {
+        TextDocumentItem {
+            uri: self.url.clone(),
+            language_id: self.shading_language.to_string(),
+            version: 0,
+            text: self.content.clone(),
+        }
+    }
+    pub fn identifier(&self) -> TextDocumentIdentifier {
+        TextDocumentIdentifier {
+            uri: self.url.clone(),
+        }
+    }
+}
 
 pub struct TestServer {
     child: Child,
@@ -89,21 +122,24 @@ impl TestServer {
         let stderr = child.stderr.take().expect("Failed to open stdout");
         let reader = BufReader::new(stdout);
         let err_reader = BufReader::new(stderr);
-        TestServer {
+        let mut server = TestServer {
             child: child,
             request_id: 0,
             reader,
             err_reader,
             stdin,
-        }
+        };
+        // Send an LSP initialize request
+        server.initialize();
+        server
     }
-    pub fn initialize(&mut self) {
+    fn initialize(&mut self) {
         let params = InitializeParams::default();
         self.send_request::<Initialize>(&params, |_| {});
         self.send_notification::<Initialized>(&InitializedParams {});
         self.expect_request::<WorkspaceConfiguration>();
     }
-    pub fn exit(&mut self) {
+    fn exit(&mut self) {
         self.send_request::<Shutdown>(&(), |_| {});
         self.send_notification::<Exit>(&());
         // Wait log for printing them.
@@ -213,5 +249,11 @@ impl TestServer {
                 panic!("Unhandled request {}", request.method);
             }
         }
+    }
+}
+
+impl Drop for TestServer {
+    fn drop(&mut self) {
+        self.exit();
     }
 }
