@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     include::IncludeHandler,
-    shader::{HlslShaderModel, HlslVersion},
+    shader::{HlslShaderModel, HlslVersion, ShaderStage},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::symbols::{ShaderPosition, ShaderRange},
 };
@@ -198,6 +198,32 @@ impl Dxc {
     }
 }
 
+fn get_profile(shader_stage: Option<ShaderStage>) -> &'static str {
+    // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-models
+    match shader_stage {
+        Some(shader_stage) => match shader_stage {
+            ShaderStage::Vertex => "vs",
+            ShaderStage::Fragment => "ps",
+            ShaderStage::Compute => "cs",
+            ShaderStage::TesselationControl => "ds",
+            ShaderStage::TesselationEvaluation => "hs",
+            ShaderStage::Geometry => "gs",
+            // Mesh shader not in spec. but seems to be it
+            ShaderStage::Mesh => "ms", // Check these
+            ShaderStage::Task => "as", // Check these
+            // All RT seems to use lib profile.
+            ShaderStage::RayGeneration
+            | ShaderStage::ClosestHit
+            | ShaderStage::AnyHit
+            | ShaderStage::Callable
+            | ShaderStage::Miss
+            | ShaderStage::Intersect => "lib",
+        },
+        // Use lib profile if no stage.
+        None => "lib",
+    }
+}
+
 impl Validator for Dxc {
     fn validate_shader(
         &mut self,
@@ -251,9 +277,13 @@ impl Validator for Dxc {
         let result = self.compiler.compile(
             &blob,
             file_name.as_str(),
-            "", // TODO: Could have a command to validate specific entry point (specify stage & entry point)
+            match &params.entry_point {
+                Some(entry_point) => entry_point.as_str(),
+                None => "",
+            },
             format!(
-                "lib_{}", // Using lib profile to avoid specifying entry point
+                "{}_{}",
+                get_profile(params.shader_stage),
                 match params.hlsl_shader_model {
                     HlslShaderModel::ShaderModel6 => "6_0",
                     HlslShaderModel::ShaderModel6_1 => "6_1",

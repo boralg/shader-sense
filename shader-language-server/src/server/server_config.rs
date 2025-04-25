@@ -63,7 +63,7 @@ pub struct ServerConfig {
 
 impl ServerConfig {
     pub fn into_validation_params(&self, variant: Option<ShaderVariant>) -> ValidationParams {
-        let (mut defines, mut includes) = match variant {
+        let (mut defines, mut includes, entry_point, shader_stage) = match variant {
             Some(variant) => (
                 variant.defines.clone(),
                 variant
@@ -71,12 +71,16 @@ impl ServerConfig {
                     .into_iter()
                     .map(|e| e.into_os_string().into_string().unwrap())
                     .collect::<Vec<String>>(),
+                Some(variant.entry_point),
+                variant.stage,
             ),
-            None => (HashMap::new(), Vec::new()),
+            None => (HashMap::new(), Vec::new(), None, None),
         };
         defines.extend(self.defines.clone());
         includes.extend(self.includes.clone());
         ValidationParams {
+            entry_point: entry_point,
+            shader_stage: shader_stage,
             defines: defines,
             includes: includes,
             path_remapping: self

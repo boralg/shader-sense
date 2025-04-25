@@ -246,7 +246,9 @@ impl Validator for Glslang {
         let file_name = self.get_file_name(file_path);
 
         let (shader_stage, shader_source, offset_first_line) =
-            if let Some(shader_stage) = ShaderStage::from_file_name(&file_name) {
+            if let Some(variant_stage) = params.shader_stage {
+                (variant_stage, content.clone(), false)
+            } else if let Some(shader_stage) = ShaderStage::from_file_name(&file_name) {
                 (shader_stage, content.clone(), false)
             } else {
                 // If we dont have a stage, might require some preprocess to avoid errors.
@@ -346,7 +348,7 @@ impl Validator for Glslang {
                 Ok(diag) => return Ok(diag),
             },
         };
-        let _shader = match glslang::Shader::new(&self.compiler, input)
+        let shader = match glslang::Shader::new(&self.compiler, input)
             .map_err(|e| self.from_glslang_error(e, file_path, &params, offset_first_line))
         {
             Ok(value) => value,
@@ -355,14 +357,20 @@ impl Validator for Glslang {
                 Ok(diag) => return Ok(diag),
             },
         };
-        // Linking require main entry point. Should work around this somehow.
-        /*let _spirv = match shader.compile().map_err(|e| self.from_glslang_error(e)) {
-            Ok(value) => value,
-            Err(error) => match error {
-                Err(error) => return Err(error),
-                Ok(diag) => return Ok((diag, include_handler.get_dependencies().clone())),
-            },
-        };*/
+        // Linking require main entry point.
+        // For now, glslang is expecting main entry point, no way to change this via C api.
+        /*if params.entry_point.is_some() {
+            let _spirv = match shader
+                .compile()
+                .map_err(|e| self.from_glslang_error(e, file_path, &params, offset_first_line))
+            {
+                Ok(value) => value,
+                Err(error) => match error {
+                    Err(error) => return Err(error),
+                    Ok(diag) => return Ok(diag),
+                },
+            };
+        }*/
 
         Ok(ShaderDiagnosticList::empty()) // No error detected.
     }

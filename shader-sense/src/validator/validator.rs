@@ -4,12 +4,14 @@ use std::{
 };
 
 use crate::{
-    shader::{GlslSpirvVersion, GlslTargetClient, HlslShaderModel, HlslVersion},
+    shader::{GlslSpirvVersion, GlslTargetClient, HlslShaderModel, HlslVersion, ShaderStage},
     shader_error::{ShaderDiagnosticList, ShaderError},
 };
 
 #[derive(Debug, Default, Clone)]
 pub struct ValidationParams {
+    pub entry_point: Option<String>,
+    pub shader_stage: Option<ShaderStage>,
     pub includes: Vec<String>,
     pub defines: HashMap<String, String>,
     pub path_remapping: HashMap<PathBuf, PathBuf>,
