@@ -8,3 +8,10 @@ rustflags = [
   #"-C", "link-arg=--export-memory",
 ]
 runner = "wasmtime --wasi threads=y --dir ../shader-sense/test::/test"
+
+[target.wasm32-unknown-unknown]
+# Tree sitter is a C API with rust binding here, and linking rust & C for wasm32-unknown-unknown is impossible without this perma-unstable flag, available only in nightly rust.
+# Will have to wait until the issue is fixed in wasm32-unknown-unknown, god knows when.
+# https://stackoverflow.com/questions/78556000/how-you-can-link-a-rust-library-with-c-c-and-wasm-bindgen-for-the-wasm32-unkno
+# https://github.com/rustwasm/wasm-bindgen/issues/3454
+rustflags = ["-Z", "wasm-c-abi=spec"]
