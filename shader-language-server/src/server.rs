@@ -207,7 +207,11 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         match self.recolt_diagnostic(&uri) {
                             Ok(mut diagnostics) => {
                                 let main_diagnostic = match diagnostics.remove(&uri) {
@@ -271,7 +275,11 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         let position = params.text_document_position_params.position;
                         match self.recolt_goto(&uri, position) {
                             Ok(value) => self
@@ -300,7 +308,11 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document_position.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         match self.recolt_completion(
                             &uri,
                             params.text_document_position.position,
@@ -336,7 +348,11 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         match self
                             .recolt_signature(&uri, params.text_document_position_params.position)
                         {
@@ -366,7 +382,11 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         let position = params.text_document_position_params.position;
                         match self.recolt_hover(&uri, position) {
                             Ok(value) => self
@@ -395,7 +415,11 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         match self.recolt_inlay_hint(&uri, &params.range) {
                             Ok(inlay_hints) => {
                                 self.connection.send_response::<InlayHintRequest>(
@@ -427,7 +451,11 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         // Adding regions
                         let mut folding_ranges: Vec<FoldingRange> = cached_file
                             .data
@@ -511,7 +539,11 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         match self.recolt_document_symbol(&uri) {
                             Ok(symbols) => self.connection.send_response::<DocumentSymbolRequest>(
                                 req.id.clone(),
@@ -541,7 +573,11 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         let ast = RefCell::borrow(&cached_file.shader_module).dump_ast();
                         self.connection
                             .send_response::<DumpAstRequest>(req.id.clone(), Some(ast));
@@ -562,7 +598,11 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         let deps_tree = cached_file
                             .data
                             .as_ref()
@@ -590,7 +630,11 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         match self.recolt_semantic_tokens(&uri) {
                             Ok(semantic_tokens) => {
                                 self.connection.send_response::<SemanticTokensFullRequest>(
@@ -689,7 +733,11 @@ impl ServerLanguage {
                 // File content is updated through DidChangeTextDocument.
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "Not a main file.");
+                        assert!(
+                            cached_file.is_main_file(),
+                            "File {} is not a main file.",
+                            uri
+                        );
                         assert!(
                             params.text.is_none()
                                 || (params.text.is_some()
