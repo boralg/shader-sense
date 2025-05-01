@@ -73,9 +73,6 @@ impl ServerLanguageFileCache {
             diagnostic_cache,
         })
     }
-    pub fn edit_data<F: FnOnce(&mut ServerFileCacheData)>(&mut self, uri: &Url, callback: F) {
-        callback(self.files.get_mut(uri).unwrap().data.as_mut().unwrap())
-    }
     pub fn cache_file_data(
         &mut self,
         uri: &Url,
@@ -90,7 +87,7 @@ impl ServerLanguageFileCache {
             uri
         );
         let file_path = uri.to_file_path().unwrap();
-        let context = if let Some(variant) = self.variants.get(uri) {
+        let mut context = if let Some(variant) = self.variants.get(uri) {
             // If we have an active variant for this file, use it.
             ShaderPreprocessorContext::main(
                 &file_path,
@@ -137,7 +134,7 @@ impl ServerLanguageFileCache {
             let shader_module = RefCell::borrow(&shader_module);
             match symbol_provider.query_symbols_with_context(
                 &shader_module,
-                context,
+                &mut context,
                 &mut |include| {
                     let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
                     let included_file =
@@ -528,7 +525,7 @@ impl ServerLanguageFileCache {
         // Add main file symbols
         let mut symbol_cache = data.symbol_cache.get_all_symbols();
         // Add config symbols
-        for (key, value) in &data.symbol_cache.get_context().defines {
+        for (key, value) in data.symbol_cache.get_context().get_defines() {
             symbol_cache.macros.push(ShaderSymbol {
                 label: key.clone(),
                 description: format!(

@@ -15,7 +15,7 @@ mod tests {
 
     fn validate_include(path: &Path) -> bool {
         let file_path = Path::new("./test/hlsl/dontcare.hlsl");
-        let mut include_handler = IncludeHandler::new(
+        let mut include_handler = IncludeHandler::main(
             file_path,
             vec![],
             HashMap::from([
@@ -56,7 +56,7 @@ mod tests {
     #[test]
     fn test_directory_stack() {
         let file_path = Path::new("./test/hlsl/include-level.hlsl");
-        let mut include_handler = IncludeHandler::new(file_path, vec![], HashMap::new());
+        let mut include_handler = IncludeHandler::main(file_path, vec![], HashMap::new());
         assert!(include_handler
             .search_path_in_includes(Path::new("./inc0/level0.hlsl"))
             .is_some());

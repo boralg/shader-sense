@@ -1,12 +1,13 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
 #[derive(Debug, Default, Clone)]
 pub struct IncludeHandler {
-    includes: Vec<String>,
+    includes: Vec<String>, // No need to store include, store them as directory stack ? No cuz we want stack before include.
     directory_stack: Vec<PathBuf>, // Vec for keeping insertion order. Might own duplicate.
+    visited_dependencies: HashSet<PathBuf>,
     path_remapping: HashMap<PathBuf, PathBuf>, // remapping of path / virtual path
 }
 // std::fs::canonicalize not supported on wasi target... Emulate it.
@@ -41,30 +42,34 @@ pub fn canonicalize(p: &Path) -> std::io::Result<PathBuf> {
 }
 
 impl IncludeHandler {
-    pub fn default(file: &Path) -> Self {
-        Self::new(file, Vec::new(), HashMap::new())
+    pub fn main_without_config(file: &Path) -> Self {
+        Self::main(file, Vec::new(), HashMap::new())
     }
-    // New main file.
-    pub fn new(
-        file: &Path,
+    pub fn main(
+        file_path: &Path,
         includes: Vec<String>,
         path_remapping: HashMap<PathBuf, PathBuf>,
     ) -> Self {
         // Add local path to directory stack
-        let cwd = file.parent().unwrap();
-        let mut stack = Vec::new();
-        stack.push(cwd.into());
-        Self::new_from_stack(includes, path_remapping, stack)
-    }
-    pub fn new_from_stack(
-        includes: Vec<String>,
-        path_remapping: HashMap<PathBuf, PathBuf>,
-        directory_stack: Vec<PathBuf>,
-    ) -> Self {
+        let cwd = file_path.parent().unwrap();
+        let mut directory_stack = Vec::new();
+        directory_stack.push(cwd.into());
+        let mut visited_dependencies = HashSet::new();
+        visited_dependencies.insert(file_path.into());
         Self {
             includes: includes,
             directory_stack: directory_stack,
+            visited_dependencies: visited_dependencies,
             path_remapping: path_remapping,
+        }
+    }
+    pub fn is_visited(&self, path: &Path) -> bool {
+        self.visited_dependencies.contains(path)
+    }
+    pub fn visit_file(&mut self, path: &Path) {
+        self.visited_dependencies.insert(path.into());
+        if let Some(parent) = path.parent() {
+            self.directory_stack.push(canonicalize(parent).unwrap());
         }
     }
     pub fn search_in_includes(
@@ -95,9 +100,7 @@ impl IncludeHandler {
             for directory_stack in self.directory_stack.iter().rev() {
                 let path = Path::new(directory_stack).join(&relative_path);
                 if path.is_file() {
-                    if let Some(parent) = path.parent() {
-                        self.directory_stack.push(canonicalize(parent).unwrap());
-                    }
+                    self.visit_file(&path);
                     return Some(path);
                 }
             }
@@ -105,9 +108,7 @@ impl IncludeHandler {
             for include_path in &self.includes {
                 let path = Path::new(include_path).join(&relative_path);
                 if path.is_file() {
-                    if let Some(parent) = path.parent() {
-                        self.directory_stack.push(canonicalize(parent).unwrap());
-                    }
+                    self.visit_file(&path);
                     return Some(path);
                 }
             }
@@ -118,9 +119,7 @@ impl IncludeHandler {
                 if target_path.is_file() {
                     // We should not add virtual path to stack, as they are well defined already.
                     // But we expect a correct directory stack.
-                    if let Some(parent) = target_path.parent() {
-                        self.directory_stack.push(canonicalize(parent).unwrap());
-                    }
+                    self.visit_file(&target_path);
                     return Some(target_path);
                 }
             }

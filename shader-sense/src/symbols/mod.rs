@@ -10,7 +10,7 @@ mod wgsl;
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::{HashMap, HashSet},
+        collections::HashSet,
         path::{Path, PathBuf},
     };
 
@@ -75,7 +75,7 @@ mod tests {
         file_path: &Path,
         shader_content: &String,
     ) -> Result<ShaderSymbolList, ShaderError> {
-        let mut include_handler = IncludeHandler::new(&file_path, vec![], HashMap::new());
+        let mut include_handler = IncludeHandler::main_without_config(&file_path);
         let deps = find_dependencies(&mut include_handler, &shader_content);
         let mut all_symbols = language.get_intrinsics_symbol().clone();
         let symbol_tree = language.create_module(file_path, shader_content).unwrap();

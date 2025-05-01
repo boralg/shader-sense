@@ -3,7 +3,6 @@ use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
-    include::canonicalize,
     shader::ShadingLanguageTag,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
 };
@@ -17,7 +16,7 @@ use super::{
     symbol_tree::{ShaderModule, ShaderModuleHandle, ShaderSymbols, SymbolTree},
     symbols::{
         ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude,
-        ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolList,
+        ShaderPreprocessorMode, ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolList,
     },
 };
 
@@ -149,14 +148,18 @@ impl SymbolProvider {
     pub fn query_symbols_with_context<'a>(
         &self,
         shader_module: &ShaderModule,
-        mut context: ShaderPreprocessorContext,
+        context: &mut ShaderPreprocessorContext,
         include_callback: &'a mut SymbolIncludeCallback<'a>,
         old_symbols: Option<ShaderSymbols>,
     ) -> Result<ShaderSymbols, ShaderError> {
         // Either we create it from context, or we store it in context (no need to store 2 ref to it).
         let preprocessor =
-            self.query_preprocessor(shader_module, &mut context, include_callback, old_symbols)?;
-        let symbol_list = self.query_file_symbols(shader_module)?;
+            self.query_preprocessor(shader_module, context, include_callback, old_symbols)?;
+        let symbol_list = if let ShaderPreprocessorMode::OnceVisited = preprocessor.mode {
+            ShaderSymbolList::default() // if once, no symbols.
+        } else {
+            self.query_file_symbols(shader_module)?
+        };
         Ok(ShaderSymbols {
             preprocessor,
             symbol_list,
@@ -172,13 +175,17 @@ impl SymbolProvider {
         let mut context = ShaderPreprocessorContext::main(&shader_module.file_path, symbol_params);
         let preprocessor =
             self.query_preprocessor(shader_module, &mut context, include_callback, old_symbols)?;
-        let symbol_list = self.query_file_symbols(shader_module)?;
+        let symbol_list = if let ShaderPreprocessorMode::OnceVisited = preprocessor.mode {
+            ShaderSymbolList::default() // if once, no symbols.
+        } else {
+            self.query_file_symbols(shader_module)?
+        };
         Ok(ShaderSymbols {
             preprocessor,
             symbol_list,
         })
     }
-    pub(super) fn query_preprocessor<'a>(
+    fn query_preprocessor<'a>(
         &self,
         symbol_tree: &SymbolTree,
         context: &'a mut ShaderPreprocessorContext,
@@ -187,13 +194,19 @@ impl SymbolProvider {
     ) -> Result<ShaderPreprocessor, ShaderError> {
         let mut preprocessor = ShaderPreprocessor::new(context.clone());
 
-        // Update context.
-        context
-            .visited_dependencies
-            .insert(symbol_tree.file_path.clone(), preprocessor.once);
-        if let Some(parent) = symbol_tree.file_path.parent() {
-            context.directory_stack.push(canonicalize(parent).unwrap());
+        // Check pragma once macro.
+        if let Some(_) = symbol_tree.content.find("#pragma once") {
+            // Assume regions not affecting it neither does include order.
+            preprocessor.mode = if context.is_visited(&symbol_tree.file_path) {
+                ShaderPreprocessorMode::OnceVisited
+            } else {
+                ShaderPreprocessorMode::Once
+            };
+            return Ok(preprocessor);
+        } else {
+            preprocessor.mode = ShaderPreprocessorMode::Default;
         }
+
         for parser in &self.preprocessor_parsers {
             let mut query_cursor = QueryCursor::new();
             for matches in query_cursor.matches(
@@ -209,11 +222,6 @@ impl SymbolProvider {
                     context,
                 );
             }
-        }
-        // Mark this shader as once if pragma once is set.
-        if let Some(_) = symbol_tree.content.find("#pragma once") {
-            // Assume regions not affecting it neither does include order.
-            preprocessor.once = true;
         }
         // Query regions.
         // Will filter includes & defines in inactive regions
@@ -245,7 +253,7 @@ impl SymbolProvider {
         }
         Ok(preprocessor)
     }
-    pub(super) fn query_file_symbols(
+    fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
     ) -> Result<ShaderSymbolList, ShaderError> {

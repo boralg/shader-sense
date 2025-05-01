@@ -80,7 +80,7 @@ impl<'a> GlslangIncludeHandler<'a> {
         include_callback: &'a mut dyn FnMut(&Path) -> Option<String>,
     ) -> Self {
         Self {
-            include_handler: IncludeHandler::new(file_path, includes, path_remapping),
+            include_handler: IncludeHandler::main(file_path, includes, path_remapping),
             include_callback: include_callback,
         }
     }
@@ -124,7 +124,7 @@ impl Glslang {
             }
         }
         starts.push(errors.len());
-        let mut include_handler = IncludeHandler::new(
+        let mut include_handler = IncludeHandler::main(
             file_path,
             params.includes.clone(),
             params.path_remapping.clone(),
@@ -348,7 +348,7 @@ impl Validator for Glslang {
                 Ok(diag) => return Ok(diag),
             },
         };
-        let shader = match glslang::Shader::new(&self.compiler, input)
+        let _shader = match glslang::Shader::new(&self.compiler, input)
             .map_err(|e| self.from_glslang_error(e, file_path, &params, offset_first_line))
         {
             Ok(value) => value,

@@ -10,7 +10,8 @@ use crate::{
         symbol_tree::{ShaderModuleHandle, ShaderSymbols, SymbolTree},
         symbols::{
             ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext,
-            ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderRange, ShaderRegion,
+            ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderPreprocessorMode,
+            ShaderRange, ShaderRegion,
         },
     },
 };
@@ -105,13 +106,6 @@ impl HlslSymbolRegionFinder {
         .unwrap();
         Self { query_if }
     }
-    fn get_define_value(context: &ShaderPreprocessorContext, name: &str) -> Option<String> {
-        context
-            .defines
-            .iter()
-            .find(|(key, _)| *key == name)
-            .map(|(_, value)| value.clone())
-    }
     fn parse_number(number: &str) -> Result<i32, ParseIntError> {
         if number.starts_with("0x") && number.len() > 2 {
             let prefixed_number = number
@@ -146,7 +140,7 @@ impl HlslSymbolRegionFinder {
         } else {
             // Here we recurse define value cuz a define might just be an alias for another define.
             // If we dont manage to parse it as a number, parse it as another define.
-            match Self::get_define_value(context, name) {
+            match context.get_define_value(name) {
                 Some(value) => match Self::parse_number(value.as_str()) {
                     Ok(parsed_value) => Ok(parsed_value),
                     Err(_) => {
@@ -162,7 +156,7 @@ impl HlslSymbolRegionFinder {
         name: &str,
         position: &ShaderPosition,
     ) -> Result<i32, ShaderError> {
-        match Self::get_define_value(context, name) {
+        match context.get_define_value(name) {
             Some(value) => match value.parse::<i32>() {
                 Ok(parsed_value) => Ok(parsed_value),
                 Err(_) => {
@@ -174,7 +168,7 @@ impl HlslSymbolRegionFinder {
         }
     }
     fn is_define_defined(context: &ShaderPreprocessorContext, name: &str) -> i32 {
-        Self::get_define_value(context, name).is_some() as i32
+        context.get_define_value(name).is_some() as i32
     }
     fn resolve_condition(
         cursor: tree_sitter::TreeCursor,
@@ -369,6 +363,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             include: &mut ShaderPreprocessorInclude,
             include_callback: &'a mut SymbolIncludeCallback<'a>,
             old_symbols: &mut Option<ShaderSymbols>,
+            mode: &ShaderPreprocessorMode,
         ) -> Result<(), ShaderError> {
             // Include found, deal with it.
             let module = RefCell::borrow(&module_handle);
@@ -395,22 +390,17 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 None => (true, None), // No old_symbol.
             };
             // Check for pragma once.
-            let is_once = match context.visited_dependencies.get(&include.absolute_path) {
-                Some(once) => *once,
-                None => false,
-            };
+            let is_once = context.is_visited(&include.absolute_path)
+                && *mode == ShaderPreprocessorMode::OnceVisited;
             if !is_once {
                 // Update include symbols if dirty, or simply move from old symbols.
                 if is_dirty {
-                    include.cache = Some(ShaderSymbols {
-                        preprocessor: symbol_provider.query_preprocessor(
-                            &module,
-                            context,
-                            include_callback,
-                            include_old_cache,
-                        )?,
-                        symbol_list: symbol_provider.query_file_symbols(&module)?,
-                    })
+                    include.cache = Some(symbol_provider.query_symbols_with_context(
+                        &module,
+                        context,
+                        include_callback,
+                        include_old_cache,
+                    )?)
                 } else {
                     assert!(include_old_cache.is_some(), "Not dirty, but missing cache.");
                     include.cache = include_old_cache;
@@ -421,13 +411,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     cache.visit_includes(&mut |included_include| {
                         // Update context.
                         let included_cache = included_include.get_cache();
-                        context.visited_dependencies.insert(
-                            included_include.absolute_path.clone(),
-                            included_cache.get_preprocessor().once,
-                        );
-                        if let Some(parent) = included_include.absolute_path.parent() {
-                            context.directory_stack.push(parent.into());
-                        }
+                        context.visit_file(&included_include.absolute_path);
                         update_context_for_include(
                             included_include,
                             context,
@@ -447,9 +431,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             Ok(())
         }
         // Add context just to be sure
-        context
-            .visited_dependencies
-            .insert(symbol_tree.file_path.clone(), preprocessor.once);
+        context.visit_file(&symbol_tree.file_path);
         // Query regions
         let mut query_cursor = QueryCursor::new();
         let mut regions = Vec::new();
@@ -513,6 +495,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                 include_mut,
                                 include_callback,
                                 old_symbols,
+                                &preprocessor.mode,
                             )?;
                         }
                         None => {
@@ -766,6 +749,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         include_mut,
                         include_callback,
                         &mut old_symbols,
+                        &preprocessor.mode,
                     )?;
                 }
                 None => {

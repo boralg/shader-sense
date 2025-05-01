@@ -41,7 +41,7 @@ impl<'a> DxcIncludeHandler<'a> {
         include_callback: &'a mut dyn FnMut(&Path) -> Option<String>,
     ) -> Self {
         Self {
-            include_handler: IncludeHandler::new(file, includes, path_remapping),
+            include_handler: IncludeHandler::main(file, includes, path_remapping),
             include_callback: include_callback,
         }
     }
@@ -104,7 +104,7 @@ impl Dxc {
             }
         }
         starts.push(errors.len()); // Push the end.
-        let mut include_handler = IncludeHandler::new(
+        let mut include_handler = IncludeHandler::main(
             file_path,
             params.includes.clone(),
             params.path_remapping.clone(),

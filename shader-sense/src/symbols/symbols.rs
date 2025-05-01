@@ -230,24 +230,15 @@ impl ShaderRegion {
 
 #[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessorContext {
-    pub defines: HashMap<String, String>, // TODO: Should store position aswell... At least target file path.
-    pub directory_stack: Vec<PathBuf>,
-    pub visited_dependencies: HashMap<PathBuf, bool>,
+    defines: HashMap<String, String>, // TODO: Should store position aswell... At least target file path.
     include_handler: IncludeHandler,
 }
 
 impl ShaderPreprocessorContext {
     pub fn main(file_path: &Path, symbol_params: ShaderSymbolParams) -> Self {
-        let stack: Vec<PathBuf> = symbol_params.includes.iter().map(|i| i.into()).collect();
-        let visited_dependencies = HashMap::new();
-        // Need some additional info for this. Added in query_preprocessor
-        //stack.push(file_path.into());
-        //visited_dependencies.insert(file_path, false);
         Self {
             defines: symbol_params.defines,
-            directory_stack: stack,
-            visited_dependencies: visited_dependencies,
-            include_handler: IncludeHandler::new(
+            include_handler: IncludeHandler::main(
                 &file_path,
                 symbol_params.includes,
                 symbol_params.path_remapping,
@@ -263,9 +254,24 @@ impl ShaderPreprocessorContext {
                 .insert(define.name, define.value.unwrap_or("".into()));
         }
     }
+    pub fn is_visited(&mut self, path: &Path) -> bool {
+        self.include_handler.is_visited(path)
+    }
+    pub fn visit_file(&mut self, path: &Path) {
+        self.include_handler.visit_file(path);
+    }
     pub fn is_dirty(&self, context: &ShaderPreprocessorContext) -> bool {
         // Compare defines to determine if context is different.
         context.defines != self.defines
+    }
+    pub fn get_define_value(&self, name: &str) -> Option<String> {
+        self.defines
+            .iter()
+            .find(|(key, _)| *key == name)
+            .map(|(_, value)| value.clone())
+    }
+    pub fn get_defines(&self) -> &HashMap<String, String> {
+        &self.defines
     }
 }
 
@@ -284,6 +290,14 @@ pub struct ShaderPreprocessorDefine {
     pub value: Option<String>,
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub enum ShaderPreprocessorMode {
+    #[default]
+    Default,
+    Once,
+    OnceVisited,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessor {
     pub context: ShaderPreprocessorContext, // Defines from includer files when included, or config.
@@ -292,7 +306,7 @@ pub struct ShaderPreprocessor {
     pub defines: Vec<ShaderPreprocessorDefine>,
     pub regions: Vec<ShaderRegion>,
     pub diagnostics: Vec<ShaderDiagnostic>, // preprocessor errors
-    pub once: bool,
+    pub mode: ShaderPreprocessorMode,
 }
 impl ShaderPreprocessorDefine {
     pub fn new(name: String, range: ShaderRange, value: Option<String>) -> Self {
@@ -325,7 +339,7 @@ impl ShaderPreprocessor {
             defines: Vec::new(),
             regions: Vec::new(),
             diagnostics: Vec::new(),
-            once: false,
+            mode: ShaderPreprocessorMode::default(),
         }
     }
     pub fn preprocess_symbols(&self, shader_symbols: &mut ShaderSymbolList) {
