@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -232,6 +232,7 @@ impl ShaderRegion {
 pub struct ShaderPreprocessorContext {
     defines: HashMap<String, String>, // TODO: Should store position aswell... At least target file path.
     include_handler: IncludeHandler,
+    dirty_files: HashSet<PathBuf>, // Dirty files that need to be recomputed no matter what.
 }
 
 impl ShaderPreprocessorContext {
@@ -243,7 +244,11 @@ impl ShaderPreprocessorContext {
                 symbol_params.includes,
                 symbol_params.path_remapping,
             ),
+            dirty_files: HashSet::new(),
         }
+    }
+    pub fn mark_dirty(&mut self, file_path: &Path) {
+        self.dirty_files.insert(file_path.into());
     }
     pub fn search_path_in_includes(&mut self, path: &Path) -> Option<PathBuf> {
         self.include_handler.search_path_in_includes(path)
@@ -260,9 +265,10 @@ impl ShaderPreprocessorContext {
     pub fn visit_file(&mut self, path: &Path) {
         self.include_handler.visit_file(path);
     }
-    pub fn is_dirty(&self, context: &ShaderPreprocessorContext) -> bool {
+    pub fn is_dirty(&self, file_path: &Path, context: &ShaderPreprocessorContext) -> bool {
         // Compare defines to determine if context is different.
-        context.defines != self.defines
+        // Check if we need to force an update aswell.
+        context.defines != self.defines || context.dirty_files.contains(file_path)
     }
     pub fn get_define_value(&self, name: &str) -> Option<String> {
         self.defines
@@ -328,6 +334,9 @@ impl ShaderPreprocessorInclude {
     }
     pub fn get_cache(&self) -> &ShaderSymbols {
         self.cache.as_ref().unwrap()
+    }
+    pub fn get_cache_mut(&mut self) -> &mut ShaderSymbols {
+        self.cache.as_mut().unwrap()
     }
 }
 

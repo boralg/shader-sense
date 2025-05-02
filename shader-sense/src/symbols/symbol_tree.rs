@@ -64,6 +64,9 @@ impl ShaderSymbols {
     pub fn get_preprocessor(&self) -> &ShaderPreprocessor {
         &self.preprocessor
     }
+    pub fn get_preprocessor_mut(&mut self) -> &mut ShaderPreprocessor {
+        &mut self.preprocessor
+    }
     pub fn visit_includes<F: FnMut(&ShaderPreprocessorInclude)>(&self, callback: &mut F) {
         for include in &self.preprocessor.includes {
             callback(&include);

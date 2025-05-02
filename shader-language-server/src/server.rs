@@ -764,8 +764,14 @@ impl ServerLanguage {
                                             &mut language_data.language,
                                             &language_data.symbol_provider,
                                             &self.config,
+                                            None,
                                         ) {
-                                            Ok(_) => self.publish_diagnostic(&uri, None),
+                                            Ok(updated_files) => {
+                                                self.publish_diagnostic(&uri, None);
+                                                for updated_file in updated_files {
+                                                    self.publish_diagnostic(&updated_file, None);
+                                                }
+                                            }
                                             Err(err) => self
                                                 .connection
                                                 .send_notification_error(format!("{}", err)),
@@ -838,9 +844,13 @@ impl ServerLanguage {
                             &mut language_data.language,
                             &language_data.symbol_provider,
                             &self.config,
+                            None,
                         ) {
-                            Ok(_) => {
-                                self.publish_diagnostic(&uri, Some(params.text_document.version))
+                            Ok(updated_files) => {
+                                self.publish_diagnostic(&uri, Some(params.text_document.version));
+                                for updated_file in updated_files {
+                                    self.publish_diagnostic(&updated_file, None);
+                                }
                             }
                             Err(err) => self.connection.send_notification_error(format!("{}", err)),
                         }
@@ -895,9 +905,15 @@ impl ServerLanguage {
                                     &mut language_data.language,
                                     &language_data.symbol_provider,
                                     &self.config,
+                                    None,
                                 ) {
                                     // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
-                                    Ok(_) => self.publish_diagnostic(&uri, None),
+                                    Ok(updated_files) => {
+                                        self.publish_diagnostic(&uri, None);
+                                        for updated_file in updated_files {
+                                            self.publish_diagnostic(&updated_file, None);
+                                        }
+                                    }
                                     Err(err) => {
                                         self.connection.send_notification_error(format!("{}", err))
                                     }
@@ -967,8 +983,14 @@ impl ServerLanguage {
                                     &mut language_data.language,
                                     &language_data.symbol_provider,
                                     &server.config,
+                                    None,
                                 ) {
-                                    Ok(_) => file_to_republish.push(url.clone()),
+                                    Ok(updated_files) => {
+                                        file_to_republish.push(url.clone());
+                                        for updated_file in updated_files {
+                                            file_to_republish.push(updated_file);
+                                        }
+                                    }
                                     Err(err) => server
                                         .connection
                                         .send_notification_error(format!("{}", err)),

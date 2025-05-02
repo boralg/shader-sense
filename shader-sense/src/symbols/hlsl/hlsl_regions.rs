@@ -1,4 +1,9 @@
-use std::{cell::RefCell, num::ParseIntError, path::PathBuf};
+use std::{
+    cell::RefCell,
+    num::ParseIntError,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 use tree_sitter::{Query, QueryCursor};
 
@@ -343,10 +348,9 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         fn update_context_for_include(
             include: &ShaderPreprocessorInclude,
             context: &mut ShaderPreprocessorContext,
-            preprocessor: &ShaderPreprocessor,
+            defines: &Vec<ShaderPreprocessorDefine>,
         ) {
-            let define_before_include = preprocessor
-                .defines
+            let define_before_include = defines
                 .iter()
                 .filter(|define| match &define.range {
                     Some(range) => range.end < include.range.start,
@@ -355,18 +359,23 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 .cloned()
                 .collect::<Vec<ShaderPreprocessorDefine>>();
             context.append_defines(define_before_include);
+            context.visit_file(&include.absolute_path);
         }
         fn process_include<'a>(
             module_handle: ShaderModuleHandle,
             symbol_provider: &SymbolProvider,
             context: &mut ShaderPreprocessorContext,
-            include: &mut ShaderPreprocessorInclude,
+            include_path: &Path,
+            include_range: &ShaderRange,
             include_callback: &'a mut SymbolIncludeCallback<'a>,
             old_symbols: &mut Option<ShaderSymbols>,
-            mode: &ShaderPreprocessorMode,
+            preprocessor: &mut ShaderPreprocessor,
         ) -> Result<(), ShaderError> {
-            // Include found, deal with it.
-            let module = RefCell::borrow(&module_handle);
+            let include = preprocessor
+                .includes
+                .iter_mut()
+                .find(|e| e.absolute_path == include_path && e.range == *include_range)
+                .unwrap();
             // Check if we need to update.
             let (is_dirty, include_old_cache) = match old_symbols {
                 Some(old_symbol) => match old_symbol
@@ -377,7 +386,11 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 {
                     Some(old_include) => match old_include.cache.take() {
                         Some(old_cache) => {
-                            if old_cache.get_preprocessor().context.is_dirty(&context) {
+                            if old_cache
+                                .get_preprocessor()
+                                .context
+                                .is_dirty(&include.absolute_path, &context)
+                            {
                                 (true, Some(old_cache))
                             } else {
                                 (false, Some(old_cache))
@@ -391,10 +404,12 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             };
             // Check for pragma once.
             let is_once = context.is_visited(&include.absolute_path)
-                && *mode == ShaderPreprocessorMode::OnceVisited;
+                && preprocessor.mode == ShaderPreprocessorMode::OnceVisited;
             if !is_once {
                 // Update include symbols if dirty, or simply move from old symbols.
                 if is_dirty {
+                    // Include found, deal with it.
+                    let module = RefCell::borrow(&module_handle);
                     include.cache = Some(symbol_provider.query_symbols_with_context(
                         &module,
                         context,
@@ -403,21 +418,31 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     )?)
                 } else {
                     assert!(include_old_cache.is_some(), "Not dirty, but missing cache.");
-                    include.cache = include_old_cache;
-                    let cache = include.get_cache();
                     // Add include context.
-                    update_context_for_include(include, context, &cache.preprocessor);
+                    update_context_for_include(include, context, &preprocessor.defines);
+                    // Update cache.
+                    include.cache = include_old_cache;
+
                     // Recurse all childs & copy their defines & co.
-                    cache.visit_includes(&mut |included_include| {
-                        // Update context.
-                        let included_cache = included_include.get_cache();
-                        context.visit_file(&included_include.absolute_path);
-                        update_context_for_include(
-                            included_include,
+                    let included_include_info: Vec<(PathBuf, ShaderRange)> = include
+                        .get_cache()
+                        .get_preprocessor()
+                        .includes
+                        .iter()
+                        .map(|i| (i.absolute_path.clone(), i.range.clone()))
+                        .collect();
+                    for (included_include_path, included_include_range) in included_include_info {
+                        process_include(
+                            Rc::clone(&module_handle),
+                            symbol_provider,
                             context,
-                            &included_cache.preprocessor,
-                        );
-                    });
+                            &included_include_path,
+                            &included_include_range,
+                            include_callback,
+                            old_symbols,
+                            include.get_cache_mut().get_preprocessor_mut(),
+                        )?;
+                    }
                 }
             } else {
                 // File already included & marked as once.
@@ -477,25 +502,19 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         .find(|e| e.absolute_path == include_path && e.range == include_range)
                         .unwrap();
                     processed_includes.push((include.absolute_path.clone(), include.range.clone()));
-                    update_context_for_include(&include, context, preprocessor);
+                    update_context_for_include(&include, context, &preprocessor.defines);
                     // https://stevedonovan.github.io/rustifications/2018/08/18/rust-closures-are-hard.html
                     match include_callback(&include)? {
                         Some(module_handle) => {
-                            let include_mut = preprocessor
-                                .includes
-                                .iter_mut()
-                                .find(|e| {
-                                    e.absolute_path == include_path && e.range == include_range
-                                })
-                                .unwrap();
                             process_include(
                                 module_handle,
                                 symbol_provider,
                                 context,
-                                include_mut,
+                                &include_path,
+                                &include_range,
                                 include_callback,
                                 old_symbols,
-                                &preprocessor.mode,
+                                preprocessor,
                             )?;
                         }
                         None => {
@@ -734,22 +753,18 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 .iter()
                 .find(|e| e.absolute_path == include_path && e.range == include_range)
                 .unwrap();
-            update_context_for_include(include, context, preprocessor);
+            update_context_for_include(include, context, &preprocessor.defines);
             match include_callback(&include)? {
                 Some(module_handle) => {
-                    let include_mut = preprocessor
-                        .includes
-                        .iter_mut()
-                        .find(|e| e.absolute_path == include_path && e.range == include_range)
-                        .unwrap();
                     process_include(
                         module_handle,
                         symbol_provider,
                         context,
-                        include_mut,
+                        &include_path,
+                        &include_range,
                         include_callback,
                         &mut old_symbols,
-                        &preprocessor.mode,
+                        preprocessor,
                     )?;
                 }
                 None => {

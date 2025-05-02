@@ -73,6 +73,21 @@ impl ServerLanguageFileCache {
             diagnostic_cache,
         })
     }
+    fn get_dependent_files(&self, dependent_url: &Url) -> Vec<Url> {
+        let dependant_file_path = dependent_url.to_file_path().unwrap();
+        self.files
+            .iter()
+            .filter(|(file_url, file)| {
+                *file_url != dependent_url
+                    && file.is_main_file()
+                    && file
+                        .get_data()
+                        .symbol_cache
+                        .has_dependency(&dependant_file_path)
+            })
+            .map(|(url, _file)| url.clone())
+            .collect()
+    }
     pub fn cache_file_data(
         &mut self,
         uri: &Url,
@@ -80,13 +95,33 @@ impl ServerLanguageFileCache {
         shader_language: &mut ShaderLanguage,
         symbol_provider: &SymbolProvider,
         config: &ServerConfig,
-    ) -> Result<(), ShaderError> {
+        dirty_deps: Option<&Path>,
+    ) -> Result<Vec<Url>, ShaderError> {
         assert!(
             self.files.get(&uri).unwrap().is_main_file(),
             "Trying to cache deps file {}",
             uri
         );
+        // Check open files that depend on this file and require a recache.
+        let dependent_files_uri = self.get_dependent_files(&uri);
+        let mut updated_files = dependent_files_uri.clone();
+        for dependent_file_uri in &dependent_files_uri {
+            info!(
+                "Updating file {} as it depend on {}",
+                dependent_file_uri, uri
+            );
+            updated_files.extend(self.cache_file_data(
+                &dependent_file_uri,
+                validator,
+                shader_language,
+                symbol_provider,
+                config,
+                Some(&dependent_file_uri.to_file_path().unwrap()),
+            )?);
+        }
+        // Prepare context depending on variant.
         let file_path = uri.to_file_path().unwrap();
+        // TODO: if a file depend on a variant, dont need to compute its cache, its already computed in the variant ?
         let mut context = if let Some(variant) = self.variants.get(uri) {
             // If we have an active variant for this file, use it.
             ShaderPreprocessorContext::main(
@@ -124,6 +159,9 @@ impl ServerLanguageFileCache {
                 ShaderPreprocessorContext::main(&file_path, config.into_symbol_params(None))
             }
         };
+        if let Some(dirty_deps) = dirty_deps {
+            context.mark_dirty(dirty_deps);
+        }
         // Reset cache
         let old_data = self.files.get_mut(&uri).unwrap().data.take();
         // Get symbols for main file.
@@ -282,7 +320,7 @@ impl ServerLanguageFileCache {
                 diagnostics
             },
         );
-        Ok(())
+        Ok(updated_files)
     }
     pub fn watch_file(
         &mut self,
@@ -336,7 +374,15 @@ impl ServerLanguageFileCache {
             }
         };
         // Cache file data from new context.
-        self.cache_file_data(uri, validator, shader_language, symbol_provider, config)?;
+        // We dont update content here, so we can ignore updated_files.
+        let _updated_files = self.cache_file_data(
+            uri,
+            validator,
+            shader_language,
+            symbol_provider,
+            config,
+            None,
+        )?;
         Ok(self.files.get(&uri).unwrap())
     }
     pub fn watch_dependency(
