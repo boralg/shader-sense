@@ -193,7 +193,7 @@ impl ServerLanguage {
         if self.config.trace.is_verbose() {
             format!("{:#?}", dbg)
         } else {
-            "enable trace for more info".into()
+            "{?}".into()
         }
     }
     fn on_request(&mut self, req: lsp_server::Request) -> Result<(), serde_json::Error> {

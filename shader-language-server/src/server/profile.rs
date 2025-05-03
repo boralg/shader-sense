@@ -17,6 +17,7 @@ pub struct Profiler {
 }
 impl Profiler {
     pub fn new(message: String) -> Self {
+        info!("vv {} vv", message);
         Self {
             start: Instant::now(),
             message: message,
@@ -26,7 +27,7 @@ impl Profiler {
 impl Drop for Profiler {
     fn drop(&mut self) {
         info!(
-            "{} (duration {}ms)",
+            "^^ {} (duration {}ms) ^^",
             self.message,
             self.start.elapsed().as_millis()
         );
