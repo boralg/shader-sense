@@ -23,12 +23,16 @@ pub fn desktop_server() -> &'static Mutex<TestServer> {
     unsafe {
         // For static mut.
         SERVER.get_or_init(|| {
-            std::panic::set_hook(Box::new(|_| match SERVER.get_mut() {
-                Some(lock) => match lock.get_mut() {
-                    Ok(server) => server.exit(),
-                    Err(err) => println!("Failed to lock server on panic: {}", err),
-                },
-                None => println!("Failed to get server once."),
+            let default_panic = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |info| {
+                match SERVER.get_mut() {
+                    Some(lock) => match lock.get_mut() {
+                        Ok(server) => server.exit(),
+                        Err(err) => println!("Failed to lock server on panic: {}", err),
+                    },
+                    None => println!("Failed to get server once."),
+                }
+                default_panic(info);
             }));
             Mutex::new(TestServer::desktop().unwrap())
         })
