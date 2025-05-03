@@ -232,11 +232,40 @@ impl ServerLanguageFileCache {
 
             let mut diagnostic_list = {
                 profile_scope!("Raw validation");
-                let validation_params =
-                    config.into_validation_params(self.variants.get(uri).cloned());
-                validator.validate_shader(
-                    &RefCell::borrow(&shader_module).content,
-                    RefCell::borrow(&shader_module).file_path.as_path(),
+                // Get variant & compute diagnostics from it.
+                let variant = if let Some(variant) = self.variants.get(uri) {
+                    Some((uri.clone(), variant.clone()))
+                } else {
+                    let includer_variant = self.variants.iter().find(|(url, _variant)| match self
+                        .files
+                        .get(url)
+                    {
+                        Some(cached_file) => {
+                            cached_file.is_main_file()
+                                && cached_file
+                                    .get_data()
+                                    .symbol_cache
+                                    .has_dependency(&file_path)
+                        }
+                        None => false,
+                    });
+                    if let Some((variant_url, includer_variant)) = includer_variant {
+                        Some((variant_url.clone(), includer_variant.clone()))
+                    } else {
+                        None
+                    }
+                };
+                let validation_params = config
+                    .into_validation_params(variant.as_ref().map(|(_, variant)| variant.clone()));
+                let variant_shader_module = match variant {
+                    Some((variant_url, _)) => {
+                        Rc::clone(&self.files.get(&variant_url).unwrap().shader_module)
+                    }
+                    None => shader_module,
+                };
+                let diagnostics = validator.validate_shader(
+                    &RefCell::borrow(&variant_shader_module).content,
+                    RefCell::borrow(&variant_shader_module).file_path.as_path(),
                     &validation_params,
                     &mut |deps_path: &Path| -> Option<String> {
                         let deps_uri = Url::from_file_path(deps_path).unwrap();
@@ -268,7 +297,8 @@ impl ServerLanguageFileCache {
                         let content = RefCell::borrow(&deps_file.shader_module).content.clone();
                         Some(content)
                     },
-                )?
+                )?;
+                diagnostics
             };
             // Clear diagnostic if no errors.
             // TODO: Should add empty for main file & deps if none to clear them.

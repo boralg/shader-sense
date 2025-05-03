@@ -16,7 +16,7 @@ use lsp_types::{
 };
 use lsp_types::{
     DiagnosticSeverity, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticReportResult,
+    DocumentDiagnosticReportResult, RelatedFullDocumentDiagnosticReport,
 };
 use shader_language_server::server::shader_variant::{
     DidChangeShaderVariant, DidChangeShaderVariantParams, ShaderVariant,
@@ -41,6 +41,19 @@ fn get_document_symbol_params(file: &TestFile) -> DocumentSymbolParams {
         text_document: file.identifier(),
         work_done_progress_params: WorkDoneProgressParams::default(),
         partial_result_params: PartialResultParams::default(),
+    }
+}
+fn get_diagnostic_report(
+    result: DocumentDiagnosticReportResult,
+) -> RelatedFullDocumentDiagnosticReport {
+    if let DocumentDiagnosticReportResult::Report(report) = result {
+        if let DocumentDiagnosticReport::Full(report) = report {
+            report
+        } else {
+            unreachable!("Should not be reached");
+        }
+    } else {
+        unreachable!("Should not be reached");
     }
 }
 
@@ -100,6 +113,97 @@ fn test_variant() {
     });
 }
 
+#[test]
+fn test_variant_dependency() {
+    let server_locked = desktop_server();
+
+    // Test document
+    let file_variant = TestFile::new(
+        Path::new("../shader-sense/test/hlsl/variants.hlsl"),
+        ShadingLanguage::Hlsl,
+    );
+    let file_macros = TestFile::new(
+        Path::new("../shader-sense/test/hlsl/macro.hlsl"),
+        ShadingLanguage::Hlsl,
+    );
+    println!("Opening file {}", file_variant.url);
+    println!("Opening file {}", file_macros.url);
+
+    let mut server = server_locked.lock().unwrap();
+    server.send_notification::<DidOpenTextDocument>(&DidOpenTextDocumentParams {
+        text_document: file_variant.item(),
+    });
+    server.send_notification::<DidOpenTextDocument>(&DidOpenTextDocumentParams {
+        text_document: file_macros.item(),
+    });
+    server.send_request::<DocumentDiagnosticRequest>(
+        &DocumentDiagnosticParams {
+            text_document: file_macros.identifier(),
+            identifier: None,
+            previous_result_id: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        },
+        |report| {
+            let report = get_diagnostic_report(report);
+            let errors: Vec<&lsp_types::Diagnostic> = report
+                .full_document_diagnostic_report
+                .items
+                .iter()
+                .filter(|d| match &d.severity {
+                    Some(severity) => *severity == DiagnosticSeverity::ERROR,
+                    None => false,
+                })
+                .collect();
+            assert!(
+                errors.len() == 1,
+                "An error should trigger without the variant context. Got {:?}",
+                errors
+            );
+        },
+    );
+    server.send_notification::<DidChangeShaderVariant>(&DidChangeShaderVariantParams {
+        text_document: file_variant.identifier(),
+        shader_variant: Some(ShaderVariant {
+            entry_point: "".into(),
+            stage: None,
+            defines: HashMap::new(),
+            includes: Vec::new(),
+        }),
+    });
+    server.send_request::<DocumentDiagnosticRequest>(
+        &DocumentDiagnosticParams {
+            text_document: file_macros.identifier(),
+            identifier: None,
+            previous_result_id: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        },
+        |report| {
+            let report = get_diagnostic_report(report);
+            let errors: Vec<&lsp_types::Diagnostic> = report
+                .full_document_diagnostic_report
+                .items
+                .iter()
+                .filter(|d| match &d.severity {
+                    Some(severity) => *severity == DiagnosticSeverity::ERROR,
+                    None => false,
+                })
+                .collect();
+            assert!(
+                errors.is_empty(),
+                "Macro should be imported through variant. Got {:?}",
+                errors,
+            );
+        },
+    );
+    server.send_notification::<DidCloseTextDocument>(&DidCloseTextDocumentParams {
+        text_document: file_macros.identifier(),
+    });
+    server.send_notification::<DidCloseTextDocument>(&DidCloseTextDocumentParams {
+        text_document: file_variant.identifier(),
+    });
+}
 #[test]
 fn test_utf8_edit() {
     let server_locked = desktop_server();
