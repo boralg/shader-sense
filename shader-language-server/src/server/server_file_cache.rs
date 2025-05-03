@@ -73,7 +73,7 @@ impl ServerLanguageFileCache {
             diagnostic_cache,
         })
     }
-    fn get_dependent_files(&self, dependent_url: &Url) -> Vec<Url> {
+    pub fn get_dependent_files(&self, dependent_url: &Url) -> Vec<Url> {
         let dependant_file_path = dependent_url.to_file_path().unwrap();
         self.files
             .iter()
@@ -87,6 +87,25 @@ impl ServerLanguageFileCache {
             })
             .map(|(url, _file)| url.clone())
             .collect()
+    }
+    pub fn get_relying_on_files(&self, url: &Url) -> Vec<Url> {
+        match self.files.get(url) {
+            Some(file) => {
+                let mut relying_on_files = Vec::new();
+                file.get_data().symbol_cache.visit_includes(&mut |include| {
+                    let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
+                    let is_relying_on = match self.files.get(&include_uri) {
+                        Some(deps) => deps.is_main_file(),
+                        None => false,
+                    };
+                    if is_relying_on {
+                        relying_on_files.push(include_uri);
+                    }
+                });
+                relying_on_files
+            }
+            None => Vec::new(),
+        }
     }
     pub fn cache_file_data(
         &mut self,
@@ -125,6 +144,7 @@ impl ServerLanguageFileCache {
         // TODO: if a file depend on a variant, dont need to compute its cache, its already computed in the variant ?
         let mut context = if let Some(variant) = self.variants.get(uri) {
             // If we have an active variant for this file, use it.
+            info!("Caching file {} as variant", uri);
             ShaderPreprocessorContext::main(
                 &file_path,
                 config.into_symbol_params(Some(variant.clone())),
@@ -145,6 +165,7 @@ impl ServerLanguageFileCache {
                         None => false,
                     });
             if let Some((variant_url, _includer_variant)) = includer_variant {
+                info!("Caching file {} from variant {}", uri, variant_url);
                 let variant_cached_file = self.files.get(variant_url).unwrap();
                 let cached_file_as_include = variant_cached_file
                     .get_data()
@@ -157,6 +178,7 @@ impl ServerLanguageFileCache {
                     .context
                     .clone()
             } else {
+                info!("Caching file {} without variant", uri);
                 ShaderPreprocessorContext::main(&file_path, config.into_symbol_params(None))
             }
         };
@@ -471,6 +493,7 @@ impl ServerLanguageFileCache {
             )?;
         } else {
             // No update on content to perform.
+            assert!(false, "Calling update_file unnecessarily");
         }
         Ok(())
     }

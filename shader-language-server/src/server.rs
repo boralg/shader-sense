@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 mod common;
@@ -890,26 +891,40 @@ impl ServerLanguage {
                     Some(cached_file) => {
                         if cached_file.is_main_file() {
                             let shading_language = cached_file.shading_language;
-                            let language_data =
-                                self.language_data.get_mut(&shading_language).unwrap();
-                            match self.watched_files.update_file(
-                                &uri,
-                                &mut language_data.language,
-                                None,
-                                None,
-                            ) {
+                            // Check all open files that rely on this variant and require a recache.
+                            let relying_on_variant_uris =
+                                self.watched_files.get_relying_on_files(&uri);
+                            let files_to_update: Vec<(Url, Option<PathBuf>)> = {
+                                let mut base = vec![(uri.clone(), None)];
+                                let mut additional: Vec<(Url, Option<PathBuf>)> =
+                                    relying_on_variant_uris
+                                        .into_iter()
+                                        .map(|f| {
+                                            info!(
+                                                "Updating relying file {} for variant {}",
+                                                f, uri
+                                            );
+                                            (f, Some(uri.to_file_path().unwrap()))
+                                        })
+                                        .collect();
+                                base.append(&mut additional);
+                                base
+                            };
+                            for (file_to_update, dirty_deps) in files_to_update {
                                 // Cache once all changes have been applied.
-                                Ok(()) => match self.watched_files.cache_file_data(
-                                    &uri,
+                                let language_data =
+                                    self.language_data.get_mut(&shading_language).unwrap();
+                                match self.watched_files.cache_file_data(
+                                    &file_to_update,
                                     language_data.validator.as_mut(),
                                     &mut language_data.language,
                                     &language_data.symbol_provider,
                                     &self.config,
-                                    None,
+                                    dirty_deps.as_ref().map(|e| e.as_path()),
                                 ) {
                                     // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
                                     Ok(updated_files) => {
-                                        self.publish_diagnostic(&uri, None);
+                                        self.publish_diagnostic(&file_to_update, None);
                                         for updated_file in updated_files {
                                             self.publish_diagnostic(&updated_file, None);
                                         }
@@ -917,12 +932,8 @@ impl ServerLanguage {
                                     Err(err) => {
                                         self.connection.send_notification_error(format!("{}", err))
                                     }
-                                },
-                                Err(err) => self.connection.send_notification_error(format!(
-                                    "Failed to update file {} after changing variant : {}",
-                                    uri, err
-                                )),
-                            };
+                                };
+                            }
                         } else {
                             // Not main file, no need to update.
                         }
@@ -968,39 +979,27 @@ impl ServerLanguage {
                     server.clear_diagnostic(&server.connection, &url);
                     let language_data = server.language_data.get_mut(&shading_language).unwrap();
                     // Update symbols & republish diags.
-                    match server.watched_files.update_file(
-                        &url,
-                        &mut language_data.language,
-                        None,
-                        None,
-                    ) {
-                        Ok(_) => {
-                            if server.watched_files.files.get(&url).unwrap().is_main_file() {
-                                // Cache once for main file all changes have been applied.
-                                match server.watched_files.cache_file_data(
-                                    &url,
-                                    language_data.validator.as_mut(),
-                                    &mut language_data.language,
-                                    &language_data.symbol_provider,
-                                    &server.config,
-                                    None,
-                                ) {
-                                    Ok(updated_files) => {
-                                        file_to_republish.push(url.clone());
-                                        for updated_file in updated_files {
-                                            file_to_republish.push(updated_file);
-                                        }
-                                    }
-                                    Err(err) => server
-                                        .connection
-                                        .send_notification_error(format!("{}", err)),
+                    if server.watched_files.files.get(&url).unwrap().is_main_file() {
+                        // Cache once for main file all changes have been applied.
+                        match server.watched_files.cache_file_data(
+                            &url,
+                            language_data.validator.as_mut(),
+                            &mut language_data.language,
+                            &language_data.symbol_provider,
+                            &server.config,
+                            None,
+                        ) {
+                            Ok(updated_files) => {
+                                file_to_republish.push(url.clone());
+                                for updated_file in updated_files {
+                                    file_to_republish.push(updated_file);
                                 }
                             }
+                            Err(err) => server
+                                .connection
+                                .send_notification_error(format!("{}", err)),
                         }
-                        Err(err) => server
-                            .connection
-                            .send_notification_error(format!("{}", err)),
-                    };
+                    }
                 }
                 // Republish all diagnostics with new settings.
                 for url in &file_to_republish {
