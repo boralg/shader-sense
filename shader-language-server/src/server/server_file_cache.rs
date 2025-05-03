@@ -106,9 +106,10 @@ impl ServerLanguageFileCache {
         let dependent_files_uri = self.get_dependent_files(&uri);
         let mut updated_files = dependent_files_uri.clone();
         for dependent_file_uri in &dependent_files_uri {
-            info!(
+            profile_scope!(
                 "Updating file {} as it depend on {}",
-                dependent_file_uri, uri
+                dependent_file_uri,
+                uri
             );
             updated_files.extend(self.cache_file_data(
                 &dependent_file_uri,
