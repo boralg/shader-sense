@@ -4,20 +4,45 @@
 
 use core::panic;
 use std::collections::HashMap;
-use std::{
-    path::Path,
-    sync::{Mutex, OnceLock},
-};
+use std::path::Path;
 
+use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, Position,
-    Range, TextDocumentContentChangeEvent, VersionedTextDocumentIdentifier,
+    request::DocumentSymbolRequest,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DocumentSymbolParams, DocumentSymbolResponse, PartialResultParams, Position, Range,
+    TextDocumentContentChangeEvent, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
+};
+use lsp_types::{
+    DiagnosticSeverity, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    DocumentDiagnosticReportResult,
+};
+use shader_language_server::server::shader_variant::{
+    DidChangeShaderVariant, DidChangeShaderVariantParams, ShaderVariant,
 };
 use shader_sense::shader::ShadingLanguage;
-use test_server::{TestFile, TestServer};
+use test_server::{desktop_server, TestFile};
 
 mod test_server;
+
+fn has_symbol(response: Option<DocumentSymbolResponse>, symbol: &str) -> bool {
+    let symbols = response.unwrap();
+    match symbols {
+        DocumentSymbolResponse::Flat(symbol_informations) => symbol_informations
+            .iter()
+            .find(|e| e.name == symbol)
+            .is_some(),
+        _ => panic!("Should not be reached."),
+    }
+}
+fn get_document_symbol_params(file: &TestFile) -> DocumentSymbolParams {
+    DocumentSymbolParams {
+        text_document: file.identifier(),
+        work_done_progress_params: WorkDoneProgressParams::default(),
+        partial_result_params: PartialResultParams::default(),
+    }
+}
 
 #[test]
 fn test_server_wasi_runtime() {
@@ -33,22 +58,8 @@ fn test_server_wasi_runtime() {
     };
 }
 
-// Share a single server for all test.
-fn desktop_server() -> &'static Mutex<TestServer> {
-    static SERVER: OnceLock<Mutex<TestServer>> = OnceLock::new();
-    SERVER.get_or_init(|| Mutex::new(TestServer::desktop().unwrap()))
-}
-
 #[test]
 fn test_variant() {
-    use lsp_types::{
-        request::DocumentSymbolRequest, DocumentSymbolParams, DocumentSymbolResponse,
-        PartialResultParams, WorkDoneProgressParams,
-    };
-    use shader_language_server::server::shader_variant::{
-        DidChangeShaderVariant, DidChangeShaderVariantParams, ShaderVariant,
-    };
-
     let server_locked = desktop_server();
 
     // Test document
@@ -57,21 +68,7 @@ fn test_variant() {
         ShadingLanguage::Hlsl,
     );
     println!("Opening file {}", file.url);
-    let document_symbol_params = DocumentSymbolParams {
-        text_document: file.identifier(),
-        work_done_progress_params: WorkDoneProgressParams::default(),
-        partial_result_params: PartialResultParams::default(),
-    };
-    fn has_symbol(response: Option<DocumentSymbolResponse>, symbol: &str) -> bool {
-        let symbols = response.unwrap();
-        match symbols {
-            DocumentSymbolResponse::Flat(symbol_informations) => symbol_informations
-                .iter()
-                .find(|e| e.name == symbol)
-                .is_some(),
-            _ => panic!("Should not be reached."),
-        }
-    }
+    let document_symbol_params = get_document_symbol_params(&file);
 
     let mut server = server_locked.lock().unwrap();
     server.send_notification::<DidOpenTextDocument>(&DidOpenTextDocumentParams {
