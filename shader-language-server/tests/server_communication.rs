@@ -108,6 +108,10 @@ fn test_variant() {
             "Missing symbol mainOk for variant"
         );
     });
+    server.send_notification::<DidChangeShaderVariant>(&DidChangeShaderVariantParams {
+        text_document: file.identifier(),
+        shader_variant: None, // Clear for next tests
+    });
     server.send_notification::<DidCloseTextDocument>(&DidCloseTextDocumentParams {
         text_document: file.identifier(),
     });
@@ -197,6 +201,10 @@ fn test_variant_dependency() {
             );
         },
     );
+    server.send_notification::<DidChangeShaderVariant>(&DidChangeShaderVariantParams {
+        text_document: file_variant.identifier(),
+        shader_variant: None, // Clear for next tests
+    });
     server.send_notification::<DidCloseTextDocument>(&DidCloseTextDocumentParams {
         text_document: file_macros.identifier(),
     });
