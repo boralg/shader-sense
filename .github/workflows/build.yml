@@ -42,18 +42,17 @@ jobs:
     
     strategy:
       matrix:
-          # WASI has its own build step below.
-          os: [windows-latest, ubuntu-latest, macos-latest]
-
           include:
+            # All rust analyzer supported targets that we could support: 
+            # https://github.com/rust-lang/rust-analyzer/blob/master/.github/workflows/release.yaml
+            # But Dxc does not support them all, so only use the one DXC support, 
+            # else fallback to WASI server which is supported everywhere.
+            # WASI has its own build step below.
             - os: windows-latest
               target: x86_64-pc-windows-msvc
               ext: .exe
             - os: ubuntu-latest
               target: x86_64-unknown-linux-gnu
-              ext: 
-            - os: macos-latest
-              target: x86_64-apple-darwin
               ext: 
 
     steps:
@@ -66,16 +65,16 @@ jobs:
         run: cargo build --release --verbose --target ${{ matrix.target }} # Specify target to build into target
       - name: Copy desktop executable
         run: mkdir -p ./bin/ && cp ./target/${{ matrix.target }}/release/shader-language-server${{ matrix.ext }} ./bin/shader-language-server${{ matrix.ext }}
+      # TODO: Add debug symbols for supported target to bin folder.
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.os }}
+          name: shader-language-server-${{ matrix.target }}
           path: ./bin/
 
   # Separate build task as its more complex.  
   build-wasi:
     runs-on: ubuntu-latest
-    #if: ${{ vars.COMPILE_WASI == 'true' }}
 
     # Build WASM from source.
     steps:
@@ -119,5 +118,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wasi
+          name: shader-language-server-wasm32-wasip1-threads
           path: ./bin/
