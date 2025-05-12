@@ -116,6 +116,10 @@ impl ServerLanguageFileCache {
         config: &ServerConfig,
         dirty_deps: Option<&Path>,
     ) -> Result<Vec<Url>, ShaderError> {
+        profile_scope!(
+            "Caching file data for file {}",
+            uri
+        );
         assert!(
             self.files.get(&uri).unwrap().is_main_file(),
             "Trying to cache deps file {}",
