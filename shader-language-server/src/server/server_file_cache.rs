@@ -125,6 +125,7 @@ impl ServerLanguageFileCache {
         // Check open files that depend on this file and require a recache.
         let dependent_files_uri = self.get_dependent_files(&uri);
         let mut updated_files = dependent_files_uri.clone();
+        // We recompute relying before computing deps, but marking this file as dirty, so should be fine.
         for dependent_file_uri in &dependent_files_uri {
             profile_scope!(
                 "Updating file {} as it depend on {}",
@@ -137,7 +138,7 @@ impl ServerLanguageFileCache {
                 shader_language,
                 symbol_provider,
                 config,
-                Some(&dependent_file_uri.to_file_path().unwrap()),
+                Some(&uri.to_file_path().unwrap()),
             )?);
         }
         // Prepare context depending on variant.
