@@ -4,7 +4,6 @@ use std::{
     io::{BufReader, Read},
     path::Path,
     process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio},
-    sync::{Mutex, OnceLock},
 };
 
 use lsp_types::{
@@ -13,31 +12,6 @@ use lsp_types::{
     InitializeParams, InitializedParams, TextDocumentIdentifier, TextDocumentItem, Url,
 };
 use shader_sense::{include::canonicalize, shader::ShadingLanguage};
-
-// Share a single server for all test.
-pub fn desktop_server() -> &'static Mutex<TestServer> {
-    // Static lifetime does not get dropped. So hook panic to exit server.
-    // https://doc.rust-lang.org/reference/items/static-items.html#:~:text=Static%20items%20have%20the%20static,the%20end%20of%20the%20program
-    static mut SERVER: OnceLock<Mutex<TestServer>> = OnceLock::new();
-    #[allow(static_mut_refs)] // Mut only used on panic, so should be fine.
-    unsafe {
-        // For static mut.
-        SERVER.get_or_init(|| {
-            let default_panic = std::panic::take_hook();
-            std::panic::set_hook(Box::new(move |info| {
-                match SERVER.get_mut() {
-                    Some(lock) => match lock.get_mut() {
-                        Ok(server) => server.exit(),
-                        Err(err) => println!("Failed to lock server on panic: {}", err),
-                    },
-                    None => println!("Failed to get server once."),
-                }
-                default_panic(info);
-            }));
-            Mutex::new(TestServer::desktop().unwrap())
-        })
-    }
-}
 
 pub struct TestFile {
     pub url: Url,

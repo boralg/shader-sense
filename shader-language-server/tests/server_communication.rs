@@ -22,7 +22,7 @@ use shader_language_server::server::shader_variant::{
     DidChangeShaderVariant, DidChangeShaderVariantParams, ShaderVariant,
 };
 use shader_sense::shader::ShadingLanguage;
-use test_server::{desktop_server, TestFile};
+use test_server::{TestFile, TestServer};
 
 mod test_server;
 
@@ -73,7 +73,7 @@ fn test_server_wasi_runtime() {
 
 #[test]
 fn test_variant() {
-    let server_locked = desktop_server();
+    let mut server = TestServer::desktop().unwrap();
 
     // Test document
     let file = TestFile::new(
@@ -83,7 +83,6 @@ fn test_variant() {
     println!("Opening file {}", file.url);
     let document_symbol_params = get_document_symbol_params(&file);
 
-    let mut server = server_locked.lock().unwrap();
     server.send_notification::<DidOpenTextDocument>(&DidOpenTextDocumentParams {
         text_document: file.item(),
     });
@@ -119,7 +118,7 @@ fn test_variant() {
 
 #[test]
 fn test_variant_dependency() {
-    let server_locked = desktop_server();
+    let mut server = TestServer::desktop().unwrap();
 
     // Test document
     let file_variant = TestFile::new(
@@ -133,7 +132,6 @@ fn test_variant_dependency() {
     println!("Opening file {}", file_variant.url);
     println!("Opening file {}", file_macros.url);
 
-    let mut server = server_locked.lock().unwrap();
     server.send_notification::<DidOpenTextDocument>(&DidOpenTextDocumentParams {
         text_document: file_variant.item(),
     });
@@ -214,14 +212,13 @@ fn test_variant_dependency() {
 }
 #[test]
 fn test_utf8_edit() {
-    let server_locked = desktop_server();
+    let mut server = TestServer::desktop().unwrap();
 
     let file = TestFile::new(
         Path::new("../shader-sense/test/hlsl/utf8.hlsl"),
         ShadingLanguage::Hlsl,
     );
 
-    let mut server = server_locked.lock().unwrap();
     server.send_notification::<DidOpenTextDocument>(&DidOpenTextDocumentParams {
         text_document: file.item(),
     });
@@ -253,7 +250,7 @@ fn test_utf8_edit() {
 
 #[test]
 fn test_dependencies() {
-    let server_locked = desktop_server();
+    let mut server = TestServer::desktop().unwrap();
 
     let file = TestFile::new(
         Path::new("../shader-sense/test/glsl/include-level.comp.glsl"),
@@ -268,7 +265,6 @@ fn test_dependencies() {
         ShadingLanguage::Glsl,
     );
 
-    let mut server = server_locked.lock().unwrap();
     server.send_notification::<DidOpenTextDocument>(&DidOpenTextDocumentParams {
         text_document: file.item(),
     });
