@@ -2,7 +2,11 @@ use std::path::Path;
 
 use tree_sitter::InputEdit;
 
-use crate::{shader::ShadingLanguage, shader_error::ShaderError};
+use crate::{
+    shader::ShadingLanguage,
+    shader_error::ShaderError,
+    validator::{create_validator, validator::Validator},
+};
 
 use super::{
     glsl::create_glsl_symbol_provider,
@@ -64,8 +68,9 @@ impl ShaderLanguage {
         }
     }
     // TODO: would be nice to return a solid object (not trait) for cleaner API (which might be holding a trait.)
-    //pub fn create_validator(&self) -> Validator {}
-
+    pub fn create_validator(&self) -> Box<dyn Validator> {
+        create_validator(self.shading_language)
+    }
     pub fn get_intrinsics_symbol(&self) -> &ShaderSymbolList {
         &self.shader_intrinsics
     }

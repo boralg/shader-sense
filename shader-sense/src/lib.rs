@@ -11,7 +11,11 @@ mod tests {
         path::{Path, PathBuf},
     };
 
-    use crate::include::IncludeHandler;
+    use crate::{
+        include::IncludeHandler,
+        symbols::{shader_language::ShaderLanguage, symbol_provider::ShaderSymbolParams},
+        validator::validator::ValidationParams,
+    };
 
     fn validate_include(path: &Path) -> bool {
         let file_path = Path::new("./test/hlsl/dontcare.hlsl");
@@ -63,5 +67,28 @@ mod tests {
         assert!(include_handler
             .search_path_in_includes(Path::new("./inc1/level1.hlsl"))
             .is_some());
+    }
+
+    #[test]
+    fn stack_overflow() {
+        let file_path = Path::new("./test/hlsl/stack-overflow.hlsl");
+        let mut language = ShaderLanguage::new(crate::shader::ShadingLanguage::Hlsl);
+        let symbol_provider = language.create_symbol_provider();
+        let shader_module = language
+            .create_module(file_path, &std::fs::read_to_string(file_path).unwrap())
+            .unwrap();
+        let _symbols = symbol_provider.query_symbols(
+            &shader_module,
+            ShaderSymbolParams::default(),
+            &mut |_| Ok(None),
+            None,
+        );
+        let mut validator = language.create_validator();
+        let _symbols = validator.validate_shader(
+            &shader_module.content,
+            file_path,
+            &ValidationParams::default(),
+            &mut |_| None,
+        );
     }
 }
