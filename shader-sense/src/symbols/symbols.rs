@@ -233,6 +233,7 @@ pub struct ShaderPreprocessorContext {
     defines: HashMap<String, String>, // TODO: Should store position aswell... At least target file path.
     include_handler: IncludeHandler,
     dirty_files: HashSet<PathBuf>, // Dirty files that need to be recomputed no matter what.
+    depth: u32,
 }
 
 impl ShaderPreprocessorContext {
@@ -245,6 +246,7 @@ impl ShaderPreprocessorContext {
                 symbol_params.path_remapping,
             ),
             dirty_files: HashSet::new(),
+            depth: 0,
         }
     }
     pub fn mark_dirty(&mut self, file_path: &Path) {
@@ -258,6 +260,15 @@ impl ShaderPreprocessorContext {
             self.defines
                 .insert(define.name, define.value.unwrap_or("".into()));
         }
+    }
+    pub fn increase_depth(&mut self) -> bool {
+        const DEPTH_LIMIT: u32 = 30;
+        self.depth += 1;
+        self.depth < DEPTH_LIMIT
+    }
+    pub fn decrease_depth(&mut self) {
+        assert!(self.depth > 0, "Decreasing depth but zero.");
+        self.depth -= 1;
     }
     pub fn is_visited(&mut self, path: &Path) -> bool {
         self.include_handler.is_visited(path)

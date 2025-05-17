@@ -7,12 +7,15 @@ pub mod validator;
 #[cfg(test)]
 mod tests {
     use std::{
+        cell::RefCell,
         collections::HashMap,
         path::{Path, PathBuf},
+        rc::Rc,
     };
 
     use crate::{
         include::IncludeHandler,
+        shader::ShadingLanguage,
         symbols::{shader_language::ShaderLanguage, symbol_provider::ShaderSymbolParams},
         validator::validator::ValidationParams,
     };
@@ -70,25 +73,44 @@ mod tests {
     }
 
     #[test]
-    fn stack_overflow() {
+    fn test_stack_overflow() {
+        // Should handle include stack overflow gracefully.
         let file_path = Path::new("./test/hlsl/stack-overflow.hlsl");
-        let mut language = ShaderLanguage::new(crate::shader::ShadingLanguage::Hlsl);
+        let mut language = ShaderLanguage::new(ShadingLanguage::Hlsl);
         let symbol_provider = language.create_symbol_provider();
         let shader_module = language
             .create_module(file_path, &std::fs::read_to_string(file_path).unwrap())
             .unwrap();
+        println!("Testing symbol overflow");
+        let mut depth = 0;
         let _symbols = symbol_provider.query_symbols(
             &shader_module,
             ShaderSymbolParams::default(),
-            &mut |_| Ok(None),
+            &mut |include| {
+                depth += 1;
+                println!(
+                    "Including {} (depth {})",
+                    include.absolute_path.display(),
+                    depth
+                );
+                Ok(Some(Rc::new(RefCell::new(
+                    language
+                        .create_module(
+                            &include.absolute_path,
+                            &std::fs::read_to_string(&include.absolute_path).unwrap(),
+                        )
+                        .unwrap(),
+                ))))
+            },
             None,
         );
+        println!("Testing validation overflow");
         let mut validator = language.create_validator();
         let _symbols = validator.validate_shader(
             &shader_module.content,
             file_path,
             &ValidationParams::default(),
-            &mut |_| None,
+            &mut |path| Some(std::fs::read_to_string(path).unwrap()),
         );
     }
 }

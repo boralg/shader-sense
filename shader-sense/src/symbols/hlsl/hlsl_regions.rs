@@ -503,29 +503,36 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         .unwrap();
                     processed_includes.push((include.absolute_path.clone(), include.range.clone()));
                     update_context_for_include(&include, context, &preprocessor.defines);
-                    // https://stevedonovan.github.io/rustifications/2018/08/18/rust-closures-are-hard.html
-                    match include_callback(&include)? {
-                        Some(module_handle) => {
-                            process_include(
-                                module_handle,
-                                symbol_provider,
-                                context,
-                                &include_path,
-                                &include_range,
-                                include_callback,
-                                old_symbols,
-                                preprocessor,
-                            )?;
-                        }
-                        None => {
-                            // Include not found.
-                            preprocessor.diagnostics.push(ShaderDiagnostic {
-                                severity: ShaderDiagnosticSeverity::Warning,
-                                error: format!("Failed to find include {}", include.relative_path),
-                                range: include.range.clone(),
-                            });
-                        }
-                    };
+                    // Avoid stack overflow
+                    if context.increase_depth() {
+                        match include_callback(&include)? {
+                            Some(module_handle) => {
+                                process_include(
+                                    module_handle,
+                                    symbol_provider,
+                                    context,
+                                    &include_path,
+                                    &include_range,
+                                    include_callback,
+                                    old_symbols,
+                                    preprocessor,
+                                )?;
+                                context.decrease_depth();
+                            }
+                            None => {
+                                context.decrease_depth();
+                                // Include not found.
+                                preprocessor.diagnostics.push(ShaderDiagnostic {
+                                    severity: ShaderDiagnosticSeverity::Warning,
+                                    error: format!(
+                                        "Failed to find include {}",
+                                        include.relative_path
+                                    ),
+                                    range: include.range.clone(),
+                                });
+                            }
+                        };
+                    }
                 }
                 // Process regions
                 let (is_active_region, region_start) = match cursor.node().kind() {
@@ -754,28 +761,33 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 .find(|e| e.absolute_path == include_path && e.range == include_range)
                 .unwrap();
             update_context_for_include(include, context, &preprocessor.defines);
-            match include_callback(&include)? {
-                Some(module_handle) => {
-                    process_include(
-                        module_handle,
-                        symbol_provider,
-                        context,
-                        &include_path,
-                        &include_range,
-                        include_callback,
-                        &mut old_symbols,
-                        preprocessor,
-                    )?;
-                }
-                None => {
-                    // Include not found.
-                    preprocessor.diagnostics.push(ShaderDiagnostic {
-                        severity: ShaderDiagnosticSeverity::Warning,
-                        error: format!("Failed to find include {}", include.relative_path),
-                        range: include.range.clone(),
-                    });
-                }
-            };
+            // Avoid stack overflow
+            if context.increase_depth() {
+                match include_callback(&include)? {
+                    Some(module_handle) => {
+                        process_include(
+                            module_handle,
+                            symbol_provider,
+                            context,
+                            &include_path,
+                            &include_range,
+                            include_callback,
+                            &mut old_symbols,
+                            preprocessor,
+                        )?;
+                        context.decrease_depth();
+                    }
+                    None => {
+                        context.decrease_depth();
+                        // Include not found.
+                        preprocessor.diagnostics.push(ShaderDiagnostic {
+                            severity: ShaderDiagnosticSeverity::Warning,
+                            error: format!("Failed to find include {}", include.relative_path),
+                            range: include.range.clone(),
+                        });
+                    }
+                };
+            }
         }
         let define_after_last_include = preprocessor
             .defines
