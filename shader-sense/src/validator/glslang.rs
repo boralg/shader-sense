@@ -92,17 +92,23 @@ impl glslang::include::IncludeHandler for GlslangIncludeHandler<'_> {
         _ty: IncludeType, // TODO: should use them ?
         header_name: &str,
         _includer_name: &str,
-        _include_depth: usize,
+        include_depth: usize,
     ) -> Option<IncludeResult> {
-        match self
-            .include_handler
-            .search_in_includes(Path::new(header_name), self.include_callback)
-        {
-            Some(data) => Some(IncludeResult {
-                name: String::from(header_name),
-                data: data.0,
-            }),
-            None => None,
+        // Glslang does not handle stack overflow natively. So put a limit there.
+        const DEPTH_LIMIT: usize = 30; // Same as symbols.rs::DEPTH_LIMIT
+        if include_depth > DEPTH_LIMIT {
+            None
+        } else {
+            match self
+                .include_handler
+                .search_in_includes(Path::new(header_name), self.include_callback)
+            {
+                Some(data) => Some(IncludeResult {
+                    name: String::from(header_name),
+                    data: data.0,
+                }),
+                None => None,
+            }
         }
     }
 }
