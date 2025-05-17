@@ -532,6 +532,23 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                 });
                             }
                         };
+                    } else {
+                        // Notify
+                        preprocessor.diagnostics.push(ShaderDiagnostic {
+                            severity: ShaderDiagnosticSeverity::Warning,
+                            error: format!(
+                                "Include {} reached maximum include depth",
+                                include.relative_path
+                            ),
+                            range: include.range.clone(),
+                        });
+                        // Set empty symbols to avoid crash when getting symbols.
+                        preprocessor
+                            .includes
+                            .iter_mut()
+                            .find(|e| e.absolute_path == include_path && e.range == include_range)
+                            .unwrap()
+                            .cache = Some(ShaderSymbols::default());
                     }
                 }
                 // Process regions
@@ -787,6 +804,23 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         });
                     }
                 };
+            } else {
+                // Notify
+                preprocessor.diagnostics.push(ShaderDiagnostic {
+                    severity: ShaderDiagnosticSeverity::Warning,
+                    error: format!(
+                        "Include {} reached maximum include depth",
+                        include.relative_path
+                    ),
+                    range: include.range.clone(),
+                });
+                // Set empty symbols to avoid crash when getting symbols.
+                preprocessor
+                    .includes
+                    .iter_mut()
+                    .find(|e| e.absolute_path == include_path && e.range == include_range)
+                    .unwrap()
+                    .cache = Some(ShaderSymbols::default());
             }
         }
         let define_after_last_include = preprocessor

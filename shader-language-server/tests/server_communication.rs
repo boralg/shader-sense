@@ -284,3 +284,20 @@ fn test_dependencies() {
         text_document: deps0.identifier(),
     });
 }
+
+#[test]
+fn test_server_stack_overflow() {
+    let mut server = TestServer::desktop().unwrap();
+
+    let file = TestFile::new(
+        Path::new("../shader-sense/test/hlsl/stack-overflow.hlsl"),
+        ShadingLanguage::Hlsl,
+    );
+
+    server.send_notification::<DidOpenTextDocument>(&DidOpenTextDocumentParams {
+        text_document: file.item(),
+    });
+    server.send_notification::<DidCloseTextDocument>(&DidCloseTextDocumentParams {
+        text_document: file.identifier(),
+    });
+}
