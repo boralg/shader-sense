@@ -44,10 +44,12 @@ impl ServerLanguage {
                             deprecated: None,
                             range: shader_range_to_location(
                                 symbol.range.as_ref().expect("Should be filtered out"),
-                            ).range, // TODO: need to store the information somewhere.
+                            )
+                            .range, // TODO: need to store the information somewhere.
                             selection_range: shader_range_to_location(
                                 symbol.range.as_ref().expect("Should be filtered out"),
-                            ).range,
+                            )
+                            .range,
                             children: None, // TODO: Should use a tree instead.
                         }
                     })
