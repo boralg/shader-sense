@@ -1,4 +1,4 @@
-use lsp_types::{SymbolInformation, SymbolKind, Url};
+use lsp_types::{DocumentSymbol, SymbolKind, Url};
 use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderSymbolType};
 
 use super::{common::shader_range_to_location, ServerLanguage};
@@ -7,7 +7,7 @@ impl ServerLanguage {
     pub fn recolt_document_symbol(
         &mut self,
         uri: &Url,
-    ) -> Result<Vec<SymbolInformation>, ShaderError> {
+    ) -> Result<Vec<DocumentSymbol>, ShaderError> {
         let cached_file = self.watched_files.get_file(uri).unwrap();
         let symbols = cached_file
             .get_data()
@@ -26,8 +26,9 @@ impl ServerLanguage {
                     .map(|symbol| {
                         #[allow(deprecated)]
                         // https://github.com/rust-lang/rust/issues/102777
-                        SymbolInformation {
+                        DocumentSymbol {
                             name: symbol.label.clone(),
+                            detail: Some(symbol.format()),
                             kind: match ty {
                                 ShaderSymbolType::Types => SymbolKind::TYPE_PARAMETER,
                                 ShaderSymbolType::Constants => SymbolKind::CONSTANT,
@@ -41,15 +42,18 @@ impl ServerLanguage {
                             },
                             tags: None,
                             deprecated: None,
-                            location: shader_range_to_location(
+                            range: shader_range_to_location(
                                 symbol.range.as_ref().expect("Should be filtered out"),
-                            ),
-                            container_name: None,
+                            ).range, // TODO: need to store the information somewhere.
+                            selection_range: shader_range_to_location(
+                                symbol.range.as_ref().expect("Should be filtered out"),
+                            ).range,
+                            children: None, // TODO: Should use a tree instead.
                         }
                     })
                     .collect()
             })
-            .collect::<Vec<Vec<SymbolInformation>>>()
+            .collect::<Vec<Vec<DocumentSymbol>>>()
             .concat();
         Ok(symbols)
     }
