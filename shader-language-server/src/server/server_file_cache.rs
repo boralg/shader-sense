@@ -641,6 +641,7 @@ impl ServerLanguageFileCache {
                     value: value.clone(),
                 },
                 range: None,
+                scope: None,
                 scope_stack: None,
             });
         }

@@ -29,10 +29,9 @@ mod test_server;
 fn has_symbol(response: Option<DocumentSymbolResponse>, symbol: &str) -> bool {
     let symbols = response.unwrap();
     match symbols {
-        DocumentSymbolResponse::Flat(symbol_informations) => symbol_informations
-            .iter()
-            .find(|e| e.name == symbol)
-            .is_some(),
+        DocumentSymbolResponse::Nested(document_symbol) => {
+            document_symbol.iter().find(|e| e.name == symbol).is_some()
+        }
         _ => panic!("Should not be reached."),
     }
 }

@@ -213,6 +213,13 @@ impl ShaderRange {
             false
         }
     }
+    pub fn join(mut lhs: ShaderRange, rhs: ShaderRange) -> ShaderScope {
+        lhs.start.line = std::cmp::min(lhs.start.line, rhs.start.line);
+        lhs.start.pos = std::cmp::min(lhs.start.pos, rhs.start.pos);
+        lhs.end.line = std::cmp::max(lhs.end.line, rhs.end.line);
+        lhs.end.pos = std::cmp::max(lhs.end.pos, rhs.end.pos);
+        lhs
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -401,6 +408,7 @@ impl ShaderPreprocessor {
                         },
                     },
                     range: define.range.clone(),
+                    scope: None,
                     scope_stack: None, // No scope for define
                 }
             })
@@ -420,6 +428,7 @@ impl ShaderPreprocessor {
                         target: ShaderPosition::new(include.absolute_path.clone(), 0, 0),
                     },
                     range: Some(include.range.clone()),
+                    scope: None,
                     scope_stack: None, // No scope for include
                 }
             })
@@ -450,6 +459,7 @@ impl ShaderMember {
                 count: self.count,
             },
             range: None, // Should have a position ?
+            scope: None, // TODO: Should be scope of parent
             scope_stack: None,
         }
     }
@@ -467,6 +477,7 @@ impl ShaderMethod {
                 signatures: vec![self.signature.clone()],
             },
             range: None, // Should have a position ?
+            scope: None, // TODO: Should be scope of parent
             scope_stack: None,
         }
     }
@@ -527,6 +538,8 @@ pub struct ShaderSymbol {
     // Runtime info. No serialization.
     #[serde(skip)]
     pub range: Option<ShaderRange>, // Range of symbol in shader
+    #[serde(skip)]
+    pub scope: Option<ShaderScope>, // Owning scope
     #[serde(skip)]
     pub scope_stack: Option<Vec<ShaderScope>>, // Stack of declaration
 }

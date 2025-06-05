@@ -14,6 +14,7 @@ impl GlslIntrinsicParser {
                 data: ShaderSymbolData::Keyword {},
                 range: None,
                 scope_stack: None,
+                scope: None,
             }
         }
         symbols

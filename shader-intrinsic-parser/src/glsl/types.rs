@@ -26,6 +26,7 @@ impl GlslIntrinsicParser {
                     }],
                 },
                 range: None,
+                scope: None,
                 scope_stack: None,
             }
         }
@@ -80,6 +81,7 @@ impl GlslIntrinsicParser {
                         },
                     ],
                 },
+                scope: None,
                 range: None,
                 scope_stack: None,
             }
@@ -129,6 +131,7 @@ impl GlslIntrinsicParser {
                         },
                     ],
                 },
+                scope: None,
                 range: None,
                 scope_stack: None,
             }

@@ -55,6 +55,7 @@ impl SymbolTreeParser for WgslStructTreeParser {
                     .collect::<Vec<ShaderParameter>>(),
                 methods: vec![],
             },
+            scope: None, // TODO: compute
             range: Some(range),
             scope_stack: Some(scope_stack),
         });

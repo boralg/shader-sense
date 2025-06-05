@@ -66,9 +66,10 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
         let scope_stack = self.compute_scope_stack(scopes, &range);
         // Query internal scope
         let scope_node = matches.captures[matches.captures.len() - 1].node;
+        let scope_range = ShaderRange::from_range(scope_node.range(), file_path);
         let parameter_scope_stack = {
             let mut s = scope_stack.clone();
-            s.push(ShaderRange::from_range(scope_node.range(), file_path));
+            s.push(scope_range.clone());
             s
         };
         // Get parameters & add them as function scope variable.
@@ -87,6 +88,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
                         ty: ty.clone(),
                         count: None,
                     },
+                    scope: None,
                     range: Some(ShaderRange::from_range(w[1].node.range(), file_path)),
                     scope_stack: Some(parameter_scope_stack.clone()),
                 });
@@ -111,6 +113,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
                     parameters: parameters,
                 }],
             },
+            scope: Some(scope_range),
             range: Some(range),
             scope_stack: Some(scope_stack), // In GLSL, all function are global scope.
         });
@@ -243,6 +246,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
                 members: members,
                 methods: methods,
             },
+            scope: None, // TODO: compute
             range: Some(range),
             scope_stack: Some(scope_stack),
         });
@@ -311,6 +315,7 @@ impl SymbolTreeParser for HlslVariableTreeParser {
                     Err(_) => 0, // TODO: Need to resolve the parameter. Could use proxy tree same as for region conditions. For now, simply return zero.
                 }),
             },
+            scope: None,
             range: Some(range),
             scope_stack: Some(scope_stack),
         });
@@ -374,6 +379,7 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
                     })
                     .collect(),
             },
+            scope: None,
             range: Some(range), // TODO: this should be range of whole expression.
             scope_stack: Some(scope_stack),
         });

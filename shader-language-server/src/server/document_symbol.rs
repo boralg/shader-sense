@@ -1,5 +1,8 @@
 use lsp_types::{DocumentSymbol, SymbolKind, Url};
-use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderSymbolType};
+use shader_sense::{
+    shader_error::ShaderError,
+    symbols::symbols::{ShaderScope, ShaderSymbolType},
+};
 
 use super::{common::shader_range_to_location, ServerLanguage};
 
@@ -24,6 +27,12 @@ impl ServerLanguage {
                             && symbol.range.is_some()
                     })
                     .map(|symbol| {
+                        let label_range = symbol.range.clone().expect("Should be filtered out");
+                        // Content expected to englobe label.
+                        let content_range = match &symbol.scope {
+                            Some(scope) => ShaderScope::join(scope.clone(), label_range.clone()),
+                            None => label_range.clone(),
+                        };
                         #[allow(deprecated)]
                         // https://github.com/rust-lang/rust/issues/102777
                         DocumentSymbol {
@@ -42,14 +51,8 @@ impl ServerLanguage {
                             },
                             tags: None,
                             deprecated: None,
-                            range: shader_range_to_location(
-                                symbol.range.as_ref().expect("Should be filtered out"),
-                            )
-                            .range, // TODO: need to store the information somewhere.
-                            selection_range: shader_range_to_location(
-                                symbol.range.as_ref().expect("Should be filtered out"),
-                            )
-                            .range,
+                            range: shader_range_to_location(&content_range).range,
+                            selection_range: shader_range_to_location(&label_range).range,
                             children: None, // TODO: Should use a tree instead.
                         }
                     })

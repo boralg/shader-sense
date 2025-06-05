@@ -51,8 +51,8 @@ impl SymbolTreeParser for GlslFunctionTreeParser {
         let range = ShaderRange::from_range(label_node.range(), file_path.into());
         let scope_stack = self.compute_scope_stack(scopes, &range);
         // Query internal scopes variables
-        /*let scope_node = matche.captures[matche.captures.len() - 1].node;
-        let content_scope_stack = {
+        let scope_node = matches.captures[matches.captures.len() - 1].node;
+        /*let content_scope_stack = {
             let mut s = scope_stack.clone();
             s.push(range.clone());
             s
@@ -83,6 +83,7 @@ impl SymbolTreeParser for GlslFunctionTreeParser {
                         .collect::<Vec<ShaderParameter>>(),
                 }],
             },
+            scope: Some(ShaderRange::from_range(scope_node.range(), file_path)),
             range: Some(range),
             scope_stack: Some(scope_stack), // In GLSL, all function are global scope.
         });
@@ -138,6 +139,7 @@ impl SymbolTreeParser for GlslUniformBlock {
                         .collect::<Vec<ShaderParameter>>(),
                     methods: vec![],
                 },
+                scope: None,
                 range: Some(identifier_range),
                 scope_stack: None, // Uniform are global stack in GLSL.
             });
@@ -154,6 +156,7 @@ impl SymbolTreeParser for GlslUniformBlock {
                     ty: get_name(shader_content, identifier_node).into(),
                     count: None,
                 },
+                scope: None,
                 range: Some(variable_range),
                 scope_stack: None, // Uniform are global stack in GLSL.
             });
@@ -173,6 +176,7 @@ impl SymbolTreeParser for GlslUniformBlock {
                         ty: get_name(shader_content, uniform_value[0].node).into(),
                         count: None,
                     },
+                    scope: None,
                     range: Some(range),
                     scope_stack: None, // Uniform are global stack in GLSL.
                 });
@@ -233,6 +237,7 @@ impl SymbolTreeParser for GlslStructTreeParser {
                 members: members,
                 methods: vec![],
             },
+            scope: None, // TODO: compute
             range: Some(range),
             scope_stack: Some(scope_stack),
         });
@@ -281,6 +286,7 @@ impl SymbolTreeParser for GlslVariableTreeParser {
                 ty: get_name(shader_content, matches.captures[0].node).into(),
                 count: None,
             },
+            scope: None,
             range: Some(range),
             scope_stack: Some(scope_stack),
         });
@@ -342,6 +348,7 @@ impl SymbolTreeParser for GlslCallExpressionTreeParser {
                     })
                     .collect(),
             },
+            scope: None,
             range: Some(range), // TODO: this should be range of whole expression.
             scope_stack: Some(scope_stack),
         });

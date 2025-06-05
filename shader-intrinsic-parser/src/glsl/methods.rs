@@ -99,6 +99,7 @@ impl GlslIntrinsicParser {
                         },
                         range: None,
                         scope_stack: None,
+                        scope: None,
                     });
                 }
             } else {
@@ -174,6 +175,7 @@ impl GlslIntrinsicParser {
                         count: None,
                     },
                     range: None,
+                    scope: None,
                     scope_stack: None,
                 });
             }

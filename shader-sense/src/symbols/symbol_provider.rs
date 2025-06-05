@@ -98,11 +98,6 @@ impl SymbolProvider {
     pub fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope> {
         // TODO: look for namespace aswell.
         // Should be per lang instead.
-        fn join_scope(mut lhs: ShaderRange, rhs: ShaderRange) -> ShaderScope {
-            lhs.start = std::cmp::min(lhs.start, rhs.start);
-            lhs.end = std::cmp::min(lhs.end, rhs.end);
-            lhs
-        }
         let mut query_cursor = QueryCursor::new();
         let mut scopes = Vec::new();
         for matche in query_cursor.matches(
@@ -116,7 +111,7 @@ impl SymbolProvider {
                     ShaderScope::from_range(matche.captures[0].node.range(), &symbol_tree.file_path)
                 }
                 // a bit weird, a body and single curly brace ? mergin them to be safe.
-                2 => join_scope(
+                2 => ShaderScope::join(
                     ShaderScope::from_range(
                         matche.captures[0].node.range(),
                         &symbol_tree.file_path,
