@@ -95,8 +95,7 @@ impl glslang::include::IncludeHandler for GlslangIncludeHandler<'_> {
         include_depth: usize,
     ) -> Option<IncludeResult> {
         // Glslang does not handle stack overflow natively. So put a limit there.
-        const DEPTH_LIMIT: usize = 30; // Same as symbols.rs::DEPTH_LIMIT
-        if include_depth > DEPTH_LIMIT {
+        if include_depth > IncludeHandler::DEPTH_LIMIT {
             None
         } else {
             match self

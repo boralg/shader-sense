@@ -240,7 +240,7 @@ pub struct ShaderPreprocessorContext {
     defines: HashMap<String, String>, // TODO: Should store position aswell... At least target file path.
     include_handler: IncludeHandler,
     dirty_files: HashSet<PathBuf>, // Dirty files that need to be recomputed no matter what.
-    depth: u32,
+    depth: usize,
 }
 
 impl ShaderPreprocessorContext {
@@ -269,9 +269,12 @@ impl ShaderPreprocessorContext {
         }
     }
     pub fn increase_depth(&mut self) -> bool {
-        const DEPTH_LIMIT: u32 = 30;
-        self.depth += 1;
-        self.depth < DEPTH_LIMIT
+        if self.depth < IncludeHandler::DEPTH_LIMIT {
+            self.depth += 1;
+            true
+        } else {
+            false
+        }
     }
     pub fn decrease_depth(&mut self) {
         assert!(self.depth > 0, "Decreasing depth but zero.");

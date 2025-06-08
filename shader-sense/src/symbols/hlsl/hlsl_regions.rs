@@ -505,22 +505,18 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     update_context_for_include(&include, context, &preprocessor.defines);
                     // Avoid stack overflow
                     if context.increase_depth() {
-                        match include_callback(&include)? {
-                            Some(module_handle) => {
-                                process_include(
-                                    module_handle,
-                                    symbol_provider,
-                                    context,
-                                    &include_path,
-                                    &include_range,
-                                    include_callback,
-                                    old_symbols,
-                                    preprocessor,
-                                )?;
-                                context.decrease_depth();
-                            }
+                        let error = match include_callback(&include)? {
+                            Some(module_handle) => process_include(
+                                module_handle,
+                                symbol_provider,
+                                context,
+                                &include_path,
+                                &include_range,
+                                include_callback,
+                                old_symbols,
+                                preprocessor,
+                            ),
                             None => {
-                                context.decrease_depth();
                                 // Include not found.
                                 preprocessor.diagnostics.push(ShaderDiagnostic {
                                     severity: ShaderDiagnosticSeverity::Warning,
@@ -530,8 +526,11 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                     ),
                                     range: include.range.clone(),
                                 });
+                                Ok(())
                             }
                         };
+                        context.decrease_depth();
+                        let _void = error?; // Propagate error
                     } else {
                         // Notify
                         preprocessor.diagnostics.push(ShaderDiagnostic {
@@ -780,30 +779,29 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             update_context_for_include(include, context, &preprocessor.defines);
             // Avoid stack overflow
             if context.increase_depth() {
-                match include_callback(&include)? {
-                    Some(module_handle) => {
-                        process_include(
-                            module_handle,
-                            symbol_provider,
-                            context,
-                            &include_path,
-                            &include_range,
-                            include_callback,
-                            &mut old_symbols,
-                            preprocessor,
-                        )?;
-                        context.decrease_depth();
-                    }
+                let error = match include_callback(&include)? {
+                    Some(module_handle) => process_include(
+                        module_handle,
+                        symbol_provider,
+                        context,
+                        &include_path,
+                        &include_range,
+                        include_callback,
+                        &mut old_symbols,
+                        preprocessor,
+                    ),
                     None => {
-                        context.decrease_depth();
                         // Include not found.
                         preprocessor.diagnostics.push(ShaderDiagnostic {
                             severity: ShaderDiagnosticSeverity::Warning,
                             error: format!("Failed to find include {}", include.relative_path),
                             range: include.range.clone(),
                         });
+                        Ok(())
                     }
                 };
+                context.decrease_depth();
+                let _void = error?;
             } else {
                 // Notify
                 preprocessor.diagnostics.push(ShaderDiagnostic {

@@ -42,6 +42,8 @@ pub fn canonicalize(p: &Path) -> std::io::Result<PathBuf> {
 }
 
 impl IncludeHandler {
+    pub const DEPTH_LIMIT: usize = 30;
+
     pub fn main_without_config(file: &Path) -> Self {
         Self::main(file, Vec::new(), HashMap::new())
     }
