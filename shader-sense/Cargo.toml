@@ -10,7 +10,7 @@ license-file = "../LICENSE"
 readme = "../README.md"
 
 [dependencies]
-glslang = "0.6.0"
+glslang = "0.6.1"
 naga = { version = "24.0.0", features = ["wgsl-in"] }
 regex = "1.10.4"
 serde = { version = "1.0.199", features = ["derive"] }
