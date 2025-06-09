@@ -42,7 +42,7 @@ cargo build --target wasm32-wasip1-threads
 
 ### Dependencies
 
-You will need to install clang. You will also need to setup the environment variable `WASI_SYSROOT` as well targetting the wasi sysroot folder which you can find at [WASI SDK repo](https://github.com/WebAssembly/wasi-sdk) in releases so that cc-rs can build c++ correctly.
+You will need to install clang. You will also need to setup the environment variable `CC` as well targetting a clang executable that can handle WASI (default visual studio clang cannot). You can find one in [WASI SDK](https://github.com/WebAssembly/wasi-sdk) so that cc-rs can build c correctly.
 
 ### DirectX Shader Compiler issue
 
