@@ -385,3 +385,218 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
         });
     }
 }
+
+#[cfg(test)]
+mod hlsl_parser_tests {
+    use std::{path::Path, vec};
+
+    use tree_sitter::{Query, QueryCursor};
+
+    use crate::{
+        shader::ShadingLanguage,
+        symbols::{
+            hlsl::hlsl_parser::{HlslFunctionTreeParser, HlslStructTreeParser},
+            shader_language::ShaderLanguage,
+            symbol_parser::{ShaderSymbolListBuilder, SymbolTreeParser},
+            symbols::{
+                ShaderMember, ShaderMethod, ShaderParameter, ShaderSignature, ShaderSymbol,
+                ShaderSymbolData, ShaderSymbolList,
+            },
+        },
+    };
+
+    fn parse<Parser: SymbolTreeParser>(
+        parser: &Parser,
+        file_path: &Path,
+        shader_content: &str,
+    ) -> ShaderSymbolList {
+        let mut symbol_list_builder = ShaderSymbolListBuilder::new(&|_| true);
+        let mut query_cursor = QueryCursor::new();
+        let query = Query::new(tree_sitter_hlsl::language(), parser.get_query().as_str()).unwrap();
+
+        let mut language = ShaderLanguage::new(ShadingLanguage::Hlsl);
+        let module = language.create_module(file_path, shader_content).unwrap();
+        for matches in
+            query_cursor.matches(&query, module.tree.root_node(), module.content.as_bytes())
+        {
+            parser.process_match(
+                matches,
+                &module.file_path,
+                &module.content,
+                &vec![],
+                &mut symbol_list_builder,
+            );
+        }
+        symbol_list_builder.get_shader_symbol_list()
+    }
+    fn compare(symbol_expected: &ShaderSymbol, symbol: &ShaderSymbol) {
+        assert!(symbol_expected.label == symbol.label, "Invalid label");
+        assert!(
+            symbol_expected.description == symbol.description,
+            "Invalid description"
+        );
+        assert!(symbol_expected.link == symbol.link, "Invalid link");
+        match (&symbol.data, &symbol_expected.data) {
+            (ShaderSymbolData::None, ShaderSymbolData::None) => todo!(),
+            (
+                ShaderSymbolData::Types { constructors: c1 },
+                ShaderSymbolData::Types { constructors: c2 },
+            ) => {
+                assert!(c1.len() == c2.len(), "Invalid constructors");
+            }
+            (
+                ShaderSymbolData::Struct {
+                    constructors: c1,
+                    members: m1,
+                    methods: me1,
+                },
+                ShaderSymbolData::Struct {
+                    constructors: c2,
+                    members: m2,
+                    methods: me2,
+                },
+            ) => {
+                assert!(c1.len() == c2.len(), "Invalid constructors");
+                assert!(m1.len() == m2.len(), "Invalid members");
+                assert!(me1.len() == me2.len(), "Invalid methods");
+            }
+            (
+                ShaderSymbolData::Constants {
+                    ty: t1,
+                    qualifier: q1,
+                    value: v1,
+                },
+                ShaderSymbolData::Constants {
+                    ty: t2,
+                    qualifier: q2,
+                    value: v2,
+                },
+            ) => todo!(),
+            (
+                ShaderSymbolData::Functions { signatures: s1 },
+                ShaderSymbolData::Functions { signatures: s2 },
+            ) => {
+                assert!(s1.len() == s2.len(), "Invalid functions");
+            }
+            (ShaderSymbolData::Keyword {}, ShaderSymbolData::Keyword {}) => {}
+            (
+                ShaderSymbolData::Variables { ty: t1, count: c1 },
+                ShaderSymbolData::Variables { ty: t2, count: c2 },
+            ) => todo!(),
+            (
+                ShaderSymbolData::CallExpression {
+                    label: l1,
+                    range: r1,
+                    parameters: p1,
+                },
+                ShaderSymbolData::CallExpression {
+                    label: l2,
+                    range: r2,
+                    parameters: p2,
+                },
+            ) => todo!(),
+            (ShaderSymbolData::Link { target: t1 }, ShaderSymbolData::Link { target: t2 }) => {
+                assert!(t1 == t2, "Mismatching link")
+            }
+            (ShaderSymbolData::Macro { value: v1 }, ShaderSymbolData::Macro { value: v2 }) => {
+                assert!(v1 == v2, "Mismatching macro")
+            }
+            _ => panic!("data mismatch"),
+        }
+    }
+
+    #[test]
+    fn struct_parser() {
+        let path = Path::new("dontcare");
+        let content = r"
+            struct TestStruct {
+                float member0;
+                float member1 = 5;
+                float method() {
+                }
+            };
+        ";
+        let result = parse(&HlslStructTreeParser::new(), path, content);
+        compare(
+            &ShaderSymbol {
+                label: "TestStruct".into(),
+                description: "".into(),
+                version: "".into(),
+                stages: vec![],
+                link: None,
+                data: ShaderSymbolData::Struct {
+                    constructors: vec![],
+                    members: vec![
+                        ShaderMember {
+                            ty: "float".into(),
+                            label: "member0".into(),
+                            description: "".into(),
+                            count: None,
+                        },
+                        ShaderMember {
+                            ty: "float".into(),
+                            label: "member1".into(),
+                            description: "".into(),
+                            count: None,
+                        },
+                    ],
+                    methods: vec![ShaderMethod {
+                        label: "method".into(),
+                        signature: ShaderSignature {
+                            returnType: "float".into(),
+                            description: "".into(),
+                            parameters: vec![],
+                        },
+                    }],
+                },
+                range: None,
+                scope: None,
+                scope_stack: None,
+            },
+            &result.types[0],
+        );
+    }
+
+    #[test]
+    fn function_parser() {
+        let path = Path::new("dontcare");
+        let content = r"
+            void function(float p0, uint p1 = 0) {
+            }
+        ";
+        let result = parse(&HlslFunctionTreeParser { is_field: false }, path, content);
+        compare(
+            &ShaderSymbol {
+                label: "function".into(),
+                description: "".into(),
+                version: "".into(),
+                stages: vec![],
+                link: None,
+                data: ShaderSymbolData::Functions {
+                    signatures: vec![ShaderSignature {
+                        returnType: "void".into(),
+                        description: "".into(),
+                        parameters: vec![
+                            ShaderParameter {
+                                ty: "float".into(),
+                                label: "p0".into(),
+                                description: "".into(),
+                                count: None,
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "p1".into(),
+                                description: "".into(),
+                                count: None,
+                            },
+                        ],
+                    }],
+                },
+                range: None,
+                scope: None,
+                scope_stack: None,
+            },
+            &result.functions[0],
+        );
+    }
+}
