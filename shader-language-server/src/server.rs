@@ -147,7 +147,7 @@ impl ServerLanguage {
                     },
                     legend: SemanticTokensLegend {
                         token_modifiers: vec![],
-                        token_types: vec![SemanticTokenType::MACRO],
+                        token_types: vec![SemanticTokenType::MACRO, SemanticTokenType::PARAMETER],
                     },
                     range: None,
                     full: Some(SemanticTokensFullOptions::Bool(true)),
