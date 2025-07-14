@@ -30,10 +30,9 @@ impl ServerLanguage {
             // word_range should be the same as symbol range
             Ok((word, word_range)) => match self.watched_files.get_file(uri) {
                 Some(target_cached_file) => {
-                    let all_symbol_list = self
+                    let symbol_list = self
                         .watched_files
                         .get_all_symbols(uri, &language_data.language);
-                    let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);
                     let matching_symbols = symbol_list.find_symbols_at(&word, &shader_position);
                     if matching_symbols.len() == 0 {
                         Ok(None)

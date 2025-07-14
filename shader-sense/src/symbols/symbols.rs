@@ -374,7 +374,7 @@ impl ShaderPreprocessor {
     }
     pub fn preprocess_symbols(&self, shader_symbols: &mut ShaderSymbolList) {
         // Filter inactive regions symbols
-        shader_symbols.retain(|symbol| {
+        shader_symbols.retain(|_symbol_type, symbol| {
             let is_in_inactive_region = match &symbol.range {
                 Some(range) => {
                     for region in &self.regions {
@@ -581,22 +581,55 @@ impl ShaderSymbolList {
         serde_json::from_str::<ShaderSymbolList>(&file_content)
             .expect("Failed to parse ShaderSymbolList")
     }
+    fn is_symbol_defined_at(
+        shader_symbol: &ShaderSymbol,
+        cursor_position: &ShaderPosition,
+    ) -> bool {
+        match &shader_symbol.range {
+            Some(symbol_range) => {
+                if symbol_range.start.file_path == cursor_position.file_path {
+                    // Ensure symbols are already defined at pos
+                    let is_already_defined = if symbol_range.start.line == cursor_position.line {
+                        cursor_position.pos > symbol_range.start.pos
+                    } else {
+                        cursor_position.line > symbol_range.start.line
+                    };
+                    if is_already_defined {
+                        // If we are in main file, check if scope in range.
+                        match &shader_symbol.scope_stack {
+                            Some(symbol_scope_stack) => {
+                                for symbol_scope in symbol_scope_stack {
+                                    if !symbol_scope.contain(cursor_position) {
+                                        return false; // scope not in range
+                                    }
+                                }
+                                true // scope in range
+                            }
+                            None => true, // Global space
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    // If we are not in main file, only show whats in global scope.
+                    // TODO: should handle include position in file aswell.
+                    match &shader_symbol.scope_stack {
+                        Some(symbol_scope_stack) => symbol_scope_stack.is_empty(), // Global scope or inaccessible
+                        None => true,                                              // Global space
+                    }
+                }
+            }
+            None => true, // intrinsics
+        }
+    }
     pub fn find_symbols_at(&self, label: &String, position: &ShaderPosition) -> Vec<&ShaderSymbol> {
         self.iter()
             .map(|(sl, ty)| {
                 if !ty.is_transient() {
                     sl.iter()
-                        .filter(|e| {
-                            if e.label == *label {
-                                match &e.range {
-                                    Some(range) => {
-                                        // TODO: should filter from other file with include range, but no access to it from there...
-                                        // TODO: handle scopes aswell... (& remove duplicate filter_scoped_symbol) + splat function.
-                                        *position > range.start
-                                            || range.start.file_path != position.file_path
-                                    }
-                                    None => true,
-                                }
+                        .filter(|symbol| {
+                            if symbol.label == *label {
+                                Self::is_symbol_defined_at(symbol, position)
                             } else {
                                 false
                             }
@@ -608,6 +641,13 @@ impl ShaderSymbolList {
             })
             .collect::<Vec<Vec<&ShaderSymbol>>>()
             .concat()
+    }
+    pub fn filter_scoped_symbol(&self, cursor_position: &ShaderPosition) -> ShaderSymbolList {
+        let mut filter_scoped_symbols = self.clone();
+        filter_scoped_symbols.retain(|symbol_type, symbol| {
+            !symbol_type.is_transient() && Self::is_symbol_defined_at(symbol, cursor_position)
+        });
+        filter_scoped_symbols
     }
     pub fn find_symbols(&self, label: &String) -> Vec<&ShaderSymbol> {
         self.iter()
@@ -708,85 +748,22 @@ impl ShaderSymbolList {
                 .collect(),
         }
     }
-    pub fn retain<P: Fn(&ShaderSymbol) -> bool>(&mut self, predicate: P) {
-        self.types.retain(&predicate);
-        self.constants.retain(&predicate);
-        self.functions.retain(&predicate);
-        self.variables.retain(&predicate);
-        self.call_expression.retain(&predicate);
-        self.keywords.retain(&predicate);
-        self.macros.retain(&predicate);
-        self.includes.retain(&predicate);
-    }
-    pub fn filter_scoped_symbol(&self, cursor_position: &ShaderPosition) -> ShaderSymbolList {
-        // Ensure symbols are already defined at pos
-        let filter_position = |shader_symbol: &ShaderSymbol| -> bool {
-            match &shader_symbol.scope_stack {
-                Some(scope) => {
-                    if scope.is_empty() {
-                        true // Global space
-                    } else {
-                        match &shader_symbol.range {
-                            Some(range) => {
-                                if range.start.line == cursor_position.line {
-                                    cursor_position.pos > range.start.pos
-                                } else {
-                                    cursor_position.line > range.start.line
-                                }
-                            }
-                            None => true, // intrinsics
-                        }
-                    }
-                }
-                None => true, // Global space
-            }
-        };
-        // Ensure symbols are in scope
-        let filter_scope = |shader_symbol: &ShaderSymbol| -> bool {
-            match &shader_symbol.range {
-                Some(symbol_range) => {
-                    if symbol_range.start.file_path == cursor_position.file_path {
-                        // If we are in main file, check if scope in range.
-                        match &shader_symbol.scope_stack {
-                            Some(symbol_scope_stack) => {
-                                for symbol_scope in symbol_scope_stack {
-                                    if !symbol_scope.contain(&cursor_position) {
-                                        return false;
-                                    }
-                                }
-                                true
-                            }
-                            None => true,
-                        }
-                    } else {
-                        // If we are not in main file, only show whats in global scope.
-                        match &shader_symbol.scope_stack {
-                            Some(symbol_scope_stack) => symbol_scope_stack.is_empty(), // Global scope or inaccessible
-                            None => true,
-                        }
-                    }
-                }
-                None => true,
-            }
-        };
-        // TODO: should add a filter for when multiple same definition: pick latest (shadowing)
-        let filter_all = |shader_symbols: &ShaderSymbol| -> Option<ShaderSymbol> {
-            if filter_position(shader_symbols) && filter_scope(shader_symbols) {
-                Some(shader_symbols.clone())
-            } else {
-                None
-            }
-        };
-        ShaderSymbolList {
-            functions: self.functions.iter().filter_map(filter_all).collect(),
-            types: self.types.iter().filter_map(filter_all).collect(),
-            constants: self.constants.iter().filter_map(filter_all).collect(),
-            variables: self.variables.iter().filter_map(filter_all).collect(),
-            call_expression: self.call_expression.iter().filter_map(filter_all).collect(),
-            keywords: self.keywords.iter().filter_map(filter_all).collect(),
-            macros: self.macros.iter().filter_map(filter_all).collect(),
-            includes: self.includes.iter().filter_map(filter_all).collect(),
-        }
+    pub fn retain<P: Fn(ShaderSymbolType, &ShaderSymbol) -> bool>(&mut self, predicate: P) {
+        self.types.retain(|s| predicate(ShaderSymbolType::Types, s));
+        self.constants
+            .retain(|s| predicate(ShaderSymbolType::Constants, s));
+        self.functions
+            .retain(|s| predicate(ShaderSymbolType::Functions, s));
+        self.variables
+            .retain(|s| predicate(ShaderSymbolType::Variables, s));
+        self.call_expression
+            .retain(|s| predicate(ShaderSymbolType::CallExpression, s));
+        self.keywords
+            .retain(|s| predicate(ShaderSymbolType::Keyword, s));
+        self.macros
+            .retain(|s| predicate(ShaderSymbolType::Macros, s));
+        self.includes
+            .retain(|s| predicate(ShaderSymbolType::Include, s));
     }
 }
 

@@ -26,7 +26,7 @@ impl ServerLanguage {
             line: position.line as u32,
             pos: position.character as u32,
         };
-        let all_symbol_list = self
+        let symbol_list = self
             .watched_files
             .get_all_symbols(uri, &language_data.language);
         match language_data.symbol_provider.get_word_range_at_position(
@@ -34,7 +34,6 @@ impl ServerLanguage {
             &shader_position,
         ) {
             Ok((word, word_range)) => {
-                let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);
                 let matching_symbols = symbol_list.find_symbols_at(&word, &shader_position);
                 Ok(Some(GotoDefinitionResponse::Link(
                     matching_symbols
