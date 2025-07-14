@@ -15,8 +15,7 @@ use crate::{
         symbol_tree::{ShaderModuleHandle, ShaderSymbols, SymbolTree},
         symbols::{
             ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext,
-            ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderPreprocessorMode,
-            ShaderRange, ShaderRegion,
+            ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderRange, ShaderRegion,
         },
     },
 };
