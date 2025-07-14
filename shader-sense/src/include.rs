@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::{Path, PathBuf},
 };
 
@@ -7,7 +7,7 @@ use std::{
 pub struct IncludeHandler {
     includes: Vec<String>, // No need to store include, store them as directory stack ? No cuz we want stack before include.
     directory_stack: Vec<PathBuf>, // Vec for keeping insertion order. Might own duplicate.
-    visited_dependencies: HashSet<PathBuf>,
+    visited_dependencies: HashMap<PathBuf, usize>,
     path_remapping: HashMap<PathBuf, PathBuf>, // remapping of path / virtual path
 }
 // std::fs::canonicalize not supported on wasi target... Emulate it.
@@ -56,8 +56,8 @@ impl IncludeHandler {
         let cwd = file_path.parent().unwrap();
         let mut directory_stack = Vec::new();
         directory_stack.push(cwd.into());
-        let mut visited_dependencies = HashSet::new();
-        visited_dependencies.insert(file_path.into());
+        let mut visited_dependencies = HashMap::new();
+        visited_dependencies.insert(file_path.into(), 1);
         Self {
             includes: includes,
             directory_stack: directory_stack,
@@ -65,13 +65,18 @@ impl IncludeHandler {
             path_remapping: path_remapping,
         }
     }
-    pub fn is_visited(&self, path: &Path) -> bool {
-        self.visited_dependencies.contains(path)
+    pub fn get_visited_count(&self, path: &Path) -> usize {
+        self.visited_dependencies.get(path).cloned().unwrap_or(0)
     }
     pub fn visit_file(&mut self, path: &Path) {
-        self.visited_dependencies.insert(path.into());
-        if let Some(parent) = path.parent() {
-            self.directory_stack.push(canonicalize(parent).unwrap());
+        match self.visited_dependencies.get_mut(path.into()) {
+            Some(visited_dependency_count) => *visited_dependency_count += 1,
+            None => {
+                self.visited_dependencies.insert(path.into(), 1);
+                if let Some(parent) = path.parent() {
+                    self.directory_stack.push(canonicalize(parent).unwrap());
+                }
+            }
         }
     }
     pub fn search_in_includes(

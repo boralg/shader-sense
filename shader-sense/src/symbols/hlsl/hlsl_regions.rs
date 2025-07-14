@@ -359,7 +359,6 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 .cloned()
                 .collect::<Vec<ShaderPreprocessorDefine>>();
             context.append_defines(define_before_include);
-            context.visit_file(&include.absolute_path);
         }
         fn process_include<'a>(
             module_handle: ShaderModuleHandle,
@@ -402,37 +401,34 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 },
                 None => (true, None), // No old_symbol.
             };
-            // Check for pragma once.
-            let is_once = context.is_visited(&include.absolute_path)
-                && preprocessor.mode == ShaderPreprocessorMode::OnceVisited;
-            if !is_once {
-                // Update include symbols if dirty, or simply move from old symbols.
-                if is_dirty {
-                    // Include found, deal with it.
-                    let module = RefCell::borrow(&module_handle);
-                    include.cache = Some(symbol_provider.query_symbols_with_context(
-                        &module,
-                        context,
-                        include_callback,
-                        include_old_cache,
-                    )?)
-                } else {
-                    assert!(include_old_cache.is_some(), "Not dirty, but missing cache.");
-                    // Add include context.
-                    update_context_for_include(include, context, &preprocessor.defines);
-                    // Update cache.
-                    include.cache = include_old_cache;
+            // Update include symbols if dirty, or simply move from old symbols.
+            if is_dirty {
+                // Include found, deal with it.
+                let module = RefCell::borrow(&module_handle);
+                include.cache = Some(symbol_provider.query_symbols_with_context(
+                    &module,
+                    context,
+                    include_callback,
+                    include_old_cache,
+                )?)
+            } else {
+                assert!(include_old_cache.is_some(), "Not dirty, but missing cache.");
+                // Add include context.
+                update_context_for_include(include, context, &preprocessor.defines);
+                // Update cache.
+                include.cache = include_old_cache;
 
-                    // Recurse all childs & copy their defines & co.
-                    let included_include_info: Vec<(PathBuf, ShaderRange)> = include
-                        .get_cache()
-                        .get_preprocessor()
-                        .includes
-                        .iter()
-                        .map(|i| (i.absolute_path.clone(), i.range.clone()))
-                        .collect();
-                    for (included_include_path, included_include_range) in included_include_info {
-                        process_include(
+                // Recurse all childs & copy their defines & co.
+                let included_include_info: Vec<(PathBuf, ShaderRange)> = include
+                    .get_cache()
+                    .get_preprocessor()
+                    .includes
+                    .iter()
+                    .map(|i| (i.absolute_path.clone(), i.range.clone()))
+                    .collect();
+                for (included_include_path, included_include_range) in included_include_info {
+                    if context.increase_depth() {
+                        let error = process_include(
                             Rc::clone(&module_handle),
                             symbol_provider,
                             context,
@@ -441,12 +437,11 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             include_callback,
                             old_symbols,
                             include.get_cache_mut().get_preprocessor_mut(),
-                        )?;
+                        );
+                        context.decrease_depth();
+                        let _void = error?; // Propagate error
                     }
                 }
-            } else {
-                // File already included & marked as once.
-                include.cache = Some(ShaderSymbols::default());
             }
             assert!(
                 include.cache.is_some(),
@@ -455,8 +450,6 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             );
             Ok(())
         }
-        // Add context just to be sure
-        context.visit_file(&symbol_tree.file_path);
         // Query regions
         let mut query_cursor = QueryCursor::new();
         let mut regions = Vec::new();

@@ -280,11 +280,8 @@ impl ShaderPreprocessorContext {
         assert!(self.depth > 0, "Decreasing depth but zero.");
         self.depth -= 1;
     }
-    pub fn is_visited(&mut self, path: &Path) -> bool {
-        self.include_handler.is_visited(path)
-    }
-    pub fn visit_file(&mut self, path: &Path) {
-        self.include_handler.visit_file(path);
+    pub fn get_visited_count(&mut self, path: &Path) -> usize {
+        self.include_handler.get_visited_count(path)
     }
     pub fn is_dirty(&self, file_path: &Path, context: &ShaderPreprocessorContext) -> bool {
         // Compare defines to determine if context is different.

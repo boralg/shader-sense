@@ -41,7 +41,8 @@ impl SymbolTreePreprocessorParser for HlslPragmaTreePreprocessorParser {
 
         // TODO: Should check regions aswell before discarding.
         if content.trim() == "once" {
-            preprocessor.mode = if context.is_visited(&file_path) {
+            // Note that file is already included once if we are processing it.
+            preprocessor.mode = if context.get_visited_count(&file_path) > 1 {
                 ShaderPreprocessorMode::OnceVisited
             } else {
                 ShaderPreprocessorMode::Once
