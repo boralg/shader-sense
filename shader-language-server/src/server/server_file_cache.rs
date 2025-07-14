@@ -330,7 +330,10 @@ impl ServerLanguageFileCache {
                             if *diagnostic_path == include.absolute_path {
                                 return Some(ShaderDiagnostic {
                                     severity: ShaderDiagnosticSeverity::Error,
-                                    error: format!("File {} has issues", include.relative_path),
+                                    error: format!(
+                                        "File {} has issues:\n{}",
+                                        include.relative_path, diagnostic.error
+                                    ),
                                     range: include.range.clone(),
                                 });
                             }
@@ -340,8 +343,8 @@ impl ServerLanguageFileCache {
                                     return Some(ShaderDiagnostic {
                                         severity: ShaderDiagnosticSeverity::Error,
                                         error: format!(
-                                            "File {} has issues",
-                                            includer.relative_path
+                                            "File {} has issues:\n{}",
+                                            includer.relative_path, diagnostic.error
                                         ),
                                         range: include.range.clone(),
                                     })
