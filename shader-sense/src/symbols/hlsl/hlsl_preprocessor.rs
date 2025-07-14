@@ -6,16 +6,48 @@ use crate::{
         symbol_parser::{get_name, SymbolTreePreprocessorParser},
         symbols::{
             ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine,
-            ShaderPreprocessorInclude, ShaderRange,
+            ShaderPreprocessorInclude, ShaderPreprocessorMode, ShaderRange,
         },
     },
 };
 
 pub fn get_hlsl_preprocessor_parser() -> Vec<Box<dyn SymbolTreePreprocessorParser>> {
     vec![
+        Box::new(HlslPragmaTreePreprocessorParser {}),
         Box::new(HlslIncludeTreePreprocessorParser {}),
         Box::new(HlslDefineTreePreprocessorParser {}),
     ]
+}
+struct HlslPragmaTreePreprocessorParser {}
+
+impl SymbolTreePreprocessorParser for HlslPragmaTreePreprocessorParser {
+    fn get_query(&self) -> String {
+        r#"(preproc_call
+            directive: (preproc_directive)
+            argument: (preproc_arg) @once
+        )"#
+        .into()
+    }
+    fn process_match(
+        &self,
+        matches: tree_sitter::QueryMatch,
+        file_path: &Path,
+        shader_content: &str,
+        preprocessor: &mut ShaderPreprocessor,
+        context: &mut ShaderPreprocessorContext,
+    ) {
+        let pragma_content_node = matches.captures[0].node;
+        let content = get_name(shader_content, pragma_content_node);
+
+        // TODO: Should check regions aswell before discarding.
+        if content.trim() == "once" {
+            preprocessor.mode = if context.is_visited(&file_path) {
+                ShaderPreprocessorMode::OnceVisited
+            } else {
+                ShaderPreprocessorMode::Once
+            };
+        }
+    }
 }
 struct HlslIncludeTreePreprocessorParser {}
 

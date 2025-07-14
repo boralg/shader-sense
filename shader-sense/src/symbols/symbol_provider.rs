@@ -189,19 +189,6 @@ impl SymbolProvider {
     ) -> Result<ShaderPreprocessor, ShaderError> {
         let mut preprocessor = ShaderPreprocessor::new(context.clone());
 
-        // Check pragma once macro.
-        if let Some(_) = symbol_tree.content.find("#pragma once") {
-            // Assume regions not affecting it neither does include order.
-            preprocessor.mode = if context.is_visited(&symbol_tree.file_path) {
-                ShaderPreprocessorMode::OnceVisited
-            } else {
-                ShaderPreprocessorMode::Once
-            };
-            return Ok(preprocessor);
-        } else {
-            preprocessor.mode = ShaderPreprocessorMode::Default;
-        }
-
         for parser in &self.preprocessor_parsers {
             let mut query_cursor = QueryCursor::new();
             for matches in query_cursor.matches(
@@ -217,6 +204,13 @@ impl SymbolProvider {
                     context,
                 );
             }
+        }
+        // Check pragma once macro.
+        if preprocessor.mode == ShaderPreprocessorMode::OnceVisited {
+            // Return a clean preprocessor.
+            let mut empty_preprocessor = ShaderPreprocessor::new(context.clone());
+            empty_preprocessor.mode = preprocessor.mode;
+            return Ok(empty_preprocessor);
         }
         // Query regions.
         // Will filter includes & defines in inactive regions
