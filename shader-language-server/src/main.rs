@@ -17,6 +17,9 @@ fn run_server() {
         get_version(),
         std::env::consts::OS
     );
+    if let Ok(current_exe) = std::env::current_exe() {
+        info!("Server running from {}", current_exe.display());
+    }
     server::run();
 }
 
