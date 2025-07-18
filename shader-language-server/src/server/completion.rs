@@ -14,7 +14,7 @@ use shader_sense::{
 use super::ServerLanguage;
 
 impl ServerLanguage {
-    fn list_members_and_methods(&self, symbol: &ShaderSymbol) -> Vec<ShaderSymbol> {
+    fn list_members_and_methods(symbol: &ShaderSymbol) -> Vec<ShaderSymbol> {
         if let ShaderSymbolData::Struct {
             constructors: _,
             members,
@@ -98,7 +98,7 @@ impl ServerLanguage {
                         };
                         while let Some(next_item) = chain_list.next() {
                             let members_and_methods =
-                                self.list_members_and_methods(&current_symbol);
+                                Self::list_members_and_methods(&current_symbol);
                             let symbol =
                                 match members_and_methods.iter().find(|e| e.label == next_item.0) {
                                     Some(next_symbol) => next_symbol.clone(),
@@ -122,7 +122,7 @@ impl ServerLanguage {
                                 return Ok(vec![]); // Nothing valid under cursor
                             }
                         }
-                        let members_and_methods = self.list_members_and_methods(&current_symbol);
+                        let members_and_methods = Self::list_members_and_methods(&current_symbol);
                         return Ok(members_and_methods
                             .into_iter()
                             .map(|s| {
@@ -136,7 +136,7 @@ impl ServerLanguage {
                                 };
                                 convert_completion_item(
                                     cached_file.shading_language,
-                                    s,
+                                    &s,
                                     completion_kind,
                                 )
                             })
@@ -185,7 +185,7 @@ impl ServerLanguage {
 
 fn convert_completion_item(
     shading_language: ShadingLanguage,
-    shader_symbol: ShaderSymbol,
+    shader_symbol: &ShaderSymbol,
     completion_kind: CompletionItemKind,
 ) -> CompletionItem {
     let doc_link = if let Some(link) = &shader_symbol.link {

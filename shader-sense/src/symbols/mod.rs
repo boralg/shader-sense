@@ -69,7 +69,7 @@ mod tests {
         recursed_dependencies
     }
 
-    fn get_all_symbols<T: ShadingLanguageTag>(
+    fn get_all_preprocessed_symbols<T: ShadingLanguageTag>(
         language: &mut ShaderLanguage,
         symbol_provider: &SymbolProvider,
         file_path: &Path,
@@ -88,7 +88,7 @@ mod tests {
             )
             .unwrap();
         let symbols = symbols.get_all_symbols();
-        all_symbols.append(symbols);
+        all_symbols.append(symbols.into());
         for dep in deps {
             let symbol_tree = language.create_module(&dep.1, &dep.0).unwrap();
             let symbols = symbol_provider
@@ -100,7 +100,7 @@ mod tests {
                 )
                 .unwrap();
             let symbols = symbols.get_all_symbols();
-            all_symbols.append(symbols);
+            all_symbols.append(symbols.into());
         }
         Ok(all_symbols)
     }
@@ -189,14 +189,15 @@ mod tests {
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         let mut language = ShaderLanguage::new(ShadingLanguage::Glsl);
         let symbol_provider = language.create_symbol_provider();
-        let symbols = get_all_symbols::<GlslShadingLanguageTag>(
+        let preprocessed_symbol_list = get_all_preprocessed_symbols::<GlslShadingLanguageTag>(
             &mut language,
             &symbol_provider,
             file_path,
             &shader_content,
         )
-        .unwrap()
-        .filter_scoped_symbol(&ShaderPosition {
+        .unwrap();
+        let symbol_list = preprocessed_symbol_list.as_ref();
+        let symbols = symbol_list.filter_scoped_symbol(&ShaderPosition {
             file_path: PathBuf::from(file_path),
             line: 16,
             pos: 0,

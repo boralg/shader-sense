@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensResult, Url};
 use shader_sense::{
     shader_error::ShaderError,
-    symbols::symbols::{ShaderPosition, ShaderSymbolData, ShaderSymbolList},
+    symbols::symbols::{ShaderPosition, ShaderSymbolData, ShaderSymbolListRef},
 };
 
 use crate::server::server_file_cache::ServerFileCache;
@@ -14,7 +14,7 @@ impl ServerLanguage {
     fn find_macros(
         uri: &Url,
         cached_file: &ServerFileCache,
-        symbols: &ShaderSymbolList,
+        symbols: &ShaderSymbolListRef,
     ) -> Vec<SemanticToken> {
         let file_path = uri.to_file_path().unwrap();
         let content = &RefCell::borrow(&cached_file.shader_module).content;
@@ -35,7 +35,7 @@ impl ServerLanguage {
                                 .find_direct_includer(&range.start.file_path)
                             {
                                 Some(include) => {
-                                    include.range.start.to_byte_offset(content).unwrap()
+                                    include.get_range().start.to_byte_offset(content).unwrap()
                                 }
                                 None => 0, // Included from another file, but not found...
                             }
@@ -79,7 +79,7 @@ impl ServerLanguage {
     fn find_parameters_variables(
         uri: &Url,
         cached_file: &ServerFileCache,
-        symbols: &ShaderSymbolList,
+        symbols: &ShaderSymbolListRef,
     ) -> Vec<SemanticToken> {
         let file_path = uri.to_file_path().unwrap();
         let content = &RefCell::borrow(&cached_file.shader_module).content;

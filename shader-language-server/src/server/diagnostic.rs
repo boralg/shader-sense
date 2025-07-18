@@ -106,7 +106,7 @@ impl ServerLanguage {
         }
         // Add empty diagnostics to direct dependencies without errors to clear them.
         for include in &data.symbol_cache.get_preprocessor().includes {
-            let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
+            let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
             if diagnostics.get(&include_uri).is_none() {
                 info!("Clearing diagnostic for deps file {}", include_uri);
                 diagnostics.insert(include_uri.clone(), vec![]);

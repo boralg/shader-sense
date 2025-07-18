@@ -90,14 +90,14 @@ mod tests {
                 depth += 1;
                 println!(
                     "Including {} (depth {})",
-                    include.absolute_path.display(),
+                    include.get_absolute_path().display(),
                     depth
                 );
                 Ok(Some(Rc::new(RefCell::new(
                     language
                         .create_module(
-                            &include.absolute_path,
-                            &std::fs::read_to_string(&include.absolute_path).unwrap(),
+                            &include.get_absolute_path(),
+                            &std::fs::read_to_string(&include.get_absolute_path()).unwrap(),
                         )
                         .unwrap(),
                 ))))

@@ -6,6 +6,8 @@ use std::{
 
 use tree_sitter::{Tree, TreeCursor};
 
+use crate::symbols::symbols::ShaderSymbolListRef;
+
 use super::{
     shader_language::ShaderLanguage,
     symbol_provider::ShaderSymbolParams,
@@ -39,23 +41,21 @@ impl ShaderSymbols {
             symbol_list: ShaderSymbolList::default(),
         }
     }
-    pub fn get_all_symbols(&self) -> ShaderSymbolList {
+    pub fn get_all_symbols(&self) -> ShaderSymbolListRef {
         let mut symbols = self.get_local_symbols();
         for include in &self.preprocessor.includes {
             assert!(
                 include.cache.is_some(),
                 "Include {} do not have cache, but is being queried.\n{}",
-                include.relative_path,
+                include.get_relative_path(),
                 self.dump_dependency_tree(&PathBuf::from("oui"))
             );
             symbols.append(include.get_cache().get_all_symbols());
         }
         symbols
     }
-    pub fn get_local_symbols(&self) -> ShaderSymbolList {
-        let mut symbols = self.symbol_list.clone();
-        self.preprocessor.preprocess_symbols(&mut symbols);
-        symbols
+    pub fn get_local_symbols(&self) -> ShaderSymbolListRef {
+        self.preprocessor.preprocess_symbols(&self.symbol_list)
     }
     pub fn get_context(&self) -> &ShaderPreprocessorContext {
         &self.preprocessor.context
@@ -120,7 +120,8 @@ impl ShaderSymbols {
         None
     }
     pub fn find_direct_includer(&self, include_path: &Path) -> Option<&ShaderPreprocessorInclude> {
-        match self.find_include_stack(&mut |include| include.absolute_path == *include_path) {
+        match self.find_include_stack(&mut |include| *include.get_absolute_path() == *include_path)
+        {
             Some(stack) => {
                 assert!(!stack.is_empty());
                 Some(stack[0])
@@ -129,7 +130,7 @@ impl ShaderSymbols {
         }
     }
     pub fn has_dependency(&self, dependency_to_find_path: &Path) -> bool {
-        self.find_include(&mut |e| e.absolute_path == *dependency_to_find_path)
+        self.find_include(&mut |e| *e.get_absolute_path() == *dependency_to_find_path)
             .is_some()
     }
     fn dump_dependency_node(
@@ -142,7 +143,7 @@ impl ShaderSymbols {
             "{}{} {} ({})\n",
             header,
             if is_last { "└─" } else { "├─" },
-            include.absolute_path.display(),
+            include.get_absolute_path().display(),
             if include.cache.is_some() {
                 "Cache"
             } else {

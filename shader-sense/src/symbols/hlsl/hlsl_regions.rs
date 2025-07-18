@@ -351,9 +351,9 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         ) {
             let define_before_include = defines
                 .iter()
-                .filter(|define| match &define.range {
-                    Some(range) => range.end < include.range.start,
-                    None => true, // Global
+                .filter(|define| match define.get_range() {
+                    Some(range) => range.end < include.get_range().start,
+                    None => true, // Global define
                 })
                 .cloned()
                 .collect::<Vec<ShaderPreprocessorDefine>>();
@@ -372,7 +372,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             let include = preprocessor
                 .includes
                 .iter_mut()
-                .find(|e| e.absolute_path == include_path && e.range == *include_range)
+                .find(|e| e.get_absolute_path() == include_path && *e.get_range() == *include_range)
                 .unwrap();
             // Check if we need to update.
             let (is_dirty, include_old_cache) = match old_symbols {
@@ -380,14 +380,14 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     .preprocessor
                     .includes
                     .iter_mut()
-                    .find(|i| i.absolute_path == include.absolute_path)
+                    .find(|i| i.get_absolute_path() == include.get_absolute_path())
                 {
                     Some(old_include) => match old_include.cache.take() {
                         Some(old_cache) => {
                             if old_cache
                                 .get_preprocessor()
                                 .context
-                                .is_dirty(&include.absolute_path, &context)
+                                .is_dirty(&include.get_absolute_path(), &context)
                             {
                                 (true, Some(old_cache))
                             } else {
@@ -423,7 +423,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     .get_preprocessor()
                     .includes
                     .iter()
-                    .map(|i| (i.absolute_path.clone(), i.range.clone()))
+                    .map(|i| (i.get_absolute_path().into(), i.get_range().clone()))
                     .collect();
                 for (included_include_path, included_include_range) in included_include_info {
                     if context.increase_depth() {
@@ -445,7 +445,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             assert!(
                 include.cache.is_some(),
                 "Failed to compute cache for file {}",
-                include.absolute_path.display()
+                include.get_absolute_path().display()
             );
             Ok(())
         }
@@ -479,21 +479,33 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     .includes
                     .iter()
                     .filter(|include| {
-                        include.range.end < region_start
+                        include.get_range().end < region_start
                             && processed_includes
                                 .iter()
-                                .find(|(p, r)| *p == include.absolute_path && *r == include.range)
+                                .find(|(p, r)| {
+                                    *p == include.get_absolute_path() && *r == *include.get_range()
+                                })
                                 .is_none()
                     })
-                    .map(|include| (include.absolute_path.clone(), include.range.clone()))
+                    .map(|include| {
+                        (
+                            include.get_absolute_path().into(),
+                            include.get_range().clone(),
+                        )
+                    })
                     .collect::<Vec<(PathBuf, ShaderRange)>>();
                 for (include_path, include_range) in includes_before {
                     let include = preprocessor
                         .includes
                         .iter()
-                        .find(|e| e.absolute_path == include_path && e.range == include_range)
+                        .find(|e| {
+                            e.get_absolute_path() == include_path && *e.get_range() == include_range
+                        })
                         .unwrap();
-                    processed_includes.push((include.absolute_path.clone(), include.range.clone()));
+                    processed_includes.push((
+                        include.get_absolute_path().into(),
+                        include.get_range().clone(),
+                    ));
                     update_context_for_include(&include, context, &preprocessor.defines);
                     // Avoid stack overflow
                     if context.increase_depth() {
@@ -514,9 +526,9 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                     severity: ShaderDiagnosticSeverity::Warning,
                                     error: format!(
                                         "Failed to find include {}",
-                                        include.relative_path
+                                        include.get_relative_path()
                                     ),
-                                    range: include.range.clone(),
+                                    range: include.get_range().clone(),
                                 });
                                 Ok(())
                             }
@@ -529,15 +541,18 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             severity: ShaderDiagnosticSeverity::Warning,
                             error: format!(
                                 "Include {} reached maximum include depth",
-                                include.relative_path
+                                include.get_relative_path()
                             ),
-                            range: include.range.clone(),
+                            range: include.get_range().clone(),
                         });
                         // Set empty symbols to avoid crash when getting symbols.
                         preprocessor
                             .includes
                             .iter_mut()
-                            .find(|e| e.absolute_path == include_path && e.range == include_range)
+                            .find(|e| {
+                                e.get_absolute_path() == include_path
+                                    && *e.get_range() == include_range
+                            })
                             .unwrap()
                             .cache = Some(ShaderSymbols::default());
                     }
@@ -660,18 +675,20 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                     is_active_region != 0,
                                 ));
                                 // Filter out local define & include in region as it may impact next region in file.
-                                preprocessor.defines.retain(|define| match &define.range {
-                                    Some(range) => {
-                                        is_active_region != 0
-                                            || (is_active_region == 0
-                                                && !region_range.contain_bounds(&range))
-                                    }
-                                    None => true,
-                                });
+                                preprocessor
+                                    .defines
+                                    .retain(|define| match &define.get_range() {
+                                        Some(range) => {
+                                            is_active_region != 0
+                                                || (is_active_region == 0
+                                                    && !region_range.contain_bounds(&range))
+                                        }
+                                        None => true,
+                                    });
                                 preprocessor.includes.retain(|include| {
                                     is_active_region != 0
                                         || (is_active_region == 0
-                                            && !region_range.contain_bounds(&include.range))
+                                            && !region_range.contain_bounds(&include.get_range()))
                                 });
 
                                 let mut next_region = parse_region(
@@ -722,16 +739,19 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     is_active_region != 0,
                 ));
                 // Filter out local define & include in region as it may impact next region in file.
-                preprocessor.defines.retain(|define| match &define.range {
-                    Some(range) => {
-                        is_active_region != 0
-                            || (is_active_region == 0 && !region_range.contain_bounds(&range))
-                    }
-                    None => true,
-                });
+                preprocessor
+                    .defines
+                    .retain(|define| match &define.get_range() {
+                        Some(range) => {
+                            is_active_region != 0
+                                || (is_active_region == 0 && !region_range.contain_bounds(&range))
+                        }
+                        None => true,
+                    });
                 preprocessor.includes.retain(|include| {
                     is_active_region != 0
-                        || (is_active_region == 0 && !region_range.contain_bounds(&include.range))
+                        || (is_active_region == 0
+                            && !region_range.contain_bounds(&include.get_range()))
                 });
                 Ok(regions)
             }
@@ -756,17 +776,22 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             .filter(|include| {
                 processed_includes
                     .iter()
-                    .find(|(p, r)| *p == include.absolute_path && *r == include.range)
+                    .find(|(p, r)| *p == include.get_absolute_path() && *r == *include.get_range())
                     .is_none()
             })
-            .map(|include| (include.absolute_path.clone(), include.range.clone()))
+            .map(|include| {
+                (
+                    include.get_absolute_path().into(),
+                    include.get_range().clone(),
+                )
+            })
             .collect::<Vec<(PathBuf, ShaderRange)>>();
         for (include_path, include_range) in include_left {
             //processed_includes.push((include.absolute_path.clone(), include.range.clone()));
             let include = preprocessor
                 .includes
                 .iter()
-                .find(|e| e.absolute_path == include_path && e.range == include_range)
+                .find(|e| e.get_absolute_path() == include_path && *e.get_range() == include_range)
                 .unwrap();
             update_context_for_include(include, context, &preprocessor.defines);
             // Avoid stack overflow
@@ -786,8 +811,11 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         // Include not found.
                         preprocessor.diagnostics.push(ShaderDiagnostic {
                             severity: ShaderDiagnosticSeverity::Warning,
-                            error: format!("Failed to find include {}", include.relative_path),
-                            range: include.range.clone(),
+                            error: format!(
+                                "Failed to find include {}",
+                                include.get_relative_path()
+                            ),
+                            range: include.get_range().clone(),
                         });
                         Ok(())
                     }
@@ -800,15 +828,17 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     severity: ShaderDiagnosticSeverity::Warning,
                     error: format!(
                         "Include {} reached maximum include depth",
-                        include.relative_path
+                        include.get_relative_path()
                     ),
-                    range: include.range.clone(),
+                    range: include.get_range().clone(),
                 });
                 // Set empty symbols to avoid crash when getting symbols.
                 preprocessor
                     .includes
                     .iter_mut()
-                    .find(|e| e.absolute_path == include_path && e.range == include_range)
+                    .find(|e| {
+                        e.get_absolute_path() == include_path && *e.get_range() == include_range
+                    })
                     .unwrap()
                     .cache = Some(ShaderSymbols::default());
             }
@@ -816,9 +846,9 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         let define_after_last_include = preprocessor
             .defines
             .iter()
-            .filter(|define| match &define.range {
+            .filter(|define| match &define.get_range() {
                 Some(range) => match preprocessor.includes.last() {
-                    Some(last_include) => range.start > last_include.range.end,
+                    Some(last_include) => range.start > last_include.get_range().end,
                     None => true, // No include in file
                 },
                 None => true, // Global

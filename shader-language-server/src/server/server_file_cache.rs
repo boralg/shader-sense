@@ -16,7 +16,7 @@ use shader_sense::{
         shader_language::ShaderLanguage,
         symbol_provider::SymbolProvider,
         symbol_tree::{ShaderModuleHandle, ShaderSymbols},
-        symbols::{ShaderPreprocessorContext, ShaderSymbol, ShaderSymbolData, ShaderSymbolList},
+        symbols::{ShaderPreprocessorContext, ShaderSymbolListRef},
     },
     validator::validator::Validator,
 };
@@ -93,7 +93,7 @@ impl ServerLanguageFileCache {
             Some(file) => {
                 let mut relying_on_files = Vec::new();
                 file.get_data().symbol_cache.visit_includes(&mut |include| {
-                    let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
+                    let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
                     let is_relying_on = match self.files.get(&include_uri) {
                         Some(deps) => deps.is_main_file(),
                         None => false,
@@ -172,7 +172,7 @@ impl ServerLanguageFileCache {
                 let cached_file_as_include = variant_cached_file
                     .get_data()
                     .symbol_cache
-                    .find_include(&mut |i| i.absolute_path == file_path)
+                    .find_include(&mut |i| i.get_absolute_path() == file_path)
                     .unwrap(); // Is expected.
                 cached_file_as_include
                     .get_cache()
@@ -199,7 +199,7 @@ impl ServerLanguageFileCache {
                 &shader_module,
                 &mut context,
                 &mut |include| {
-                    let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
+                    let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
                     let included_file =
                         self.watch_dependency(&include_uri, shading_language, shader_language)?;
                     Ok(Some(Rc::clone(&included_file.shader_module)))
@@ -327,26 +327,29 @@ impl ServerLanguageFileCache {
                             if *diagnostic_path == file_path {
                                 continue; // Main file diagnostics
                             }
-                            if *diagnostic_path == include.absolute_path {
+                            if *diagnostic_path == include.get_absolute_path() {
                                 return Some(ShaderDiagnostic {
                                     severity: ShaderDiagnosticSeverity::Error,
                                     error: format!(
                                         "File {} has issues:\n{}",
-                                        include.relative_path, diagnostic.error
+                                        include.get_relative_path(),
+                                        diagnostic.error
                                     ),
-                                    range: include.range.clone(),
+                                    range: include.get_range().clone(),
                                 });
                             }
-                            match symbols.find_include(&mut |i| i.absolute_path == *diagnostic_path)
+                            match symbols
+                                .find_include(&mut |i| i.get_absolute_path() == *diagnostic_path)
                             {
                                 Some(includer) => {
                                     return Some(ShaderDiagnostic {
                                         severity: ShaderDiagnosticSeverity::Error,
                                         error: format!(
                                             "File {} has issues:\n{}",
-                                            includer.relative_path, diagnostic.error
+                                            includer.get_relative_path(),
+                                            diagnostic.error
                                         ),
-                                        range: include.range.clone(),
+                                        range: include.get_range().clone(),
                                     })
                                 }
                                 None => {}
@@ -586,7 +589,7 @@ impl ServerLanguageFileCache {
                     );
                     let mut removed_files = Vec::new();
                     data.symbol_cache.visit_includes(&mut |include| {
-                        let include_uri = Url::from_file_path(&include.absolute_path).unwrap();
+                        let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
                         let include_used_as_deps = self.is_used_as_dependency(&include_uri);
                         match include_used_as_deps {
                             Some(_) => {} // Still used, nothing to do here.
@@ -623,33 +626,22 @@ impl ServerLanguageFileCache {
             },
         }
     }
-    pub fn get_all_symbols(&self, uri: &Url, shader_language: &ShaderLanguage) -> ShaderSymbolList {
+    pub fn get_all_symbols<'a>(
+        &'a self,
+        uri: &Url,
+        shader_language: &'a ShaderLanguage,
+    ) -> ShaderSymbolListRef<'a> {
         let cached_file = self.files.get(uri).unwrap();
         assert!(cached_file.data.is_some(), "File {} do not have cache", uri);
         let data = &cached_file.get_data();
         // Add main file symbols
         let mut symbol_cache = data.symbol_cache.get_all_symbols();
         // Add config symbols
-        for (key, value) in data.symbol_cache.get_context().get_defines() {
-            symbol_cache.macros.push(ShaderSymbol {
-                label: key.clone(),
-                description: format!(
-                    "Config preprocessor macro. Expanding to \n```\n{}\n```",
-                    value
-                ),
-                version: "".into(),
-                stages: vec![],
-                link: None,
-                data: ShaderSymbolData::Macro {
-                    value: value.clone(),
-                },
-                range: None,
-                scope: None,
-                scope_stack: None,
-            });
+        for symbol in data.symbol_cache.get_context().get_defines().iter() {
+            symbol_cache.macros.push(&symbol);
         }
         // Add intrinsics symbols
-        symbol_cache.append(shader_language.get_intrinsics_symbol().clone());
+        symbol_cache.append_as_reference(&shader_language.get_intrinsics_symbol());
         symbol_cache
     }
 }

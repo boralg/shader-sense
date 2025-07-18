@@ -47,8 +47,8 @@ pub fn default_include_callback<T: ShadingLanguageTag>(
 ) -> Result<Option<ShaderModuleHandle>, ShaderError> {
     let mut language = ShaderLanguage::new(T::get_language());
     let include_module = language.create_module(
-        &include.absolute_path,
-        std::fs::read_to_string(&include.absolute_path)
+        &include.get_absolute_path(),
+        std::fs::read_to_string(&include.get_absolute_path())
             .unwrap()
             .as_str(),
     )?;

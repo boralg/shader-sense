@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     path::{Path, PathBuf},
 };
 
@@ -237,7 +237,7 @@ impl ShaderRegion {
 
 #[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessorContext {
-    defines: HashMap<String, String>, // TODO: Should store position aswell... At least target file path.
+    defines: Vec<ShaderSymbol>,
     include_handler: IncludeHandler,
     dirty_files: HashSet<PathBuf>, // Dirty files that need to be recomputed no matter what.
     depth: usize,
@@ -246,7 +246,23 @@ pub struct ShaderPreprocessorContext {
 impl ShaderPreprocessorContext {
     pub fn main(file_path: &Path, symbol_params: ShaderSymbolParams) -> Self {
         Self {
-            defines: symbol_params.defines,
+            defines: symbol_params
+                .defines
+                .iter()
+                .map(|(key, value)| ShaderSymbol {
+                    label: key.clone(),
+                    description: format!("Preprocessor macro. Expanding to \n```\n{}\n```", value),
+                    version: "".into(),
+                    stages: vec![],
+                    link: None,
+                    data: ShaderSymbolData::Macro {
+                        value: value.clone(),
+                    },
+                    range: None,
+                    scope: None,
+                    scope_stack: None,
+                })
+                .collect(),
             include_handler: IncludeHandler::main(
                 &file_path,
                 symbol_params.includes,
@@ -262,11 +278,27 @@ impl ShaderPreprocessorContext {
     pub fn search_path_in_includes(&mut self, path: &Path) -> Option<PathBuf> {
         self.include_handler.search_path_in_includes(path)
     }
+    pub fn push_define(&mut self, name: &str, value: &str) {
+        self.defines.push(ShaderSymbol {
+            label: name.into(),
+            description: format!(
+                "Config preprocessor macro. Expanding to \n```\n{}\n```",
+                value
+            ),
+            version: "".into(),
+            stages: vec![],
+            link: None,
+            data: ShaderSymbolData::Macro {
+                value: value.into(),
+            },
+            range: None,
+            scope: None,
+            scope_stack: None,
+        });
+    }
     pub fn append_defines(&mut self, defines: Vec<ShaderPreprocessorDefine>) {
-        for define in defines {
-            self.defines
-                .insert(define.name, define.value.unwrap_or("".into()));
-        }
+        self.defines
+            .extend(defines.iter().map(|define| define.symbol.clone()));
     }
     pub fn increase_depth(&mut self) -> bool {
         if self.depth < IncludeHandler::DEPTH_LIMIT {
@@ -286,32 +318,59 @@ impl ShaderPreprocessorContext {
     pub fn is_dirty(&self, file_path: &Path, context: &ShaderPreprocessorContext) -> bool {
         // Compare defines to determine if context is different.
         // Check if we need to force an update aswell.
-        context.defines != self.defines || context.dirty_files.contains(file_path)
+        fn compare_defines(lhs: &Vec<ShaderSymbol>, rhs: &Vec<ShaderSymbol>) -> bool {
+            if lhs.len() != rhs.len() {
+                return false;
+            }
+            for lhs_symbol in lhs.iter() {
+                if rhs
+                    .iter()
+                    .find(|rhs_symbol| {
+                        lhs_symbol.label == rhs_symbol.label
+                            && match (&lhs_symbol.data, &rhs_symbol.data) {
+                                (
+                                    ShaderSymbolData::Macro { value: l_value },
+                                    ShaderSymbolData::Macro { value: r_value },
+                                ) => l_value == r_value,
+                                _ => false,
+                            }
+                    })
+                    .is_none()
+                {
+                    return false;
+                }
+            }
+            true
+        }
+        compare_defines(&context.defines, &self.defines) || context.dirty_files.contains(file_path)
     }
     pub fn get_define_value(&self, name: &str) -> Option<String> {
         self.defines
             .iter()
-            .find(|(key, _)| *key == name)
-            .map(|(_, value)| value.clone())
+            .find(|symbol| *symbol.label == *name)
+            .map(|symbol| {
+                match &symbol.data {
+                    ShaderSymbolData::Macro { value } => value.clone(),
+                    _ => panic!("Expected ShaderSymbolData::Macro"),
+                }
+                .clone()
+            })
     }
-    pub fn get_defines(&self) -> &HashMap<String, String> {
+    pub fn get_defines(&self) -> &Vec<ShaderSymbol> {
         &self.defines
     }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessorInclude {
-    pub relative_path: String,
-    pub absolute_path: PathBuf,
-    pub range: ShaderRange,
+    // TODO: move cache to symbol data
     pub cache: Option<ShaderSymbols>,
+    pub symbol: ShaderSymbol,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct ShaderPreprocessorDefine {
-    pub name: String,
-    pub range: Option<ShaderRange>,
-    pub value: Option<String>,
+    pub symbol: ShaderSymbol,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -335,19 +394,74 @@ pub struct ShaderPreprocessor {
 impl ShaderPreprocessorDefine {
     pub fn new(name: String, range: ShaderRange, value: Option<String>) -> Self {
         Self {
-            name,
-            range: Some(range),
-            value,
+            symbol: ShaderSymbol {
+                label: name.clone(),
+                description: match &value {
+                    Some(value) => {
+                        format!("Preprocessor macro. Expanding to \n```\n{}\n```", value)
+                    }
+                    None => format!("Preprocessor macro."),
+                },
+                version: "".into(),
+                stages: vec![],
+                link: None,
+                data: ShaderSymbolData::Macro {
+                    value: match &value {
+                        Some(value) => value.clone(),
+                        None => "".into(),
+                    },
+                },
+                range: Some(range.clone()),
+                scope: None,
+                scope_stack: None, // No scope for define
+            },
+        }
+    }
+    pub fn get_range(&self) -> Option<&ShaderRange> {
+        self.symbol.range.as_ref()
+    }
+    pub fn get_name(&self) -> &String {
+        &self.symbol.label
+    }
+    pub fn get_value(&self) -> Option<&String> {
+        match &self.symbol.data {
+            ShaderSymbolData::Macro { value } => Some(value),
+            _ => None,
         }
     }
 }
 impl ShaderPreprocessorInclude {
     pub fn new(relative_path: String, absolute_path: PathBuf, range: ShaderRange) -> Self {
         Self {
-            relative_path,
-            absolute_path,
-            range,
             cache: None,
+            symbol: ShaderSymbol {
+                label: relative_path,
+                description: format!("Including file {}", absolute_path.display()),
+                version: "".into(),
+                stages: vec![],
+                link: None,
+                data: ShaderSymbolData::Link {
+                    target: ShaderPosition::new(absolute_path, 0, 0),
+                },
+                range: Some(range),
+                scope: None,
+                scope_stack: None, // No scope for include
+            },
+        }
+    }
+    pub fn get_range(&self) -> &ShaderRange {
+        self.symbol
+            .range
+            .as_ref()
+            .expect("Include symbol should have range.")
+    }
+    pub fn get_relative_path(&self) -> &String {
+        &self.symbol.label
+    }
+    pub fn get_absolute_path(&self) -> &Path {
+        match &self.symbol.data {
+            ShaderSymbolData::Link { target } => &target.file_path,
+            _ => panic!("Expected ShaderSymbolData::Link"),
         }
     }
     pub fn get_cache(&self) -> &ShaderSymbols {
@@ -369,9 +483,12 @@ impl ShaderPreprocessor {
             mode: ShaderPreprocessorMode::default(),
         }
     }
-    pub fn preprocess_symbols(&self, shader_symbols: &mut ShaderSymbolList) {
+    pub fn preprocess_symbols<'a>(
+        &'a self,
+        shader_symbols: &'a ShaderSymbolList,
+    ) -> ShaderSymbolListRef<'a> {
         // Filter inactive regions symbols
-        shader_symbols.retain(|_symbol_type, symbol| {
+        let mut preprocessed_symbols = shader_symbols.filter(|_symbol_type, symbol| {
             let is_in_inactive_region = match &symbol.range {
                 Some(range) => {
                     for region in &self.regions {
@@ -386,55 +503,17 @@ impl ShaderPreprocessor {
             is_in_inactive_region
         });
         // Add defines
-        let mut define_symbols: Vec<ShaderSymbol> = self
-            .defines
-            .iter()
-            .map(|define| {
-                ShaderSymbol {
-                    label: define.name.clone(),
-                    description: match &define.value {
-                        Some(value) => {
-                            format!("Preprocessor macro. Expanding to \n```\n{}\n```", value)
-                        }
-                        None => format!("Preprocessor macro."),
-                    },
-                    version: "".into(),
-                    stages: vec![],
-                    link: None,
-                    data: ShaderSymbolData::Macro {
-                        value: match &define.value {
-                            Some(value) => value.clone(),
-                            None => "".into(),
-                        },
-                    },
-                    range: define.range.clone(),
-                    scope: None,
-                    scope_stack: None, // No scope for define
-                }
-            })
-            .collect();
+        let mut define_symbols: Vec<&ShaderSymbol> =
+            self.defines.iter().map(|define| &define.symbol).collect();
         // Add includes as symbol
-        let mut include_symbols: Vec<ShaderSymbol> = self
+        let mut include_symbols: Vec<&ShaderSymbol> = self
             .includes
             .iter()
-            .map(|include| {
-                ShaderSymbol {
-                    label: include.relative_path.clone(),
-                    description: format!("Including file {}", include.absolute_path.display()),
-                    version: "".into(),
-                    stages: vec![],
-                    link: None,
-                    data: ShaderSymbolData::Link {
-                        target: ShaderPosition::new(include.absolute_path.clone(), 0, 0),
-                    },
-                    range: Some(include.range.clone()),
-                    scope: None,
-                    scope_stack: None, // No scope for include
-                }
-            })
+            .map(|include| &include.symbol)
             .collect();
-        shader_symbols.macros.append(&mut define_symbols);
-        shader_symbols.includes.append(&mut include_symbols);
+        preprocessed_symbols.macros.append(&mut define_symbols);
+        preprocessed_symbols.includes.append(&mut include_symbols);
+        preprocessed_symbols
     }
 }
 
@@ -559,9 +638,6 @@ pub enum ShaderSymbolType {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ShaderSymbolList {
-    // Could use maps for faster search access (hover provider)
-    // Should use a tree to store symbols with scopes.
-    // And will need a symbol kind aswell.
     pub types: Vec<ShaderSymbol>,
     pub constants: Vec<ShaderSymbol>,
     pub variables: Vec<ShaderSymbol>,
@@ -572,12 +648,98 @@ pub struct ShaderSymbolList {
     pub macros: Vec<ShaderSymbol>,
     pub includes: Vec<ShaderSymbol>,
 }
+#[derive(Debug, Default, Clone)]
+pub struct ShaderSymbolListRef<'a> {
+    pub types: Vec<&'a ShaderSymbol>,
+    pub constants: Vec<&'a ShaderSymbol>,
+    pub variables: Vec<&'a ShaderSymbol>,
+    pub call_expression: Vec<&'a ShaderSymbol>,
+    pub functions: Vec<&'a ShaderSymbol>,
+    pub keywords: Vec<&'a ShaderSymbol>,
+    pub macros: Vec<&'a ShaderSymbol>,
+    pub includes: Vec<&'a ShaderSymbol>,
+}
 
 impl ShaderSymbolList {
+    // Parse intrinsic database
     pub fn parse_from_json(file_content: String) -> ShaderSymbolList {
         serde_json::from_str::<ShaderSymbolList>(&file_content)
             .expect("Failed to parse ShaderSymbolList")
     }
+    // Append another symbol list to this one.
+    pub fn append(&mut self, shader_symbol_list: ShaderSymbolList) {
+        let mut shader_symbol_list_mut = shader_symbol_list;
+        self.functions.append(&mut shader_symbol_list_mut.functions);
+        self.variables.append(&mut shader_symbol_list_mut.variables);
+        self.call_expression
+            .append(&mut shader_symbol_list_mut.call_expression);
+        self.constants.append(&mut shader_symbol_list_mut.constants);
+        self.types.append(&mut shader_symbol_list_mut.types);
+        self.keywords.append(&mut shader_symbol_list_mut.keywords);
+        self.macros.append(&mut shader_symbol_list_mut.macros);
+        self.includes.append(&mut shader_symbol_list_mut.includes);
+    }
+    pub fn as_ref(&self) -> ShaderSymbolListRef {
+        ShaderSymbolListRef {
+            types: self.types.iter().collect(),
+            constants: self.constants.iter().collect(),
+            variables: self.variables.iter().collect(),
+            call_expression: self.call_expression.iter().collect(),
+            functions: self.functions.iter().collect(),
+            keywords: self.keywords.iter().collect(),
+            macros: self.macros.iter().collect(),
+            includes: self.includes.iter().collect(),
+        }
+    }
+    pub fn filter<'a, P: Fn(ShaderSymbolType, &ShaderSymbol) -> bool>(
+        &'a self,
+        predicate: P,
+    ) -> ShaderSymbolListRef<'a> {
+        ShaderSymbolListRef {
+            types: self
+                .types
+                .iter()
+                .filter(|e| predicate(ShaderSymbolType::Types, *e))
+                .collect(),
+            constants: self
+                .constants
+                .iter()
+                .filter(|e| predicate(ShaderSymbolType::Constants, *e))
+                .collect(),
+            variables: self
+                .variables
+                .iter()
+                .filter(|e| predicate(ShaderSymbolType::Variables, *e))
+                .collect(),
+            call_expression: self
+                .call_expression
+                .iter()
+                .filter(|e| predicate(ShaderSymbolType::CallExpression, *e))
+                .collect(),
+            functions: self
+                .functions
+                .iter()
+                .filter(|e| predicate(ShaderSymbolType::Functions, *e))
+                .collect(),
+            keywords: self
+                .keywords
+                .iter()
+                .filter(|e| predicate(ShaderSymbolType::Keyword, *e))
+                .collect(),
+            macros: self
+                .macros
+                .iter()
+                .filter(|e| predicate(ShaderSymbolType::Macros, *e))
+                .collect(),
+            includes: self
+                .includes
+                .iter()
+                .filter(|e| predicate(ShaderSymbolType::Include, *e))
+                .collect(),
+        }
+    }
+}
+impl<'a> ShaderSymbolListRef<'a> {
     fn is_symbol_defined_at(
         shader_symbol: &ShaderSymbol,
         cursor_position: &ShaderPosition,
@@ -631,6 +793,7 @@ impl ShaderSymbolList {
                                 false
                             }
                         })
+                        .map(|s| *s)
                         .collect::<Vec<&ShaderSymbol>>()
                 } else {
                     vec![]
@@ -639,19 +802,17 @@ impl ShaderSymbolList {
             .collect::<Vec<Vec<&ShaderSymbol>>>()
             .concat()
     }
-    pub fn filter_scoped_symbol(&self, cursor_position: &ShaderPosition) -> ShaderSymbolList {
-        let mut filter_scoped_symbols = self.clone();
-        filter_scoped_symbols.retain(|symbol_type, symbol| {
+    pub fn filter_scoped_symbol(&self, cursor_position: &ShaderPosition) -> ShaderSymbolListRef {
+        self.filter(|symbol_type, symbol| {
             !symbol_type.is_transient() && Self::is_symbol_defined_at(symbol, cursor_position)
-        });
-        filter_scoped_symbols
+        })
     }
     pub fn find_symbols(&self, label: &String) -> Vec<&ShaderSymbol> {
         self.iter()
             .map(|(sl, ty)| {
                 if !ty.is_transient() {
                     sl.iter()
-                        .filter_map(|e| if e.label == *label { Some(e) } else { None })
+                        .filter_map(|s| if s.label == *label { Some(*s) } else { None })
                         .collect::<Vec<&ShaderSymbol>>()
                 } else {
                     vec![]
@@ -669,79 +830,61 @@ impl ShaderSymbolList {
         }
         None
     }
-    pub fn find_type_symbol(&self, label: &String) -> Option<ShaderSymbol> {
-        self.types
-            .iter()
-            .find(|s| s.label == *label)
-            .map(|s| s.clone())
+    pub fn find_type_symbol(&self, label: &String) -> Option<&ShaderSymbol> {
+        self.types.iter().find(|s| s.label == *label).map(|s| *s)
     }
-    pub fn append(&mut self, shader_symbol_list: ShaderSymbolList) {
-        let mut shader_symbol_list_mut = shader_symbol_list;
-        self.functions.append(&mut shader_symbol_list_mut.functions);
-        self.variables.append(&mut shader_symbol_list_mut.variables);
-        self.call_expression
-            .append(&mut shader_symbol_list_mut.variables);
-        self.constants.append(&mut shader_symbol_list_mut.constants);
-        self.types.append(&mut shader_symbol_list_mut.types);
-        self.keywords.append(&mut shader_symbol_list_mut.keywords);
-        self.macros.append(&mut shader_symbol_list_mut.macros);
-        self.includes.append(&mut shader_symbol_list_mut.includes);
-    }
-    pub fn iter(&self) -> ShaderSymbolListIterator {
-        ShaderSymbolListIterator {
-            list: self,
-            next: Some(ShaderSymbolType::Types), // First one
-        }
-    }
-    pub fn filter<P: Fn(&ShaderSymbol) -> bool>(&self, predicate: P) -> ShaderSymbolList {
-        ShaderSymbolList {
+    pub fn filter<P: Fn(ShaderSymbolType, &ShaderSymbol) -> bool>(
+        &self,
+        predicate: P,
+    ) -> ShaderSymbolListRef {
+        ShaderSymbolListRef {
             types: self
                 .types
                 .iter()
-                .filter(|e| predicate(*e))
-                .cloned()
+                .filter(|e| predicate(ShaderSymbolType::Types, *e))
+                .map(|s| *s)
                 .collect(),
             constants: self
                 .constants
                 .iter()
-                .filter(|e| predicate(*e))
-                .cloned()
+                .filter(|e| predicate(ShaderSymbolType::Constants, *e))
+                .map(|s| *s)
                 .collect(),
             variables: self
                 .variables
                 .iter()
-                .filter(|e| predicate(*e))
-                .cloned()
+                .filter(|e| predicate(ShaderSymbolType::Variables, *e))
+                .map(|s| *s)
                 .collect(),
             call_expression: self
                 .call_expression
                 .iter()
-                .filter(|e| predicate(*e))
-                .cloned()
+                .filter(|e| predicate(ShaderSymbolType::CallExpression, *e))
+                .map(|s| *s)
                 .collect(),
             functions: self
                 .functions
                 .iter()
-                .filter(|e| predicate(*e))
-                .cloned()
+                .filter(|e| predicate(ShaderSymbolType::Functions, *e))
+                .map(|s| *s)
                 .collect(),
             keywords: self
                 .keywords
                 .iter()
-                .filter(|e| predicate(*e))
-                .cloned()
+                .filter(|e| predicate(ShaderSymbolType::Keyword, *e))
+                .map(|s| *s)
                 .collect(),
             macros: self
                 .macros
                 .iter()
-                .filter(|e| predicate(*e))
-                .cloned()
+                .filter(|e| predicate(ShaderSymbolType::Macros, *e))
+                .map(|s| *s)
                 .collect(),
             includes: self
                 .includes
                 .iter()
-                .filter(|e| predicate(*e))
-                .cloned()
+                .filter(|e| predicate(ShaderSymbolType::Include, *e))
+                .map(|s| *s)
                 .collect(),
         }
     }
@@ -762,15 +905,81 @@ impl ShaderSymbolList {
         self.includes
             .retain(|s| predicate(ShaderSymbolType::Include, s));
     }
+    pub fn iter(&self) -> ShaderSymbolListIterator {
+        ShaderSymbolListIterator {
+            list: self,
+            next: Some(ShaderSymbolType::Types), // First one
+        }
+    }
+    pub fn append_as_reference(&mut self, shader_symbol_list: &'a ShaderSymbolList) {
+        self.functions
+            .append(&mut shader_symbol_list.functions.iter().collect());
+        self.variables
+            .append(&mut shader_symbol_list.variables.iter().collect());
+        self.call_expression
+            .append(&mut shader_symbol_list.call_expression.iter().collect());
+        self.constants
+            .append(&mut shader_symbol_list.constants.iter().collect());
+        self.types
+            .append(&mut shader_symbol_list.types.iter().collect());
+        self.keywords
+            .append(&mut shader_symbol_list.keywords.iter().collect());
+        self.macros
+            .append(&mut shader_symbol_list.macros.iter().collect());
+        self.includes
+            .append(&mut shader_symbol_list.includes.iter().collect());
+    }
+    pub fn append(&mut self, shader_symbol_list: ShaderSymbolListRef<'a>) {
+        let mut shader_symbol_list_mut = shader_symbol_list;
+        self.functions.append(&mut shader_symbol_list_mut.functions);
+        self.variables.append(&mut shader_symbol_list_mut.variables);
+        self.call_expression
+            .append(&mut shader_symbol_list_mut.call_expression);
+        self.constants.append(&mut shader_symbol_list_mut.constants);
+        self.types.append(&mut shader_symbol_list_mut.types);
+        self.keywords.append(&mut shader_symbol_list_mut.keywords);
+        self.macros.append(&mut shader_symbol_list_mut.macros);
+        self.includes.append(&mut shader_symbol_list_mut.includes);
+    }
+}
+
+impl<'a> From<&'a ShaderSymbolList> for ShaderSymbolListRef<'a> {
+    fn from(symbol_list: &'a ShaderSymbolList) -> Self {
+        Self {
+            types: symbol_list.types.iter().collect(),
+            constants: symbol_list.constants.iter().collect(),
+            variables: symbol_list.variables.iter().collect(),
+            call_expression: symbol_list.call_expression.iter().collect(),
+            functions: symbol_list.functions.iter().collect(),
+            keywords: symbol_list.keywords.iter().collect(),
+            macros: symbol_list.macros.iter().collect(),
+            includes: symbol_list.includes.iter().collect(),
+        }
+    }
+}
+
+impl<'a> Into<ShaderSymbolList> for ShaderSymbolListRef<'a> {
+    fn into(self) -> ShaderSymbolList {
+        ShaderSymbolList {
+            types: self.types.into_iter().cloned().collect(),
+            constants: self.constants.into_iter().cloned().collect(),
+            variables: self.variables.into_iter().cloned().collect(),
+            call_expression: self.call_expression.into_iter().cloned().collect(),
+            functions: self.functions.into_iter().cloned().collect(),
+            keywords: self.keywords.into_iter().cloned().collect(),
+            macros: self.macros.into_iter().cloned().collect(),
+            includes: self.includes.into_iter().cloned().collect(),
+        }
+    }
 }
 
 pub struct ShaderSymbolListIterator<'a> {
-    list: &'a ShaderSymbolList,
+    list: &'a ShaderSymbolListRef<'a>,
     next: Option<ShaderSymbolType>,
 }
 
 impl<'a> Iterator for ShaderSymbolListIterator<'a> {
-    type Item = (&'a Vec<ShaderSymbol>, ShaderSymbolType);
+    type Item = (&'a Vec<&'a ShaderSymbol>, ShaderSymbolType);
 
     fn next(&mut self) -> Option<Self::Item> {
         match &self.next {
@@ -813,12 +1022,12 @@ impl<'a> Iterator for ShaderSymbolListIterator<'a> {
     }
 }
 
-pub struct ShaderSymbolListIntoIterator {
-    list: ShaderSymbolList,
+pub struct ShaderSymbolListIntoIterator<'a> {
+    list: ShaderSymbolListRef<'a>,
     next: Option<ShaderSymbolType>,
 }
-impl Iterator for ShaderSymbolListIntoIterator {
-    type Item = (Vec<ShaderSymbol>, ShaderSymbolType);
+impl<'a> Iterator for ShaderSymbolListIntoIterator<'a> {
+    type Item = (Vec<&'a ShaderSymbol>, ShaderSymbolType);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.next.clone() {
@@ -885,9 +1094,9 @@ impl Iterator for ShaderSymbolListIntoIterator {
     }
 }
 
-impl IntoIterator for ShaderSymbolList {
-    type Item = (Vec<ShaderSymbol>, ShaderSymbolType);
-    type IntoIter = ShaderSymbolListIntoIterator;
+impl<'a> IntoIterator for ShaderSymbolListRef<'a> {
+    type Item = (Vec<&'a ShaderSymbol>, ShaderSymbolType);
+    type IntoIter = ShaderSymbolListIntoIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         ShaderSymbolListIntoIterator {
