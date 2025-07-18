@@ -21,19 +21,25 @@ impl ServerLanguage {
             .language_data
             .get_mut(&cached_file.shading_language)
             .unwrap();
+        // Get all symbols
         let symbols = self
             .watched_files
             .get_all_symbols(uri, &language_data.language);
+        let file_path = uri.to_file_path().unwrap();
         let inlay_hints = symbols
             .iter()
-            .filter(|sl| sl.1 == ShaderSymbolType::CallExpression)
-            .map(|sl| {
-                sl.0.iter()
+            .filter(|(_sl, ty)| *ty == ShaderSymbolType::CallExpression)
+            .map(|(sl, _ty)| {
+                sl.iter()
                     .filter(|s| match &s.range {
                         Some(range) => {
-                            let valid_range =
-                                lsp_range_to_shader_range(lsp_range, &range.start.file_path);
-                            valid_range.contain_bounds(&range)
+                            if range.start.file_path == file_path {
+                                let valid_range =
+                                    lsp_range_to_shader_range(lsp_range, &range.start.file_path);
+                                valid_range.contain_bounds(&range)
+                            } else {
+                                false // Skip call not in main file
+                            }
                         }
                         None => false, // Should not happen with local symbols
                     })
