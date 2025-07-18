@@ -6,3 +6,7 @@ members = [
     "shader-intrinsic-parser"
 ]
 resolver = "2"
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
