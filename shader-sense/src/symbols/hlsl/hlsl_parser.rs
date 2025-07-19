@@ -462,14 +462,14 @@ mod hlsl_parser_tests {
             }
             (
                 ShaderSymbolData::Constants {
-                    ty: t1,
-                    qualifier: q1,
-                    value: v1,
+                    ty: _t1,
+                    qualifier: _q1,
+                    value: _v1,
                 },
                 ShaderSymbolData::Constants {
-                    ty: t2,
-                    qualifier: q2,
-                    value: v2,
+                    ty: _t2,
+                    qualifier: _q2,
+                    value: _v2,
                 },
             ) => todo!(),
             (
@@ -480,19 +480,19 @@ mod hlsl_parser_tests {
             }
             (ShaderSymbolData::Keyword {}, ShaderSymbolData::Keyword {}) => {}
             (
-                ShaderSymbolData::Variables { ty: t1, count: c1 },
-                ShaderSymbolData::Variables { ty: t2, count: c2 },
+                ShaderSymbolData::Variables { ty: _t1, count: _c1 },
+                ShaderSymbolData::Variables { ty: _t2, count: _c2 },
             ) => todo!(),
             (
                 ShaderSymbolData::CallExpression {
-                    label: l1,
-                    range: r1,
-                    parameters: p1,
+                    label: _l1,
+                    range: _r1,
+                    parameters: _p1,
                 },
                 ShaderSymbolData::CallExpression {
-                    label: l2,
-                    range: r2,
-                    parameters: p2,
+                    label: _l2,
+                    range: _r2,
+                    parameters: _p2,
                 },
             ) => todo!(),
             (ShaderSymbolData::Link { target: t1 }, ShaderSymbolData::Link { target: t2 }) => {
