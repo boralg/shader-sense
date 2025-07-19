@@ -802,7 +802,10 @@ impl<'a> ShaderSymbolListRef<'a> {
             .collect::<Vec<Vec<&ShaderSymbol>>>()
             .concat()
     }
-    pub fn filter_scoped_symbol(&self, cursor_position: &ShaderPosition) -> ShaderSymbolListRef {
+    pub fn filter_scoped_symbol(
+        &'a self,
+        cursor_position: &ShaderPosition,
+    ) -> ShaderSymbolListRef<'a> {
         self.filter(|symbol_type, symbol| {
             !symbol_type.is_transient() && Self::is_symbol_defined_at(symbol, cursor_position)
         })
