@@ -18,6 +18,11 @@ serde_json = "1.0.116"
 # There is a issue with dup that wont compile for WASI.
 # It was fixed with 0.24.0, but lang does not rely on it yet, so use old version.
 tree-sitter = "=0.20.9"
+# Now tree-sitter-language crate has been added which avoid having to rely on specific tree-sitter version.
+# Should upgrade language to a version that support it:
+# - tree-sitter-hlsl v0.2.0 support it
+# - tree-sitter-glsl v0.2.0 support it
+# - tree-sitter-wgsl-bevy has a PR for that https://github.com/tree-sitter-grammars/tree-sitter-wgsl-bevy/pull/19
 tree-sitter-glsl = "=0.1.4"
 tree-sitter-hlsl = "=0.1.2"
 tree-sitter-wgsl-bevy = "=0.1.3"
