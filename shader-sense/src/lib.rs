@@ -14,7 +14,7 @@ mod tests {
     };
 
     use crate::{
-        include::IncludeHandler,
+        include::{canonicalize, IncludeHandler},
         shader::ShadingLanguage,
         symbols::{shader_language::ShaderLanguage, symbol_provider::ShaderSymbolParams},
         validator::validator::ValidationParams,
@@ -112,5 +112,11 @@ mod tests {
             &ValidationParams::default(),
             &mut |path| Some(std::fs::read_to_string(path).unwrap()),
         );
+    }
+    #[test]
+    fn test_canonicalize_parent() {
+        let path = canonicalize(Path::new("D:\\test\\data")).unwrap();
+        assert!(path == Path::new("D:\\test\\data"));
+        assert!(path.parent().unwrap() == Path::new("D:\\test"));
     }
 }

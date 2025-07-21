@@ -1,11 +1,11 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
 #[derive(Debug, Default, Clone)]
 pub struct IncludeHandler {
-    includes: Vec<String>, // No need to store include, store them as directory stack ? No cuz we want stack before include.
+    includes: HashSet<PathBuf>, // Dont store it stack to compute them before.
     directory_stack: Vec<PathBuf>, // Vec for keeping insertion order. Might own duplicate.
     visited_dependencies: HashMap<PathBuf, usize>,
     path_remapping: HashMap<PathBuf, PathBuf>, // remapping of path / virtual path
@@ -25,6 +25,9 @@ pub fn canonicalize(p: &Path) -> std::io::Result<PathBuf> {
                 buf.pop();
             } else if part != "." {
                 buf.push(part);
+                // read_link here is heavy.
+                // Is it heavier than std::fs::canonicalize though ?
+                // Check Dunce aswell.
                 if let Ok(linkpath) = buf.read_link() {
                     buf.pop();
                     __canonicalize(&linkpath, buf);
@@ -59,7 +62,10 @@ impl IncludeHandler {
         let mut visited_dependencies = HashMap::new();
         visited_dependencies.insert(file_path.into(), 1);
         Self {
-            includes: includes,
+            includes: includes
+                .into_iter()
+                .map(|s| canonicalize(Path::new(&s)).unwrap())
+                .collect(),
             directory_stack: directory_stack,
             visited_dependencies: visited_dependencies,
             path_remapping: path_remapping,
@@ -67,17 +73,6 @@ impl IncludeHandler {
     }
     pub fn get_visited_count(&self, path: &Path) -> usize {
         self.visited_dependencies.get(path).cloned().unwrap_or(0)
-    }
-    pub fn visit_file(&mut self, path: &Path) {
-        match self.visited_dependencies.get_mut(path.into()) {
-            Some(visited_dependency_count) => *visited_dependency_count += 1,
-            None => {
-                self.visited_dependencies.insert(path.into(), 1);
-                if let Some(parent) = path.parent() {
-                    self.directory_stack.push(canonicalize(parent).unwrap());
-                }
-            }
-        }
     }
     pub fn search_in_includes(
         &mut self,
@@ -91,9 +86,23 @@ impl IncludeHandler {
     }
     pub fn search_path_in_includes(&mut self, relative_path: &Path) -> Option<PathBuf> {
         self.search_path_in_includes_relative(relative_path)
-            .map(|e| canonicalize(&e).expect("Failed to convert relative path to absolute"))
+            .map(|e| {
+                // Canonicalize path.
+                let path = canonicalize(&e).unwrap();
+                // Add the parent to the stack
+                match self.visited_dependencies.get_mut(&path) {
+                    Some(visited_dependency_count) => *visited_dependency_count += 1,
+                    None => {
+                        self.visited_dependencies.insert(path.clone(), 1);
+                        if let Some(parent) = path.parent() {
+                            self.directory_stack.push(parent.into());
+                        }
+                    }
+                }
+                path
+            })
     }
-    pub fn search_path_in_includes_relative(&mut self, relative_path: &Path) -> Option<PathBuf> {
+    fn search_path_in_includes_relative(&self, relative_path: &Path) -> Option<PathBuf> {
         // Checking for file existence is a bit costly.
         // Some options are available and have been tested
         // - path.exists(): approximatively 100us
@@ -104,18 +113,17 @@ impl IncludeHandler {
         } else {
             // Check directory stack.
             // Reverse order to check first the latest added folders.
+            // Might own duplicate, should use an ordered hashset instead.
             for directory_stack in self.directory_stack.iter().rev() {
-                let path = Path::new(directory_stack).join(&relative_path);
+                let path = directory_stack.join(&relative_path);
                 if path.is_file() {
-                    self.visit_file(&path);
                     return Some(path);
                 }
             }
             // Check include paths
             for include_path in &self.includes {
-                let path = Path::new(include_path).join(&relative_path);
+                let path = include_path.join(&relative_path);
                 if path.is_file() {
-                    self.visit_file(&path);
                     return Some(path);
                 }
             }
@@ -124,9 +132,6 @@ impl IncludeHandler {
                 Self::resolve_virtual_path(relative_path, &self.path_remapping)
             {
                 if target_path.is_file() {
-                    // We should not add virtual path to stack, as they are well defined already.
-                    // But we expect a correct directory stack.
-                    self.visit_file(&target_path);
                     return Some(target_path);
                 }
             }
