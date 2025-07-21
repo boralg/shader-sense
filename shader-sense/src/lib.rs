@@ -115,8 +115,26 @@ mod tests {
     }
     #[test]
     fn test_canonicalize_parent() {
-        let path = canonicalize(Path::new("D:\\test\\data")).unwrap();
-        assert!(path == Path::new("D:\\test\\data"));
-        assert!(path.parent().unwrap() == Path::new("D:\\test"));
+        if cfg!(target_os = "windows") {
+            let path = canonicalize(Path::new("D:\\test\\data")).unwrap();
+            assert!(path == Path::new("D:\\test\\data"));
+            assert!(path.parent().unwrap() == Path::new("D:\\test"));
+        } else {
+            let path = canonicalize(Path::new("D:/test/data")).unwrap();
+            assert!(path == Path::new("D:/test/data"));
+            assert!(path.parent().unwrap() == Path::new("D:/test"));
+        }
+    }
+    #[test]
+    fn test_canonicalize_join() {
+        if cfg!(target_os = "windows") {
+            let path = canonicalize(Path::new("D:\\test")).unwrap();
+            assert!(path == Path::new("D:\\test"));
+            assert!(path.join("data") == Path::new("D:\\test\\data"));
+        } else {
+            let path = canonicalize(Path::new("D:/test")).unwrap();
+            assert!(path == Path::new("D:/test"));
+            assert!(path.join("data") == Path::new("D:/test/data"));
+        }
     }
 }
