@@ -152,33 +152,27 @@ impl ServerLanguage {
                 }
             }
             None => Ok(symbol_list
-                .into_iter()
-                .filter(|(_, ty)| *ty != ShaderSymbolType::CallExpression)
-                .map(|(symbol_list, ty)| {
-                    symbol_list
-                        .into_iter()
-                        .map(|s| {
-                            convert_completion_item(
-                                cached_file.shading_language,
-                                s,
-                                match ty {
-                                    ShaderSymbolType::Types => CompletionItemKind::TYPE_PARAMETER,
-                                    ShaderSymbolType::Constants => CompletionItemKind::CONSTANT,
-                                    ShaderSymbolType::Variables => CompletionItemKind::VARIABLE,
-                                    ShaderSymbolType::Functions => CompletionItemKind::FUNCTION,
-                                    ShaderSymbolType::Keyword => CompletionItemKind::KEYWORD,
-                                    ShaderSymbolType::Macros => CompletionItemKind::CONSTANT,
-                                    ShaderSymbolType::Include => CompletionItemKind::FILE,
-                                    ShaderSymbolType::CallExpression => {
-                                        unreachable!("Field should be filtered out.")
-                                    }
-                                },
-                            )
-                        })
-                        .collect()
+                .iter()
+                .filter(|symbol| !symbol.is_type(ShaderSymbolType::CallExpression))
+                .map(|symbol| {
+                    convert_completion_item(
+                        cached_file.shading_language,
+                        symbol,
+                        match symbol.get_type().unwrap() {
+                            ShaderSymbolType::Types => CompletionItemKind::TYPE_PARAMETER,
+                            ShaderSymbolType::Constants => CompletionItemKind::CONSTANT,
+                            ShaderSymbolType::Variables => CompletionItemKind::VARIABLE,
+                            ShaderSymbolType::Functions => CompletionItemKind::FUNCTION,
+                            ShaderSymbolType::Keyword => CompletionItemKind::KEYWORD,
+                            ShaderSymbolType::Macros => CompletionItemKind::CONSTANT,
+                            ShaderSymbolType::Include => CompletionItemKind::FILE,
+                            ShaderSymbolType::CallExpression => {
+                                unreachable!("Field should be filtered out.")
+                            }
+                        },
+                    )
                 })
-                .collect::<Vec<Vec<CompletionItem>>>()
-                .concat()),
+                .collect::<Vec<CompletionItem>>()),
         }
     }
 }

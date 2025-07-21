@@ -17,49 +17,43 @@ impl ServerLanguage {
             .symbol_cache
             .get_local_symbols()
             .iter()
-            .map(|(symbols, ty)| {
-                symbols
-                    .iter()
-                    .filter(|symbol| {
-                        // Dont publish keywords & transient.
-                        ty != ShaderSymbolType::Keyword
-                            && !ty.is_transient()
-                            && symbol.range.is_some()
-                    })
-                    .map(|symbol| {
-                        let label_range = symbol.range.clone().expect("Should be filtered out");
-                        // Content expected to englobe label.
-                        let content_range = match &symbol.scope {
-                            Some(scope) => ShaderScope::join(scope.clone(), label_range.clone()),
-                            None => label_range.clone(),
-                        };
-                        #[allow(deprecated)]
-                        // https://github.com/rust-lang/rust/issues/102777
-                        DocumentSymbol {
-                            name: symbol.label.clone(),
-                            detail: Some(symbol.format()),
-                            kind: match ty {
-                                ShaderSymbolType::Types => SymbolKind::TYPE_PARAMETER,
-                                ShaderSymbolType::Constants => SymbolKind::CONSTANT,
-                                ShaderSymbolType::Variables => SymbolKind::VARIABLE,
-                                ShaderSymbolType::Functions => SymbolKind::FUNCTION,
-                                ShaderSymbolType::Macros => SymbolKind::CONSTANT,
-                                ShaderSymbolType::Include => SymbolKind::FILE,
-                                ShaderSymbolType::Keyword | ShaderSymbolType::CallExpression => {
-                                    unreachable!("Field should be filtered out")
-                                }
-                            },
-                            tags: None,
-                            deprecated: None,
-                            range: shader_range_to_location(&content_range).range,
-                            selection_range: shader_range_to_location(&label_range).range,
-                            children: None, // TODO: Should use a tree instead.
-                        }
-                    })
-                    .collect()
+            .filter(|symbol| {
+                // Dont publish keywords & transient.
+                !symbol.is_type(ShaderSymbolType::Keyword)
+                    && !symbol.is_transient()
+                    && symbol.range.is_some()
             })
-            .collect::<Vec<Vec<DocumentSymbol>>>()
-            .concat();
+            .map(|symbol| {
+                let label_range = symbol.range.clone().expect("Should be filtered out");
+                // Content expected to englobe label.
+                let content_range = match &symbol.scope {
+                    Some(scope) => ShaderScope::join(scope.clone(), label_range.clone()),
+                    None => label_range.clone(),
+                };
+                #[allow(deprecated)]
+                // https://github.com/rust-lang/rust/issues/102777
+                DocumentSymbol {
+                    name: symbol.label.clone(),
+                    detail: Some(symbol.format()),
+                    kind: match symbol.get_type().unwrap() {
+                        ShaderSymbolType::Types => SymbolKind::TYPE_PARAMETER,
+                        ShaderSymbolType::Constants => SymbolKind::CONSTANT,
+                        ShaderSymbolType::Variables => SymbolKind::VARIABLE,
+                        ShaderSymbolType::Functions => SymbolKind::FUNCTION,
+                        ShaderSymbolType::Macros => SymbolKind::CONSTANT,
+                        ShaderSymbolType::Include => SymbolKind::FILE,
+                        ShaderSymbolType::Keyword | ShaderSymbolType::CallExpression => {
+                            unreachable!("Field should be filtered out")
+                        }
+                    },
+                    tags: None,
+                    deprecated: None,
+                    range: shader_range_to_location(&content_range).range,
+                    selection_range: shader_range_to_location(&label_range).range,
+                    children: None, // TODO: Should use a tree instead.
+                }
+            })
+            .collect::<Vec<DocumentSymbol>>();
         Ok(symbols)
     }
 }

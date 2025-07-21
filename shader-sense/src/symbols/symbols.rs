@@ -792,24 +792,10 @@ impl<'a> ShaderSymbolListRef<'a> {
     }
     pub fn find_symbols_at(&self, label: &String, position: &ShaderPosition) -> Vec<&ShaderSymbol> {
         self.iter()
-            .map(|(sl, ty)| {
-                if !ty.is_transient() {
-                    sl.iter()
-                        .filter(|symbol| {
-                            if symbol.label == *label {
-                                Self::is_symbol_defined_at(symbol, position)
-                            } else {
-                                false
-                            }
-                        })
-                        .map(|s| *s)
-                        .collect::<Vec<&ShaderSymbol>>()
-                } else {
-                    vec![]
-                }
+            .filter(|s| {
+                !s.is_transient() && s.label == *label && Self::is_symbol_defined_at(s, position)
             })
-            .collect::<Vec<Vec<&ShaderSymbol>>>()
-            .concat()
+            .collect()
     }
     pub fn filter_scoped_symbol(
         &'a self,
@@ -821,26 +807,14 @@ impl<'a> ShaderSymbolListRef<'a> {
     }
     pub fn find_symbols(&self, label: &String) -> Vec<&ShaderSymbol> {
         self.iter()
-            .map(|(sl, ty)| {
-                if !ty.is_transient() {
-                    sl.iter()
-                        .filter_map(|s| if s.label == *label { Some(*s) } else { None })
-                        .collect::<Vec<&ShaderSymbol>>()
-                } else {
-                    vec![]
-                }
-            })
-            .collect::<Vec<Vec<&ShaderSymbol>>>()
-            .concat()
+            .filter(|s| s.label == *label && !s.is_transient())
+            .collect::<Vec<&ShaderSymbol>>()
     }
     pub fn find_symbol(&self, label: &String) -> Option<&ShaderSymbol> {
-        for symbol_list in self.iter() {
-            match symbol_list.0.iter().find(|e| e.label == *label) {
-                Some(symbol) => return Some(symbol),
-                None => {}
-            }
+        match self.iter().find(|e| e.label == *label) {
+            Some(symbol) => return Some(symbol),
+            None => None,
         }
-        None
     }
     pub fn find_type_symbol(&self, label: &String) -> Option<&ShaderSymbol> {
         self.types.iter().find(|s| s.label == *label).map(|s| *s)
@@ -918,10 +892,7 @@ impl<'a> ShaderSymbolListRef<'a> {
             .retain(|s| predicate(ShaderSymbolType::Include, s));
     }
     pub fn iter(&self) -> ShaderSymbolListIterator {
-        ShaderSymbolListIterator {
-            list: self,
-            next: Some(ShaderSymbolType::Types), // First one
-        }
+        ShaderSymbolListIterator::new(&self)
     }
     pub fn append_as_reference(&mut self, shader_symbol_list: &'a ShaderSymbolList) {
         self.functions
@@ -987,133 +958,70 @@ impl<'a> Into<ShaderSymbolList> for ShaderSymbolListRef<'a> {
 
 pub struct ShaderSymbolListIterator<'a> {
     list: &'a ShaderSymbolListRef<'a>,
-    next: Option<ShaderSymbolType>,
+    current: Option<ShaderSymbolType>,
+    iterator: std::slice::Iter<'a, &'a ShaderSymbol>,
+}
+
+impl<'a> ShaderSymbolListIterator<'a> {
+    pub fn new(symbol_list: &'a ShaderSymbolListRef<'a>) -> Self {
+        Self {
+            list: symbol_list,
+            current: Some(ShaderSymbolType::Types), // First one
+            iterator: symbol_list.types.iter(),
+        }
+    }
 }
 
 impl<'a> Iterator for ShaderSymbolListIterator<'a> {
-    type Item = (&'a Vec<&'a ShaderSymbol>, ShaderSymbolType);
+    type Item = &'a ShaderSymbol;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match &self.next {
-            Some(ty) => match ty {
-                ShaderSymbolType::Types => {
-                    self.next = Some(ShaderSymbolType::Constants);
-                    Some((&self.list.types, ShaderSymbolType::Types))
-                }
-                ShaderSymbolType::Constants => {
-                    self.next = Some(ShaderSymbolType::Variables);
-                    Some((&self.list.constants, ShaderSymbolType::Constants))
-                }
-                ShaderSymbolType::Variables => {
-                    self.next = Some(ShaderSymbolType::CallExpression);
-                    Some((&self.list.variables, ShaderSymbolType::Variables))
-                }
-                ShaderSymbolType::CallExpression => {
-                    self.next = Some(ShaderSymbolType::Functions);
-                    Some((&self.list.call_expression, ShaderSymbolType::CallExpression))
-                }
-                ShaderSymbolType::Functions => {
-                    self.next = Some(ShaderSymbolType::Keyword);
-                    Some((&self.list.functions, ShaderSymbolType::Functions))
-                }
-                ShaderSymbolType::Keyword => {
-                    self.next = Some(ShaderSymbolType::Macros);
-                    Some((&self.list.keywords, ShaderSymbolType::Keyword))
-                }
-                ShaderSymbolType::Macros => {
-                    self.next = Some(ShaderSymbolType::Include);
-                    Some((&self.list.macros, ShaderSymbolType::Macros))
-                }
-                ShaderSymbolType::Include => {
-                    self.next = None;
-                    Some((&self.list.includes, ShaderSymbolType::Include))
-                }
+        match self.iterator.next() {
+            Some(symbol) => Some(symbol),
+            None => match &self.current {
+                Some(ty) => match ty {
+                    ShaderSymbolType::Types => {
+                        self.current = Some(ShaderSymbolType::Constants);
+                        self.iterator = self.list.constants.iter();
+                        self.next()
+                    }
+                    ShaderSymbolType::Constants => {
+                        self.current = Some(ShaderSymbolType::Variables);
+                        self.iterator = self.list.variables.iter();
+                        self.next()
+                    }
+                    ShaderSymbolType::Variables => {
+                        self.current = Some(ShaderSymbolType::CallExpression);
+                        self.iterator = self.list.call_expression.iter();
+                        self.next()
+                    }
+                    ShaderSymbolType::CallExpression => {
+                        self.current = Some(ShaderSymbolType::Functions);
+                        self.iterator = self.list.functions.iter();
+                        self.next()
+                    }
+                    ShaderSymbolType::Functions => {
+                        self.current = Some(ShaderSymbolType::Keyword);
+                        self.iterator = self.list.keywords.iter();
+                        self.next()
+                    }
+                    ShaderSymbolType::Keyword => {
+                        self.current = Some(ShaderSymbolType::Macros);
+                        self.iterator = self.list.macros.iter();
+                        self.next()
+                    }
+                    ShaderSymbolType::Macros => {
+                        self.current = Some(ShaderSymbolType::Include);
+                        self.iterator = self.list.includes.iter();
+                        self.next()
+                    }
+                    ShaderSymbolType::Include => {
+                        self.current = None;
+                        self.next()
+                    }
+                },
+                None => None,
             },
-            None => None,
-        }
-    }
-}
-
-pub struct ShaderSymbolListIntoIterator<'a> {
-    list: ShaderSymbolListRef<'a>,
-    next: Option<ShaderSymbolType>,
-}
-impl<'a> Iterator for ShaderSymbolListIntoIterator<'a> {
-    type Item = (Vec<&'a ShaderSymbol>, ShaderSymbolType);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.next.clone() {
-            Some(next) => match next {
-                ShaderSymbolType::Types => {
-                    self.next = Some(ShaderSymbolType::Constants);
-                    Some((
-                        std::mem::take(&mut self.list.types),
-                        ShaderSymbolType::Types,
-                    ))
-                }
-                ShaderSymbolType::Constants => {
-                    self.next = Some(ShaderSymbolType::Variables);
-                    Some((
-                        std::mem::take(&mut self.list.constants),
-                        ShaderSymbolType::Constants,
-                    ))
-                }
-                ShaderSymbolType::Variables => {
-                    self.next = Some(ShaderSymbolType::CallExpression);
-                    Some((
-                        std::mem::take(&mut self.list.variables),
-                        ShaderSymbolType::Variables,
-                    ))
-                }
-                ShaderSymbolType::CallExpression => {
-                    self.next = Some(ShaderSymbolType::Functions);
-                    Some((
-                        std::mem::take(&mut self.list.call_expression),
-                        ShaderSymbolType::CallExpression,
-                    ))
-                }
-                ShaderSymbolType::Functions => {
-                    self.next = Some(ShaderSymbolType::Keyword);
-                    Some((
-                        std::mem::take(&mut self.list.functions),
-                        ShaderSymbolType::Functions,
-                    ))
-                }
-                ShaderSymbolType::Keyword => {
-                    self.next = Some(ShaderSymbolType::Macros);
-                    Some((
-                        std::mem::take(&mut self.list.keywords),
-                        ShaderSymbolType::Keyword,
-                    ))
-                }
-                ShaderSymbolType::Macros => {
-                    self.next = Some(ShaderSymbolType::Include);
-                    Some((
-                        std::mem::take(&mut self.list.macros),
-                        ShaderSymbolType::Macros,
-                    ))
-                }
-                ShaderSymbolType::Include => {
-                    self.next = None;
-                    Some((
-                        std::mem::take(&mut self.list.includes),
-                        ShaderSymbolType::Include,
-                    ))
-                }
-            },
-            None => None,
-        }
-    }
-}
-
-impl<'a> IntoIterator for ShaderSymbolListRef<'a> {
-    type Item = (Vec<&'a ShaderSymbol>, ShaderSymbolType);
-    type IntoIter = ShaderSymbolListIntoIterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        ShaderSymbolListIntoIterator {
-            list: self,
-            next: Some(ShaderSymbolType::Types), // First one
         }
     }
 }
@@ -1129,6 +1037,18 @@ impl ShaderSymbolType {
 }
 
 impl ShaderSymbol {
+    pub fn is_type(&self, ty: ShaderSymbolType) -> bool {
+        match self.get_type() {
+            Some(tty) => tty == ty,
+            None => false,
+        }
+    }
+    pub fn is_transient(&self) -> bool {
+        match self.get_type() {
+            Some(ty) => ty.is_transient(),
+            None => false,
+        }
+    }
     pub fn get_type(&self) -> Option<ShaderSymbolType> {
         match &self.data {
             ShaderSymbolData::None => None,

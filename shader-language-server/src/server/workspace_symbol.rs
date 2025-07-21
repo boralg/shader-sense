@@ -20,43 +20,36 @@ impl ServerLanguage {
                 );
                 symbols
                     .iter()
-                    .filter(|(_, ty)| {
+                    .filter(|symbol| {
+                        let ty = symbol.get_type().unwrap();
                         // For workspace, only publish function, types & macros
-                        *ty == ShaderSymbolType::Functions
-                            || *ty == ShaderSymbolType::Types
-                            || *ty == ShaderSymbolType::Macros
+                        (ty == ShaderSymbolType::Functions
+                            || ty == ShaderSymbolType::Types
+                            || ty == ShaderSymbolType::Macros)
+                            && symbol.range.is_some()
+                            && (symbol.scope_stack.is_none()
+                                || symbol.scope_stack.as_ref().unwrap().is_empty())
                     })
-                    .map(|(symbols, ty)| {
-                        symbols
-                            .iter()
-                            .filter(|symbol| {
-                                symbol.range.is_some()
-                                    && (symbol.scope_stack.is_none()
-                                        || symbol.scope_stack.as_ref().unwrap().is_empty())
-                            })
-                            .map(|symbol| {
-                                #[allow(deprecated)]
-                                // https://github.com/rust-lang/rust/issues/102777
-                                SymbolInformation {
-                                    name: symbol.label.clone(),
-                                    kind: match ty {
-                                        ShaderSymbolType::Types => SymbolKind::TYPE_PARAMETER,
-                                        ShaderSymbolType::Functions => SymbolKind::FUNCTION,
-                                        ShaderSymbolType::Macros => SymbolKind::CONSTANT,
-                                        _ => unreachable!("Should be filtered out"),
-                                    },
-                                    tags: None,
-                                    deprecated: None,
-                                    location: shader_range_to_location(
-                                        symbol.range.as_ref().expect("Should be filtered out"),
-                                    ),
-                                    container_name: Some(shading_language.to_string()),
-                                }
-                            })
-                            .collect()
+                    .map(|symbol| {
+                        #[allow(deprecated)]
+                        // https://github.com/rust-lang/rust/issues/102777
+                        SymbolInformation {
+                            name: symbol.label.clone(),
+                            kind: match symbol.get_type().unwrap() {
+                                ShaderSymbolType::Types => SymbolKind::TYPE_PARAMETER,
+                                ShaderSymbolType::Functions => SymbolKind::FUNCTION,
+                                ShaderSymbolType::Macros => SymbolKind::CONSTANT,
+                                _ => unreachable!("Should be filtered out"),
+                            },
+                            tags: None,
+                            deprecated: None,
+                            location: shader_range_to_location(
+                                symbol.range.as_ref().expect("Should be filtered out"),
+                            ),
+                            container_name: Some(shading_language.to_string()),
+                        }
                     })
-                    .collect::<Vec<Vec<SymbolInformation>>>()
-                    .concat()
+                    .collect::<Vec<SymbolInformation>>()
             })
             .collect::<Vec<Vec<SymbolInformation>>>()
             .concat();
