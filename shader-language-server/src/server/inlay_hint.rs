@@ -33,7 +33,7 @@ impl ServerLanguage {
                 sl.iter()
                     .filter(|s| match &s.range {
                         Some(range) => {
-                            if range.start.file_path == file_path {
+                            if range.start.file_path.as_os_str() == file_path.as_os_str() {
                                 let valid_range =
                                     lsp_range_to_shader_range(lsp_range, &range.start.file_path);
                                 valid_range.contain_bounds(&range)

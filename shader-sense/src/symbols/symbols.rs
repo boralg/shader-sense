@@ -191,12 +191,16 @@ impl ShaderRange {
         self.contain(&position.start) && self.contain(&position.end)
     }
     pub fn contain(&self, position: &ShaderPosition) -> bool {
-        assert!(
+        debug_assert!(
             self.start.file_path == self.end.file_path,
             "Position start & end should have same value."
         );
-        // Check same file
-        if position.file_path == self.start.file_path {
+        // Check same file. Comparing components is hitting perf, so just compare raw path, which should already be canonical.
+        if position.file_path.as_os_str() == self.start.file_path.as_os_str() {
+            debug_assert!(
+                position.file_path == self.start.file_path,
+                "Raw string identical but not components"
+            );
             // Check line & position bounds.
             if position.line > self.start.line && position.line < self.end.line {
                 true
@@ -210,6 +214,10 @@ impl ShaderRange {
                 false
             }
         } else {
+            debug_assert!(
+                position.file_path != self.start.file_path,
+                "Raw string different but not components"
+            );
             false
         }
     }
@@ -746,7 +754,8 @@ impl<'a> ShaderSymbolListRef<'a> {
     ) -> bool {
         match &shader_symbol.range {
             Some(symbol_range) => {
-                if symbol_range.start.file_path == cursor_position.file_path {
+                if symbol_range.start.file_path.as_os_str() == cursor_position.file_path.as_os_str()
+                {
                     // Ensure symbols are already defined at pos
                     let is_already_defined = if symbol_range.start.line == cursor_position.line {
                         cursor_position.pos > symbol_range.start.pos

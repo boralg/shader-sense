@@ -24,7 +24,7 @@ impl ServerLanguage {
             .map(|symbol| {
                 let byte_offset_start = match &symbol.range {
                     Some(range) => {
-                        if range.start.file_path == file_path {
+                        if range.start.file_path.as_os_str() == file_path.as_os_str() {
                             range.start.to_byte_offset(content).unwrap()
                         } else {
                             match cached_file
@@ -90,7 +90,7 @@ impl ServerLanguage {
                 let mut tokens = Vec::new();
                 // If we own a scope and have a range.
                 if let (Some(scope), Some(range)) = (&symbol.scope, &symbol.range) {
-                    if range.start.file_path == file_path {
+                    if range.start.file_path.as_os_str() == file_path.as_os_str() {
                         // DIRTY_HACK: Start to range instead of scope to include parameters, because we dont have range stored for them.
                         //let content_start = scope.start.to_byte_offset(&content).unwrap();
                         let content_start = range.start.to_byte_offset(&content).unwrap();

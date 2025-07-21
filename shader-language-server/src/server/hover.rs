@@ -47,7 +47,7 @@ impl ServerLanguage {
                         let location = match &symbol.range {
                             Some(range) => format!(
                                 "Defined in {}, line {}",
-                                if range.start.file_path == file_path {
+                                if range.start.file_path.as_os_str() == file_path.as_os_str() {
                                     "this file".into()
                                 } else {
                                     range.start.file_path.file_name().unwrap().to_string_lossy()
@@ -75,7 +75,9 @@ impl ServerLanguage {
                                 ),
                             }),
                             // Range of hovered element.
-                            range: if word_range.start.file_path == *file_path {
+                            range: if word_range.start.file_path.as_os_str()
+                                == file_path.as_os_str()
+                            {
                                 Some(shader_range_to_lsp_range(&word_range))
                             } else {
                                 None
