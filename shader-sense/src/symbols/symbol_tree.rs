@@ -144,10 +144,9 @@ impl ShaderSymbols {
             header,
             if is_last { "└─" } else { "├─" },
             include.get_absolute_path().display(),
-            if include.cache.is_some() {
-                "Cache"
-            } else {
-                "Missing cache"
+            match &include.cache {
+                Some(cache) => format!("{:?}", cache.preprocessor.mode),
+                None => "Missing cache".into(),
             }
         );
         let childs_header = format!("{}{}", header, if is_last { "  " } else { "|  " });
