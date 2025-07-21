@@ -480,8 +480,14 @@ mod hlsl_parser_tests {
             }
             (ShaderSymbolData::Keyword {}, ShaderSymbolData::Keyword {}) => {}
             (
-                ShaderSymbolData::Variables { ty: _t1, count: _c1 },
-                ShaderSymbolData::Variables { ty: _t2, count: _c2 },
+                ShaderSymbolData::Variables {
+                    ty: _t1,
+                    count: _c1,
+                },
+                ShaderSymbolData::Variables {
+                    ty: _t2,
+                    count: _c2,
+                },
             ) => todo!(),
             (
                 ShaderSymbolData::CallExpression {
