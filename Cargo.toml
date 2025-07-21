@@ -7,6 +7,9 @@ members = [
 ]
 resolver = "2"
 
+# For profiling. Build with:
+# cargo build --profile=release-with-debug
+# And attach server with vs or any debugger
 [profile.release-with-debug]
 inherits = "release"
 debug = true
