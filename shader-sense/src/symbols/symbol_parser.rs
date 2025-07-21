@@ -78,8 +78,8 @@ impl<'a> ShaderSymbolListBuilder<'a> {
             self.shader_symbol_list.functions.push(shader_symbol);
         }
     }
-    pub fn get_shader_symbol_list(&mut self) -> ShaderSymbolList {
-        std::mem::take(&mut self.shader_symbol_list)
+    pub fn get_shader_symbol_list(self) -> ShaderSymbolList {
+        self.shader_symbol_list
     }
 }
 

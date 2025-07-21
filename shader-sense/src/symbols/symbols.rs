@@ -369,14 +369,14 @@ impl ShaderPreprocessorContext {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct ShaderPreprocessorInclude {
     // TODO: move cache to symbol data
     pub cache: Option<ShaderSymbols>,
     pub symbol: ShaderSymbol,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct ShaderPreprocessorDefine {
     pub symbol: ShaderSymbol,
 }
@@ -570,10 +570,8 @@ impl ShaderMethod {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ShaderSymbolData {
-    #[default]
-    None,
     // A bit of duplicate from variables ? Should be struct (Which should be renamed something else)
     Types {
         constructors: Vec<ShaderSignature>,
@@ -614,7 +612,7 @@ pub enum ShaderSymbolData {
 }
 
 #[allow(non_snake_case)] // for JSON
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShaderSymbol {
     pub label: String,            // Label for the item
     pub description: String,      // Description of the item
@@ -631,9 +629,8 @@ pub struct ShaderSymbol {
     pub scope_stack: Option<Vec<ShaderScope>>, // Stack of declaration
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum ShaderSymbolType {
-    #[default]
     Types,
     Constants,
     Variables,
@@ -1051,7 +1048,6 @@ impl ShaderSymbol {
     }
     pub fn get_type(&self) -> Option<ShaderSymbolType> {
         match &self.data {
-            ShaderSymbolData::None => None,
             ShaderSymbolData::Types { constructors: _ } => Some(ShaderSymbolType::Types),
             ShaderSymbolData::Struct {
                 constructors: _,
@@ -1077,7 +1073,6 @@ impl ShaderSymbol {
     }
     pub fn format(&self) -> String {
         match &self.data {
-            ShaderSymbolData::None => format!("Unknown {}", self.label.clone()),
             ShaderSymbolData::Types { constructors: _ } => format!("{}", self.label.clone()),
             ShaderSymbolData::Struct {
                 constructors: _,

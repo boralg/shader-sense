@@ -280,8 +280,7 @@ impl SymbolProvider {
                 );
             }
         }
-        let symbols = symbol_list_builder.get_shader_symbol_list();
-        Ok(symbols)
+        Ok(symbol_list_builder.get_shader_symbol_list())
     }
     pub fn get_word_chain_range_at_position(
         &self,

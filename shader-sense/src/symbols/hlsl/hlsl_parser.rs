@@ -182,7 +182,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
                 symbols
                     .get_shader_symbol_list()
                     .functions
-                    .iter()
+                    .into_iter()
                     .map(|f| ShaderMethod {
                         label: f.label.clone(),
                         signature: if let ShaderSymbolData::Functions { signatures } = &f.data {
@@ -216,7 +216,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
                 symbols
                     .get_shader_symbol_list()
                     .variables
-                    .iter()
+                    .into_iter()
                     .map(|f| ShaderMember {
                         label: f.label.clone(),
                         ty: if let ShaderSymbolData::Variables { ty, count: _ } = &f.data {
@@ -437,7 +437,6 @@ mod hlsl_parser_tests {
         );
         assert!(symbol_expected.link == symbol.link, "Invalid link");
         match (&symbol.data, &symbol_expected.data) {
-            (ShaderSymbolData::None, ShaderSymbolData::None) => todo!(),
             (
                 ShaderSymbolData::Types { constructors: c1 },
                 ShaderSymbolData::Types { constructors: c2 },
