@@ -26,6 +26,7 @@ impl ServerLanguage {
             .watched_files
             .get_all_symbols(uri, &language_data.language);
         let file_path = uri.to_file_path().unwrap();
+        let valid_range = lsp_range_to_shader_range(lsp_range, &file_path);
         let inlay_hints = symbols
             .iter()
             .filter(|s| {
@@ -33,8 +34,6 @@ impl ServerLanguage {
                     && match &s.range {
                         Some(range) => {
                             if range.start.file_path.as_os_str() == file_path.as_os_str() {
-                                let valid_range =
-                                    lsp_range_to_shader_range(lsp_range, &range.start.file_path);
                                 valid_range.contain_bounds(&range)
                             } else {
                                 false // Skip call not in main file
