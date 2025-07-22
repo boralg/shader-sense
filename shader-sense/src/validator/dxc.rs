@@ -304,10 +304,36 @@ impl Validator for Dxc {
 
         match result {
             Ok(dxc_result) => {
-                let result_blob = match dxc_result.get_result() {
+                // Read error buffer as they might have warnings.
+                let error_blob = match dxc_result.get_error_buffer() {
                     Ok(blob) => blob,
                     Err(err) => match self.from_hassle_error(err, file_path, &params) {
                         Ok(diagnostics) => return Ok(diagnostics),
+                        Err(error) => return Err(error),
+                    },
+                };
+                let warning_emitted = match self.library.get_blob_as_string(&error_blob.into()) {
+                    Ok(string) => string,
+                    Err(err) => match self.from_hassle_error(err, file_path, &params) {
+                        Ok(diagnostics) => return Ok(diagnostics),
+                        Err(error) => return Err(error),
+                    },
+                };
+                let warning_diagnostics = match self.from_hassle_error(
+                    HassleError::CompileError(warning_emitted),
+                    file_path,
+                    &params,
+                ) {
+                    Ok(diag) => diag,
+                    Err(error) => return Err(error),
+                };
+                // Get other diagnostics from result
+                let result_blob = match dxc_result.get_result() {
+                    Ok(blob) => blob,
+                    Err(err) => match self.from_hassle_error(err, file_path, &params) {
+                        Ok(diagnostics) => {
+                            return Ok(ShaderDiagnosticList::join(warning_diagnostics, diagnostics))
+                        }
                         Err(error) => return Err(error),
                     },
                 };
@@ -318,24 +344,31 @@ impl Validator for Dxc {
                     {
                         Ok(blob) => blob,
                         Err(err) => match self.from_hassle_error(err, file_path, &params) {
-                            Ok(diagnostics) => return Ok(diagnostics),
+                            Ok(diagnostics) => {
+                                return Ok(ShaderDiagnosticList::join(
+                                    warning_diagnostics,
+                                    diagnostics,
+                                ))
+                            }
                             Err(error) => return Err(error),
                         },
                     };
 
                     match validator.validate(blob_encoding.into()) {
-                        Ok(_) => Ok(ShaderDiagnosticList::empty()),
-                        Err(dxc_err) => {
+                        Ok(_) => Ok(warning_diagnostics),
+                        Err((_dxc_res, hassle_err)) => {
                             //let error_blob = dxc_err.0.get_error_buffer().map_err(|e| self.from_hassle_error(e))?;
                             //let error_emitted = self.library.get_blob_as_string(&error_blob.into()).map_err(|e| self.from_hassle_error(e))?;
-                            match self.from_hassle_error(dxc_err.1, file_path, &params) {
-                                Ok(diag) => Ok(diag),
+                            match self.from_hassle_error(hassle_err, file_path, &params) {
+                                Ok(diagnostics) => {
+                                    Ok(ShaderDiagnosticList::join(warning_diagnostics, diagnostics))
+                                }
                                 Err(err) => Err(err),
                             }
                         }
                     }
                 } else {
-                    Ok(ShaderDiagnosticList::empty())
+                    Ok(warning_diagnostics)
                 }
             }
             Err((dxc_result, _hresult)) => {
@@ -347,7 +380,7 @@ impl Validator for Dxc {
                     },
                 };
                 let error_emitted = match self.library.get_blob_as_string(&error_blob.into()) {
-                    Ok(blob) => blob,
+                    Ok(string) => string,
                     Err(err) => match self.from_hassle_error(err, file_path, &params) {
                         Ok(diagnostics) => return Ok(diagnostics),
                         Err(error) => return Err(error),
@@ -358,8 +391,8 @@ impl Validator for Dxc {
                     file_path,
                     &params,
                 ) {
-                    Err(error) => Err(error),
                     Ok(diag) => Ok(diag),
+                    Err(error) => Err(error),
                 }
             }
         }

@@ -137,4 +137,8 @@ impl ShaderDiagnosticList {
     pub fn is_empty(&self) -> bool {
         self.diagnostics.is_empty()
     }
+    pub fn join(mut lhs: ShaderDiagnosticList, rhs: ShaderDiagnosticList) -> Self {
+        lhs.diagnostics.extend(rhs.diagnostics);
+        lhs
+    }
 }
