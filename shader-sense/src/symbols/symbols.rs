@@ -182,13 +182,39 @@ pub type ShaderScope = ShaderRange;
 
 impl ShaderRange {
     pub fn new(start: ShaderPosition, end: ShaderPosition) -> Self {
+        debug_assert!(
+            start.file_path == end.file_path,
+            "Position start & end should have same value."
+        );
         Self { start, end }
     }
     pub fn whole(_content: &str) -> Self {
         todo!()
     }
-    pub fn contain_bounds(&self, position: &ShaderRange) -> bool {
-        self.contain(&position.start) && self.contain(&position.end)
+    pub fn contain_bounds(&self, range: &ShaderRange) -> bool {
+        if self.start.file_path.as_os_str() == range.start.file_path.as_os_str() {
+            debug_assert!(
+                range.start.file_path == self.start.file_path,
+                "Raw string identical but not components"
+            );
+            if range.start.line > self.start.line && range.end.line < self.end.line {
+                true
+            } else if range.start.line == self.start.line && range.end.line == self.end.line {
+                range.start.pos >= self.start.pos && range.end.pos <= self.end.pos
+            } else if range.start.line == self.start.line && range.end.line < self.end.line {
+                range.start.pos >= self.start.pos
+            } else if range.end.line == self.end.line && range.start.line > self.start.line {
+                range.end.pos <= self.end.pos
+            } else {
+                false
+            }
+        } else {
+            debug_assert!(
+                range.start.file_path != self.start.file_path,
+                "Raw string different but not components"
+            );
+            false
+        }
     }
     pub fn contain(&self, position: &ShaderPosition) -> bool {
         debug_assert!(
@@ -496,20 +522,16 @@ impl ShaderPreprocessor {
         shader_symbols: &'a ShaderSymbolList,
     ) -> ShaderSymbolListRef<'a> {
         // Filter inactive regions symbols
-        let mut preprocessed_symbols = shader_symbols.filter(|_symbol_type, symbol| {
-            let is_in_inactive_region = match &symbol.range {
-                Some(range) => {
-                    for region in &self.regions {
-                        if !region.is_active && region.range.contain_bounds(&range) {
-                            return false; // Symbol is in inactive region. Remove it.
-                        }
-                    }
-                    true
-                }
-                None => true, // keep
-            };
-            is_in_inactive_region
-        });
+        let inactive_regions: Vec<&ShaderRegion> =
+            self.regions.iter().filter(|r| !r.is_active).collect();
+        let mut preprocessed_symbols =
+            shader_symbols.filter(move |_symbol_type, symbol| match &symbol.range {
+                Some(range) => inactive_regions
+                    .iter()
+                    .find(|r| r.range.contain_bounds(&range))
+                    .is_none(),
+                None => true, // Global range
+            });
         // Add defines
         let mut define_symbols: Vec<&ShaderSymbol> =
             self.defines.iter().map(|define| &define.symbol).collect();
