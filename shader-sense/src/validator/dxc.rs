@@ -96,6 +96,10 @@ impl Dxc {
         file_path: &Path,
         params: &ValidationParams,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
+        // Check empty string.
+        if errors.len() == 0 {
+            return Ok(ShaderDiagnosticList::empty());
+        }
         let mut shader_error_list = ShaderDiagnosticList::empty();
         let mut starts = Vec::new();
         for capture in self.diagnostic_regex.captures_iter(errors.as_str()) {
