@@ -16,7 +16,7 @@ use shader_sense::{
         shader_language::ShaderLanguage,
         symbol_provider::SymbolProvider,
         symbol_tree::{ShaderModuleHandle, ShaderSymbols},
-        symbols::{ShaderPreprocessorContext, ShaderSymbolListRef},
+        symbols::{ShaderPreprocessorContext, ShaderRange, ShaderSymbolListRef},
     },
     validator::validator::Validator,
 };
@@ -265,7 +265,7 @@ impl ServerLanguageFileCache {
                     }
                     None => shader_module,
                 };
-                let diagnostics = validator.validate_shader(
+                let diagnostics = match validator.validate_shader(
                     &RefCell::borrow(&variant_shader_module).content,
                     RefCell::borrow(&variant_shader_module).file_path.as_path(),
                     &validation_params,
@@ -299,7 +299,14 @@ impl ServerLanguageFileCache {
                         let content = RefCell::borrow(&deps_file.shader_module).content.clone();
                         Some(content)
                     },
-                )?;
+                ) {
+                    Ok(diagnostics) => diagnostics,
+                    Err(err) => ShaderDiagnosticList { diagnostics: vec![ShaderDiagnostic {
+                        severity: ShaderDiagnosticSeverity::Error,
+                        error: format!("Failed to validate shader: {:?}", err), 
+                        range: ShaderRange::whole(&file_path, &RefCell::borrow(&variant_shader_module).content) }]
+                    },
+                };
                 diagnostics
             };
             // Clear diagnostic if no errors.

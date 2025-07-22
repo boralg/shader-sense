@@ -98,7 +98,11 @@ impl ShaderLanguage {
         module: &mut ShaderModule,
         new_text: &String,
     ) -> Result<(), ShaderError> {
-        self.update_module_partial(module, &ShaderRange::whole(&module.content), new_text)
+        self.update_module_partial(
+            module,
+            &ShaderRange::whole(&module.file_path, &module.content),
+            new_text,
+        )
     }
     // Update partial content of symbol tree
     pub fn update_module_partial(

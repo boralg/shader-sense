@@ -188,8 +188,18 @@ impl ShaderRange {
         );
         Self { start, end }
     }
-    pub fn whole(_content: &str) -> Self {
-        todo!()
+    pub fn whole(file_path: &Path, content: &str) -> Self {
+        let (last_line, last_pos) = if content.len() == 0 {
+            (0, 0)
+        } else {
+            let line_count = content.lines().count();
+            let char_count = content.lines().last().unwrap().char_indices().count();
+            (line_count - 1, char_count - 1)
+        };
+        Self {
+            start: ShaderPosition::new(file_path.into(), 0, 0),
+            end: ShaderPosition::new(file_path.into(), last_line as u32, last_pos as u32),
+        }
     }
     pub fn contain_bounds(&self, range: &ShaderRange) -> bool {
         if self.start.file_path.as_os_str() == range.start.file_path.as_os_str() {
