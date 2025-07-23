@@ -3,5 +3,5 @@
 #include "inc1/level1.hlsl"
 
 void main() {
-    level1;
+    uint value = level1;
 }

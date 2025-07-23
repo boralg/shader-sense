@@ -13,3 +13,10 @@ resolver = "2"
 [profile.release-with-debug]
 inherits = "release"
 debug = true
+
+
+[patch.crates-io]
+# DXC crash when empty warning in hassle rs. 
+# Fix not yet available on latest 0.12.0. Temp fix that prevent publish on crates.io
+# https://github.com/Traverse-Research/hassle-rs/issues/85
+hassle-rs = { git="https://github.com/antaalt/hassle-rs.git", branch="fix-crash-empty-blob" }

@@ -4,5 +4,5 @@
 #include "level-root.hlsl"
 
 void main() {
-    root;
+    uint value = root;
 }
