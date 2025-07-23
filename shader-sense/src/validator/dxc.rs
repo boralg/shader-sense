@@ -66,7 +66,19 @@ impl hassle_rs::wrapper::DxcIncludeHandler for DxcIncludeHandler<'_> {
 
 impl Dxc {
     pub fn new() -> Result<Self, hassle_rs::HassleError> {
-        let dxc = hassle_rs::Dxc::new(None)?;
+        // Pick the bundled dxc dll if available.
+        // Else it will ignore it and pick the globally available one.
+        let folder = match std::env::current_dir() {
+            Ok(parent_path) => {
+                if parent_path.join("dxcompiler.dll").is_file() {
+                    parent_path.into()
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        };
+        let dxc = hassle_rs::Dxc::new(folder)?;
         let library = dxc.create_library()?;
         let compiler = dxc.create_compiler()?;
         let (dxil, validator) = match Dxil::new(None) {
