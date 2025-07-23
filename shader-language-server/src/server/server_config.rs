@@ -17,6 +17,7 @@ pub struct ServerHlslConfig {
     pub shader_model: HlslShaderModel,
     pub version: HlslVersion,
     pub enable16bit_types: bool,
+    pub spirv: bool,
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -91,6 +92,7 @@ impl ServerConfig {
             hlsl_shader_model: self.hlsl.shader_model,
             hlsl_version: self.hlsl.version,
             hlsl_enable16bit_types: self.hlsl.enable16bit_types,
+            hlsl_spirv: self.hlsl.spirv,
             glsl_client: self.glsl.target_client,
             glsl_spirv: self.glsl.spirv_version,
         }

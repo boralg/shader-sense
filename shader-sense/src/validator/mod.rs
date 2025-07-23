@@ -285,6 +285,45 @@ mod tests {
     }
 
     #[test]
+    fn hlsl_spirv_ok() {
+        let mut validator = create_validator(ShadingLanguage::Hlsl);
+        let file_path = Path::new("./test/hlsl/spirv-shader.hlsl");
+        let shader_content = std::fs::read_to_string(file_path).unwrap();
+        // Check warning
+        match validator.validate_shader(
+            &shader_content,
+            file_path,
+            &ValidationParams {
+                hlsl_spirv: false,
+                ..Default::default()
+            },
+            &mut default_include_callback,
+        ) {
+            Ok(result) => {
+                println!("Diagnostic should not be empty: {:#?}", result);
+                assert!(!result.is_empty())
+            }
+            Err(err) => panic!("{}", err),
+        };
+        // Check no warning
+        match validator.validate_shader(
+            &shader_content,
+            file_path,
+            &ValidationParams {
+                hlsl_spirv: true,
+                ..Default::default()
+            },
+            &mut default_include_callback,
+        ) {
+            Ok(result) => {
+                println!("Diagnostic should be empty: {:#?}", result);
+                assert!(result.is_empty())
+            }
+            Err(err) => panic!("{}", err),
+        };
+    }
+
+    #[test]
     fn wgsl_ok() {
         let mut validator = create_validator(ShadingLanguage::Wgsl);
         let file_path = Path::new("./test/wgsl/ok.wgsl");

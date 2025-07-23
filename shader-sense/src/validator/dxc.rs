@@ -261,7 +261,8 @@ impl Validator for Dxc {
             include_callback,
         );
         let dxc_options = {
-            let hlsl_version = format!(
+            let mut options = Vec::new();
+            options.push(format!(
                 "-HV {}",
                 match params.hlsl_version {
                     HlslVersion::V2016 => "2016",
@@ -269,13 +270,17 @@ impl Validator for Dxc {
                     HlslVersion::V2018 => "2018",
                     HlslVersion::V2021 => "2021",
                 }
-            );
+            ));
 
             if params.hlsl_enable16bit_types {
-                vec![hlsl_version, "-enable-16bit-types".into()]
-            } else {
-                vec![hlsl_version]
+                options.push("-enable-16bit-types".into());
             }
+            if params.hlsl_spirv {
+                options.push("-spirv".into());
+                // Default target does not support lib profile, so this is required.
+                options.push("-fspv-target-env=vulkan1.3".into());
+            }
+            options
         };
         let dxc_options_str: Vec<&str> = dxc_options.iter().map(|s| s.as_str()).collect();
         let result = self.compiler.compile(
@@ -341,35 +346,40 @@ impl Validator for Dxc {
                         Err(error) => return Err(error),
                     },
                 };
-                // Skip validation if dxil.dll does not exist.
-                if let (Some(_dxil), Some(validator)) = (&self.dxil, &self.validator) {
-                    let data = result_blob.to_vec();
-                    let blob_encoding = match self.library.create_blob_with_encoding(data.as_ref())
-                    {
-                        Ok(blob) => blob,
-                        Err(err) => match self.from_hassle_error(err, file_path, &params) {
-                            Ok(diagnostics) => {
-                                return Ok(ShaderDiagnosticList::join(
-                                    warning_diagnostics,
-                                    diagnostics,
-                                ))
-                            }
-                            Err(error) => return Err(error),
-                        },
-                    };
-
-                    match validator.validate(blob_encoding.into()) {
-                        Ok(_) => Ok(warning_diagnostics),
-                        Err((_dxc_res, hassle_err)) => {
-                            //let error_blob = dxc_err.0.get_error_buffer().map_err(|e| self.from_hassle_error(e))?;
-                            //let error_emitted = self.library.get_blob_as_string(&error_blob.into()).map_err(|e| self.from_hassle_error(e))?;
-                            match self.from_hassle_error(hassle_err, file_path, &params) {
-                                Ok(diagnostics) => {
-                                    Ok(ShaderDiagnosticList::join(warning_diagnostics, diagnostics))
+                // Dxil validation not supported for spirv.
+                if !params.hlsl_spirv {
+                    // Skip validation if dxil.dll does not exist.
+                    if let (Some(_dxil), Some(validator)) = (&self.dxil, &self.validator) {
+                        let data = result_blob.to_vec();
+                        let blob_encoding =
+                            match self.library.create_blob_with_encoding(data.as_ref()) {
+                                Ok(blob) => blob,
+                                Err(err) => match self.from_hassle_error(err, file_path, &params) {
+                                    Ok(diagnostics) => {
+                                        return Ok(ShaderDiagnosticList::join(
+                                            warning_diagnostics,
+                                            diagnostics,
+                                        ))
+                                    }
+                                    Err(error) => return Err(error),
+                                },
+                            };
+                        match validator.validate(blob_encoding.into()) {
+                            Ok(_) => Ok(warning_diagnostics),
+                            Err((_dxc_res, hassle_err)) => {
+                                //let error_blob = dxc_err.0.get_error_buffer().map_err(|e| self.from_hassle_error(e))?;
+                                //let error_emitted = self.library.get_blob_as_string(&error_blob.into()).map_err(|e| self.from_hassle_error(e))?;
+                                match self.from_hassle_error(hassle_err, file_path, &params) {
+                                    Ok(diagnostics) => Ok(ShaderDiagnosticList::join(
+                                        warning_diagnostics,
+                                        diagnostics,
+                                    )),
+                                    Err(err) => Err(err),
                                 }
-                                Err(err) => Err(err),
                             }
                         }
+                    } else {
+                        Ok(warning_diagnostics)
                     }
                 } else {
                     Ok(warning_diagnostics)

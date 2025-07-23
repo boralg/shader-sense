@@ -18,6 +18,7 @@ pub struct ValidationParams {
     pub hlsl_shader_model: HlslShaderModel,
     pub hlsl_version: HlslVersion,
     pub hlsl_enable16bit_types: bool,
+    pub hlsl_spirv: bool,
     pub glsl_client: GlslTargetClient,
     pub glsl_spirv: GlslSpirvVersion,
 }
