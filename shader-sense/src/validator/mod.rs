@@ -285,6 +285,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "wasi"))] // Default behaviour of glslang, so ignore
     fn hlsl_spirv_ok() {
         let mut validator = create_validator(ShadingLanguage::Hlsl);
         let file_path = Path::new("./test/hlsl/spirv-shader.hlsl");
