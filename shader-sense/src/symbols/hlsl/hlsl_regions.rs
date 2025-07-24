@@ -340,14 +340,22 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         mut old_symbols: Option<ShaderSymbols>,
     ) -> Result<Vec<ShaderRegion>, ShaderError> {
         fn get_defined_macros_for_include(
+            last_include: Option<&ShaderPreprocessorInclude>,
             include: &ShaderPreprocessorInclude,
             defines: &Vec<ShaderPreprocessorDefine>,
         ) -> Vec<ShaderPreprocessorDefine> {
+            let start_range = match last_include {
+                Some(last_include) => last_include.get_range().clone(),
+                None => ShaderRange::zero(include.get_range().start.file_path.clone()),
+            };
+            // TODO: avoid duplicated macros.
             defines
                 .iter()
                 .filter(|define| match define.get_range() {
-                    Some(range) => range.end < include.get_range().start,
-                    None => true, // Global define
+                    Some(range) => {
+                        range.start > start_range.end && range.end < include.get_range().start
+                    }
+                    None => false, // Global define, already filled
                 })
                 .cloned()
                 .collect::<Vec<ShaderPreprocessorDefine>>()
@@ -457,13 +465,38 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     let included_preprocessor = include.get_cache_mut().get_preprocessor_mut();
                     let included_includes: Vec<&mut ShaderPreprocessorInclude> =
                         included_preprocessor.includes.iter_mut().collect();
+                    let mut last_include = None;
                     for included_include in included_includes {
+                        // Update include handler macros & include
+                        context.push_directory_stack(&included_include.get_absolute_path());
                         context.append_defines(get_defined_macros_for_include(
+                            last_include,
                             &included_include,
                             &included_preprocessor.defines,
                         ));
                         update_context_for_include(context, included_include);
+                        last_include = Some(included_include);
                     }
+                    // Add missing defines to context
+                    let define_left = match included_preprocessor.includes.last() {
+                        Some(last_include) => {
+                            // Add all defines after the last one
+                            included_preprocessor
+                                .defines
+                                .iter_mut()
+                                .filter(|define| match define.get_range() {
+                                    Some(range) => range.start > last_include.get_range().end,
+                                    None => false, // Global define
+                                })
+                                .map(|d| d.clone())
+                                .collect::<Vec<ShaderPreprocessorDefine>>()
+                        }
+                        None => {
+                            // No include, so add all defines
+                            included_preprocessor.defines.clone()
+                        }
+                    };
+                    context.append_defines(define_left);
                 }
                 update_context_for_include(context, include);
             }
@@ -508,6 +541,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                 .is_none()
                     })
                     .collect::<Vec<&mut ShaderPreprocessorInclude>>();
+                let mut last_include = None;
                 for include_before in includes_before {
                     processed_includes.push((
                         include_before.get_absolute_path().into(),
@@ -519,7 +553,11 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         include_before,
                         include_callback,
                         old_symbols,
-                        get_defined_macros_for_include(&include_before, &preprocessor.defines),
+                        get_defined_macros_for_include(
+                            last_include,
+                            &include_before,
+                            &preprocessor.defines,
+                        ),
                     ) {
                         Ok(_) => {}
                         Err(err) => match err {
@@ -534,6 +572,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             err => Err(err)?, // Propagate the error.
                         },
                     }
+                    last_include = Some(include_before);
                 }
                 // Process regions
                 let (is_active_region, region_start) = match cursor.node().kind() {
@@ -758,6 +797,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     .is_none()
             })
             .collect::<Vec<&mut ShaderPreprocessorInclude>>();
+        let mut last_include = None;
         for include_left in include_lefts {
             // Dont need to push as last execution.
             //processed_includes.push((include.absolute_path.clone(), include.range.clone()));
@@ -768,7 +808,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 include_left,
                 include_callback,
                 &mut old_symbols,
-                get_defined_macros_for_include(&include_left, &preprocessor.defines),
+                get_defined_macros_for_include(last_include, &include_left, &preprocessor.defines),
             ) {
                 Ok(_) => {}
                 Err(err) => match err {
@@ -783,6 +823,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     err => Err(err)?, // Propagate the error.
                 },
             }
+            last_include = Some(include_left);
         }
         let define_after_last_include = preprocessor
             .defines

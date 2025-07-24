@@ -78,7 +78,13 @@ impl ShaderPosition {
             pos,
         }
     }
-
+    pub fn zero(file_path: PathBuf) -> Self {
+        Self {
+            file_path,
+            line: 0,
+            pos: 0,
+        }
+    }
     pub fn from_byte_offset(
         content: &str,
         byte_offset: usize,
@@ -187,6 +193,12 @@ impl ShaderRange {
             "Position start & end should have same value."
         );
         Self { start, end }
+    }
+    pub fn zero(file_path: PathBuf) -> Self {
+        Self::new(
+            ShaderPosition::zero(file_path.clone()),
+            ShaderPosition::zero(file_path),
+        )
     }
     pub fn whole(file_path: &Path, content: &str) -> Self {
         let (last_line, last_pos) = if content.len() == 0 {
@@ -321,6 +333,9 @@ impl ShaderPreprocessorContext {
     }
     pub fn search_path_in_includes(&mut self, path: &Path) -> Option<PathBuf> {
         self.include_handler.search_path_in_includes(path)
+    }
+    pub fn push_directory_stack(&mut self, canonical_path: &Path) {
+        self.include_handler.push_directory_stack(canonical_path);
     }
     pub fn push_define(&mut self, name: &str, value: &str) {
         self.defines.push(ShaderSymbol {

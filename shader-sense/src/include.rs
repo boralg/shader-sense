@@ -84,21 +84,24 @@ impl IncludeHandler {
             None => None,
         }
     }
+    pub fn push_directory_stack(&mut self, canonical_path: &Path) {
+        match self.visited_dependencies.get_mut(canonical_path) {
+            Some(visited_dependency_count) => *visited_dependency_count += 1,
+            None => {
+                self.visited_dependencies.insert(canonical_path.into(), 1);
+                if let Some(parent) = canonical_path.parent() {
+                    self.directory_stack.push(parent.into());
+                }
+            }
+        }
+    }
     pub fn search_path_in_includes(&mut self, relative_path: &Path) -> Option<PathBuf> {
         self.search_path_in_includes_relative(relative_path)
             .map(|e| {
                 // Canonicalize path.
                 let path = canonicalize(&e).unwrap();
                 // Add the parent to the stack
-                match self.visited_dependencies.get_mut(&path) {
-                    Some(visited_dependency_count) => *visited_dependency_count += 1,
-                    None => {
-                        self.visited_dependencies.insert(path.clone(), 1);
-                        if let Some(parent) = path.parent() {
-                            self.directory_stack.push(parent.into());
-                        }
-                    }
-                }
+                self.push_directory_stack(&path);
                 path
             })
     }
