@@ -190,7 +190,7 @@ impl ServerLanguageFileCache {
         // Reset cache
         let old_data = self.files.get_mut(&uri).unwrap().data.take();
         // Get symbols for main file.
-        let (symbols, symbol_diagnostics) = if config.symbols {
+        let (symbols, symbol_diagnostics) = if config.get_symbols() {
             profile_scope!("Querying symbols for file {}", uri);
             let shading_language = self.files.get(uri).unwrap().shading_language;
             let shader_module = Rc::clone(&self.files.get(uri).unwrap().shader_module);
@@ -227,7 +227,7 @@ impl ServerLanguageFileCache {
             (ShaderSymbols::default(), ShaderDiagnosticList::default())
         };
         // Get diagnostics
-        let mut diagnostics = if config.validate {
+        let mut diagnostics = if config.get_validate() {
             profile_scope!("Validating file {}", uri);
             let shading_language = self.files.get(uri).unwrap().shading_language;
             let shader_module = Rc::clone(&self.files.get(uri).unwrap().shader_module);
@@ -274,7 +274,7 @@ impl ServerLanguageFileCache {
                         let deps_file = match self.get_file(&deps_uri) {
                             Some(deps_file) => deps_file,
                             None => {
-                                if config.symbols {
+                                if config.get_symbols() {
                                     warn!(
                                         "Should only get there if symbols did not add deps: {} from includer {}.",
                                         deps_uri,
@@ -314,7 +314,7 @@ impl ServerLanguageFileCache {
 
             {
                 // Filter by severity.
-                let required_severity = ShaderDiagnosticSeverity::from(config.severity.clone());
+                let required_severity = config.get_severity();
                 diagnostic_list
                     .diagnostics
                     .retain(|e| e.severity.is_required(required_severity.clone()));
@@ -378,7 +378,7 @@ impl ServerLanguageFileCache {
         self.create_data(
             uri,
             symbols,
-            if config.symbol_diagnostics {
+            if config.get_symbol_diagnostics() {
                 diagnostics.diagnostics.extend(preprocessor_diagnotsics);
                 diagnostics
                     .diagnostics

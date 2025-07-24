@@ -18,7 +18,7 @@ mod signature;
 mod workspace_symbol;
 
 mod profile;
-mod server_config;
+pub mod server_config; // pub for test.
 mod server_connection;
 mod server_file_cache;
 mod server_language_data;
@@ -190,7 +190,7 @@ impl ServerLanguage {
         }
     }
     fn debug(&self, dbg: &impl Debug) -> String {
-        if self.config.trace.is_verbose() {
+        if self.config.is_verbose() {
             format!("{:#?}", dbg)
         } else {
             "{?}".into()

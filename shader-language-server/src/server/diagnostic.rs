@@ -11,7 +11,7 @@ use super::{ServerConnection, ServerLanguage};
 
 impl ServerLanguage {
     pub fn publish_diagnostic(&mut self, uri: &Url, version: Option<i32>) {
-        if self.config.validate {
+        if self.config.get_validate() {
             match self.recolt_diagnostic(uri) {
                 Ok(diagnostics) => {
                     info!(
@@ -66,10 +66,7 @@ impl ServerLanguage {
         let mut diagnostics: HashMap<Url, Vec<Diagnostic>> = HashMap::new();
         for diagnostic in &diagnostic_cache.diagnostics {
             let uri = Url::from_file_path(&diagnostic.range.start.file_path).unwrap();
-            if diagnostic
-                .severity
-                .is_required(ShaderDiagnosticSeverity::from(self.config.severity.clone()))
-            {
+            if diagnostic.severity.is_required(self.config.get_severity()) {
                 let diagnostic = Diagnostic {
                     range: shader_range_to_lsp_range(&diagnostic.range),
                     severity: Some(match diagnostic.severity {

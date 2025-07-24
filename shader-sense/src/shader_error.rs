@@ -20,9 +20,9 @@ impl fmt::Display for ShaderDiagnosticSeverity {
     }
 }
 
-impl From<String> for ShaderDiagnosticSeverity {
-    fn from(value: String) -> Self {
-        match value.as_str() {
+impl From<&str> for ShaderDiagnosticSeverity {
+    fn from(value: &str) -> Self {
+        match value {
             "error" => ShaderDiagnosticSeverity::Error,
             "warning" => ShaderDiagnosticSeverity::Warning,
             "info" => ShaderDiagnosticSeverity::Information,
