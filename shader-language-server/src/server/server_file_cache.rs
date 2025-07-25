@@ -127,12 +127,12 @@ impl ServerLanguageFileCache {
             }
             None => {
                 file.data = Some(ServerFileCacheData::default());
-                false
+                true
             }
         };
         // Check open files that depend on this file and require a recache.
         // Only needed if we changed the content. Not if we just opened the file.
-        let updated_files = if is_initial_caching {
+        let updated_files = if !is_initial_caching {
             let dependent_files_uri = self.get_dependent_files(&uri);
             let mut updated_files = dependent_files_uri.clone();
             // We recompute relying before computing deps, but marking this file as dirty, so should be fine.
@@ -157,7 +157,6 @@ impl ServerLanguageFileCache {
         };
         // Prepare context depending on variant.
         let file_path = uri.to_file_path().unwrap();
-        // TODO: if a file depend on a variant, dont need to compute its cache, its already computed in the variant ?
         let mut context = if let Some(variant) = self.variants.get(uri) {
             // If we have an active variant for this file, use it.
             info!("Caching file {} as variant", uri);
@@ -181,6 +180,7 @@ impl ServerLanguageFileCache {
                         None => false,
                     });
             if let Some((variant_url, _includer_variant)) = includer_variant {
+                // Find variant cache & reuse it.
                 info!("Caching file {} from variant {}", uri, variant_url);
                 let variant_cached_file = self.files.get(variant_url).unwrap();
                 let cached_file_as_include = variant_cached_file
@@ -188,11 +188,27 @@ impl ServerLanguageFileCache {
                     .symbol_cache
                     .find_include(&mut |i| i.get_absolute_path() == file_path)
                     .unwrap(); // Is expected.
-                cached_file_as_include
-                    .get_cache()
-                    .get_preprocessor()
-                    .context
-                    .clone()
+                               // Copy all symbol cache & filter all diagnostic for the available files
+                let symbol_cache = cached_file_as_include.get_cache().clone();
+                let diagnostic_cache = ShaderDiagnosticList {
+                    diagnostics: variant_cached_file
+                        .get_data()
+                        .diagnostic_cache
+                        .diagnostics
+                        .iter()
+                        .filter(|d| {
+                            let deps_file_path = &d.range.start.file_path;
+                            *deps_file_path == file_path
+                                || symbol_cache.has_dependency(deps_file_path)
+                        })
+                        .cloned()
+                        .collect(),
+                };
+                self.files.get_mut(uri).unwrap().data = Some(ServerFileCacheData {
+                    symbol_cache,
+                    diagnostic_cache,
+                });
+                return Ok(updated_files);
             } else {
                 info!("Caching file {} without variant", uri);
                 ShaderPreprocessorContext::main(&file_path, config.into_symbol_params(None))
@@ -202,7 +218,11 @@ impl ServerLanguageFileCache {
             context.mark_dirty(dirty_deps);
         }
         // Reset cache
-        let old_data = self.files.get_mut(&uri).unwrap().data.take();
+        let old_data = if is_initial_caching {
+            None
+        } else {
+            self.files.get_mut(&uri).unwrap().data.take()
+        };
         // Get symbols for main file.
         let (symbols, symbol_diagnostics) = if config.get_symbols() {
             profile_scope!("Querying symbols for file {}", uri);
@@ -252,24 +272,24 @@ impl ServerLanguageFileCache {
                 let variant = if let Some(variant) = self.variants.get(uri) {
                     Some((uri.clone(), variant.clone()))
                 } else {
-                    let includer_variant = self.variants.iter().find(|(url, _variant)| match self
-                        .files
-                        .get(url)
-                    {
-                        Some(cached_file) => {
-                            cached_file.is_main_file()
-                                && cached_file
-                                    .get_data()
-                                    .symbol_cache
-                                    .has_dependency(&file_path)
-                        }
-                        None => false,
-                    });
-                    if let Some((variant_url, includer_variant)) = includer_variant {
-                        Some((variant_url.clone(), includer_variant.clone()))
-                    } else {
-                        None
-                    }
+                    // Here if we copied data from includer variant, we should never reach. Simply return None
+                    assert!(
+                        self.variants
+                            .iter()
+                            .find(|(url, _variant)| match self.files.get(url) {
+                                Some(cached_file) => {
+                                    cached_file.is_main_file()
+                                        && cached_file
+                                            .get_data()
+                                            .symbol_cache
+                                            .has_dependency(&file_path)
+                                }
+                                None => false,
+                            })
+                            .is_none(),
+                        "Should not be reached"
+                    );
+                    None
                 };
                 let validation_params = config
                     .into_validation_params(variant.as_ref().map(|(_, variant)| variant.clone()));
@@ -352,7 +372,7 @@ impl ServerLanguageFileCache {
                                 return Some(ShaderDiagnostic {
                                     severity: ShaderDiagnosticSeverity::Error,
                                     error: format!(
-                                        "File {} has issues:\n{}",
+                                        "File {} has issues:\n{}", // TODO: add command to file
                                         include.get_relative_path(),
                                         diagnostic.error
                                     ),
