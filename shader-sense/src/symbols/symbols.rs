@@ -52,6 +52,10 @@ pub struct ShaderPosition {
 }
 impl Ord for ShaderPosition {
     fn cmp(&self, other: &Self) -> Ordering {
+        assert!(
+            self.file_path == other.file_path,
+            "Cannot compare file from different path"
+        );
         (&self.file_path, &self.line, &self.pos).cmp(&(&other.file_path, &other.line, &other.pos))
     }
 }
@@ -407,12 +411,9 @@ impl ShaderPreprocessorContext {
         self.defines
             .iter()
             .find(|symbol| *symbol.label == *name)
-            .map(|symbol| {
-                match &symbol.data {
-                    ShaderSymbolData::Macro { value } => value.clone(),
-                    _ => panic!("Expected ShaderSymbolData::Macro"),
-                }
-                .clone()
+            .map(|symbol| match &symbol.data {
+                ShaderSymbolData::Macro { value } => value.clone(),
+                _ => panic!("Expected ShaderSymbolData::Macro"),
             })
     }
     pub fn get_defines(&self) -> &Vec<ShaderSymbol> {
