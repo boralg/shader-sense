@@ -102,17 +102,25 @@ mod tests {
             set_region(46, 22, 47, 16, false), // 11
             // unary defined expression
             set_region(51, 66, 52, 16, false), // 12
-            // region depending on region
+            // region depending on region not defined
             set_region(56, 25, 57, 35, false), // 13
             set_region(59, 28, 60, 34, false), // 14
+            // region depending on region defined
+            set_region(64, 21, 65, 29, true), // 15
+            set_region(67, 22, 68, 16, true), // 16
             // macro included before
-            set_region(64, 26, 65, 34, false), // 15
+            set_region(72, 26, 73, 34, false), // 17
             // macro defined after
-            set_region(69, 18, 70, 34, false), // 16
+            set_region(77, 18, 78, 34, false), // 18
             // macro included after
-            set_region(74, 31, 75, 34, false), // 17
+            set_region(82, 31, 83, 34, false), // 19
         ];
-        assert!(symbols.preprocessor.regions.len() == expected_regions.len());
+        assert!(
+            symbols.preprocessor.regions.len() == expected_regions.len(),
+            "Expecting {} regions, found {}",
+            expected_regions.len(),
+            symbols.preprocessor.regions.len()
+        );
         for region_index in 0..symbols.preprocessor.regions.len() {
             println!(
                 "region {}: {:#?}",

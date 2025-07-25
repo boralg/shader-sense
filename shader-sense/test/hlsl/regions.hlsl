@@ -61,6 +61,14 @@ void main() {
     #error "Should not be reached"
 #endif
 
+// region depending on region
+#if CONDITION_DEFINED
+    #define MACRO_IN_REGION 1
+#endif
+#ifdef MACRO_IN_REGION
+    float i = 0;
+#endif
+
 // macro included before
 #ifndef OTHER_CUSTOM_MACRO
     #error "Should not be reached"
