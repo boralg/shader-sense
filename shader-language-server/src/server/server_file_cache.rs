@@ -117,30 +117,44 @@ impl ServerLanguageFileCache {
         dirty_deps: Option<&Path>,
     ) -> Result<Vec<Url>, ShaderError> {
         profile_scope!("Caching file data for file {}", uri);
-        assert!(
-            self.files.get(&uri).unwrap().is_main_file(),
-            "Trying to cache deps file {}",
-            uri
-        );
+        // Check if we cache this file for the first time.
+        // Fill it default to avoid early return and empty cache.
+        let file = self.files.get_mut(uri).unwrap();
+        let is_initial_caching = match &mut file.data {
+            Some(data) => {
+                *data = ServerFileCacheData::default();
+                false
+            }
+            None => {
+                file.data = Some(ServerFileCacheData::default());
+                false
+            }
+        };
         // Check open files that depend on this file and require a recache.
-        let dependent_files_uri = self.get_dependent_files(&uri);
-        let mut updated_files = dependent_files_uri.clone();
-        // We recompute relying before computing deps, but marking this file as dirty, so should be fine.
-        for dependent_file_uri in &dependent_files_uri {
-            profile_scope!(
-                "Updating file {} as it depend on {}",
-                dependent_file_uri,
-                uri
-            );
-            updated_files.extend(self.cache_file_data(
-                &dependent_file_uri,
-                validator,
-                shader_language,
-                symbol_provider,
-                config,
-                Some(&uri.to_file_path().unwrap()),
-            )?);
-        }
+        // Only needed if we changed the content. Not if we just opened the file.
+        let updated_files = if is_initial_caching {
+            let dependent_files_uri = self.get_dependent_files(&uri);
+            let mut updated_files = dependent_files_uri.clone();
+            // We recompute relying before computing deps, but marking this file as dirty, so should be fine.
+            for dependent_file_uri in &dependent_files_uri {
+                profile_scope!(
+                    "Updating file {} as it depend on {}",
+                    dependent_file_uri,
+                    uri
+                );
+                updated_files.extend(self.cache_file_data(
+                    &dependent_file_uri,
+                    validator,
+                    shader_language,
+                    symbol_provider,
+                    config,
+                    Some(&uri.to_file_path().unwrap()),
+                )?);
+            }
+            updated_files
+        } else {
+            vec![]
+        };
         // Prepare context depending on variant.
         let file_path = uri.to_file_path().unwrap();
         // TODO: if a file depend on a variant, dont need to compute its cache, its already computed in the variant ?
@@ -412,9 +426,11 @@ impl ServerLanguageFileCache {
                     uri
                 );
                 // Replace its content from request to make sure content is correct.
+                debug_assert!(
+                    RefCell::borrow_mut(&cached_file.shader_module).content == *text,
+                    "Server deps content different from client provided one."
+                );
                 RefCell::borrow_mut(&cached_file.shader_module).content = text.clone();
-                // Promote deps to main file.
-                cached_file.data = Some(ServerFileCacheData::default());
                 info!(
                     "Starting watching {:#?} dependency file as main file at {}. {} files in cache.",
                     lang,
@@ -429,7 +445,7 @@ impl ServerLanguageFileCache {
                 let cached_file = ServerFileCache {
                     shading_language: lang,
                     shader_module: shader_module,
-                    data: Some(ServerFileCacheData::default()),
+                    data: None, // Data will be filled with cache_file_data
                 };
                 let none = self.files.insert(uri.clone(), cached_file);
                 assert!(none.is_none());
