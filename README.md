@@ -15,15 +15,15 @@ For symbol inspection, the API is relying on abstract syntax tree. As we want to
 
 ### Shader language server
 
-This library is used in a language server as [shader-language-server](https://github.com/antaalt/shader-sense/tree/main/shader-language-server). 
+This library is used in a language server at [shader-language-server](https://github.com/antaalt/shader-sense/tree/main/shader-language-server). 
 
 ### Shader intrinsic parser
 
-This library is used to parse intrinsic language documentations with [shader-intrinsic-parser](https://github.com/antaalt/shader-sense/tree/main/shader-intrinsic-parser).
+This library is using an intrinsic json database that is parsed with [shader-intrinsic-parser](https://github.com/antaalt/shader-sense/tree/main/shader-intrinsic-parser).
 
-### Example
+## Documentation
 
-You can find example of the library [here](https://github.com/antaalt/shader-sense/tree/main/shader-sense/examples).
+There is not much documentation available at this time, but you can find example of the library being used [here](https://github.com/antaalt/shader-sense/tree/main/shader-sense/examples).
 
 ## Build for WASI
 
