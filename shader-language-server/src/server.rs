@@ -9,6 +9,7 @@ mod completion;
 mod debug;
 mod diagnostic;
 mod document_symbol;
+mod formatting;
 mod goto;
 mod hover;
 mod inlay_hint;
@@ -30,7 +31,7 @@ use lsp_types::notification::{
     DidSaveTextDocument, Notification,
 };
 use lsp_types::request::{
-    Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, FoldingRangeRequest,
+    Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, FoldingRangeRequest, Formatting,
     GotoDefinition, HoverRequest, InlayHintRequest, Request, SemanticTokensFullRequest,
     SignatureHelpRequest, WorkspaceConfiguration, WorkspaceSymbolRequest,
 };
@@ -39,8 +40,8 @@ use lsp_types::{
     DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentDiagnosticReportResult,
-    DocumentSymbolOptions, DocumentSymbolParams, DocumentSymbolResponse, FoldingRange,
-    FoldingRangeKind, FoldingRangeParams, FoldingRangeProviderCapability,
+    DocumentFormattingParams, DocumentSymbolOptions, DocumentSymbolParams, DocumentSymbolResponse,
+    FoldingRange, FoldingRangeKind, FoldingRangeParams, FoldingRangeProviderCapability,
     FullDocumentDiagnosticReport, GotoDefinitionParams, HoverParams, HoverProviderCapability,
     InlayHintParams, OneOf, RelatedFullDocumentDiagnosticReport, SemanticTokenType,
     SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
@@ -153,6 +154,7 @@ impl ServerLanguage {
                     full: Some(SemanticTokensFullOptions::Bool(true)),
                 }),
             ),
+            document_formatting_provider: Some(OneOf::Left(Self::is_clang_format_available())),
             ..Default::default()
         })?;
         let _client_initialization_params =
@@ -652,6 +654,24 @@ impl ServerLanguage {
                     None => self.connection.send_notification_error(format!(
                         "Trying to visit file that is not watched : {}",
                         uri
+                    )),
+                }
+            }
+            Formatting::METHOD => {
+                let params: DocumentFormattingParams = serde_json::from_value(req.params)?;
+                profile_scope!(
+                    "Received formatting request #{}: {}",
+                    req.id,
+                    self.debug(&params)
+                );
+                let uri = clean_url(&params.text_document.uri);
+                match self.recolt_formatting(&uri) {
+                    Ok(formatting) => self
+                        .connection
+                        .send_response::<Formatting>(req.id.clone(), Some(formatting)),
+                    Err(err) => self.connection.send_notification_error(format!(
+                        "Failed to recolt formatting for {}: {}",
+                        uri, err
                     )),
                 }
             }
