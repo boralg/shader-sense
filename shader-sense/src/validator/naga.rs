@@ -48,12 +48,12 @@ impl Naga {
 impl Validator for Naga {
     fn validate_shader(
         &mut self,
-        shader_content: &String,
+        shader_content: &str,
         file_path: &Path,
         _params: &ValidationParams,
         _include_callback: &mut dyn FnMut(&Path) -> Option<String>,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
-        let module = match wgsl::parse_str(&shader_content)
+        let module = match wgsl::parse_str(shader_content)
             .map_err(|err| Self::from_parse_err(err, file_path, shader_content))
         {
             Ok(module) => module,
@@ -65,7 +65,7 @@ impl Validator for Naga {
         if let Err(error) = self.validator.validate(&module) {
             let mut list = ShaderDiagnosticList::empty();
             for (span, _) in error.spans() {
-                let loc = span.location(&shader_content);
+                let loc = span.location(shader_content);
                 list.push(ShaderDiagnostic {
                     severity: ShaderDiagnosticSeverity::Error,
                     error: error.emit_to_string(""),
@@ -85,7 +85,7 @@ impl Validator for Naga {
             }
             if list.is_empty() {
                 Err(ShaderError::InternalErr(
-                    error.emit_to_string(&shader_content),
+                    error.emit_to_string(shader_content),
                 ))
             } else {
                 Ok(list)

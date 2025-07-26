@@ -63,6 +63,8 @@ impl ServerLanguage {
         match &cached_file.shading_language {
             ShadingLanguage::Wgsl => {
                 // TODO: Find a formatter for wgsl.
+                // naga does not provide much for this...
+                // wgsl analyzer does its own parsing https://github.com/wgsl-analyzer/wgsl-analyzer/blob/main/crates/wgsl_formatter/src/lib.rs
                 Ok(vec![])
             }
             // HLSL & GLSL can rely on clang-format.

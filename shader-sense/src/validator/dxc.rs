@@ -243,7 +243,7 @@ fn get_profile(shader_stage: Option<ShaderStage>) -> &'static str {
 impl Validator for Dxc {
     fn validate_shader(
         &mut self,
-        shader_source: &String,
+        shader_source: &str,
         file_path: &Path,
         params: &ValidationParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
@@ -252,7 +252,7 @@ impl Validator for Dxc {
 
         let blob = match self
             .library
-            .create_blob_with_encoding_from_str(&shader_source)
+            .create_blob_with_encoding_from_str(shader_source)
         {
             Ok(blob) => blob,
             Err(err) => match self.from_hassle_error(err, file_path, &params) {

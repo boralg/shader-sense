@@ -243,7 +243,7 @@ impl Glslang {
 impl Validator for Glslang {
     fn validate_shader(
         &mut self,
-        content: &String,
+        content: &str,
         file_path: &Path,
         params: &ValidationParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
@@ -252,27 +252,27 @@ impl Validator for Glslang {
 
         let (shader_stage, shader_source, offset_first_line) =
             if let Some(variant_stage) = params.shader_stage {
-                (variant_stage, content.clone(), false)
+                (variant_stage, content.into(), false)
             } else if let Some(shader_stage) = ShaderStage::from_file_name(&file_name) {
-                (shader_stage, content.clone(), false)
+                (shader_stage, content.into(), false)
             } else {
                 // If we dont have a stage, might require some preprocess to avoid errors.
                 // glslang **REQUIRES** to have stage for linting.
                 let default_stage = ShaderStage::Fragment;
                 if self.hlsl {
                     // HLSL does not require version, simply assume stage.
-                    (default_stage, content.clone(), false)
+                    (default_stage, content.into(), false)
                 } else {
                     // glslang does not support linting header file, so to lint them,
                     // Assume Fragment & add default #version if missing
                     if content.contains("#version ") {
                         // Main file with missing stage.
-                        (default_stage, content.clone(), false)
+                        (default_stage, content.into(), false)
                     } else {
                         // Header file with missing stage & missing version.
                         // WARN: Assumed this string is one line offset only.
                         let version_header = String::from("#version 450\n");
-                        (default_stage, version_header + content.as_str(), true)
+                        (default_stage, version_header + content, true)
                     }
                 }
             };

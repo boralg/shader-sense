@@ -29,7 +29,7 @@ pub fn default_include_callback(path: &Path) -> Option<String> {
 pub trait Validator {
     fn validate_shader(
         &mut self, // mut because Naga requires mut for validation...
-        shader_content: &String,
+        shader_content: &str,
         file_path: &Path,
         params: &ValidationParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
