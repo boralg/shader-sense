@@ -86,11 +86,13 @@ impl ServerLanguage {
                     shader_module.content.len()
                 );
                 let mut child = Command::new("clang-format")
-                    //.arg(format!("--style={}", style.as_str()))
-                    .arg("--offset")
-                    .arg(format!("{}", offset))
-                    .arg("--length")
-                    .arg(format!("{}", length))
+                    // Required for finding .clang-format
+                    .arg(format!(
+                        "--assume-filename={}",
+                        shader_module.file_path.display()
+                    ))
+                    .arg(format!("--offset={}", offset))
+                    .arg(format!("--length={}", length))
                     //.arg("--style")
                     //.arg("file") // need a .clang-format file for style
                     //.arg("--fallback-style")
