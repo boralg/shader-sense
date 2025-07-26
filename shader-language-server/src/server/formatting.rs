@@ -5,9 +5,11 @@ use std::{
 };
 
 use log::info;
-use lsp_types::{Position, Range, TextEdit, Url};
+use lsp_types::{TextEdit, Url};
+use shader_sense::symbols::symbols::ShaderRange;
 use shader_sense::{shader::ShadingLanguage, shader_error::ShaderError};
 
+use crate::server::common::shader_range_to_lsp_range;
 use crate::server::ServerLanguage;
 
 impl ServerLanguage {
@@ -51,7 +53,12 @@ impl ServerLanguage {
             }
         }
     }
-    pub fn recolt_formatting(&self, uri: &Url) -> Result<Vec<TextEdit>, ShaderError> {
+    pub fn recolt_formatting(
+        &self,
+        uri: &Url,
+        range: Option<ShaderRange>,
+    ) -> Result<Vec<TextEdit>, ShaderError> {
+        let file_path = uri.to_file_path().unwrap();
         let cached_file = self.watched_files.get_file(uri).unwrap();
         match &cached_file.shading_language {
             ShadingLanguage::Wgsl => {
@@ -60,41 +67,52 @@ impl ServerLanguage {
             }
             // HLSL & GLSL can rely on clang-format.
             ShadingLanguage::Hlsl | ShadingLanguage::Glsl => {
+                let shader_module = RefCell::borrow(&cached_file.shader_module);
+                let (offset, length) = match &range {
+                    Some(range) => {
+                        let byte_offset_start =
+                            range.start.to_byte_offset(&shader_module.content)?;
+                        let byte_offset_end = range.end.to_byte_offset(&shader_module.content)?;
+                        let byte_length = byte_offset_end - byte_offset_start;
+                        assert!(byte_length <= shader_module.content.len());
+                        (byte_offset_start, byte_length)
+                    }
+                    None => (0, shader_module.content.len()),
+                };
+                info!(
+                    "Offset {} and length {} for content {}",
+                    offset,
+                    length,
+                    shader_module.content.len()
+                );
                 let mut child = Command::new("clang-format")
                     //.arg(format!("--style={}", style.as_str()))
+                    .arg("--offset")
+                    .arg(format!("{}", offset))
+                    .arg("--length")
+                    .arg(format!("{}", length))
+                    //.arg("--style")
+                    //.arg("file") // need a .clang-format file for style
+                    //.arg("--fallback-style")
+                    //.arg("")
                     .stdin(Stdio::piped())
                     .stdout(Stdio::piped())
                     .spawn()?;
                 // Note we place inside a scope to ensure that stdin is closed
                 {
                     let mut stdin = child.stdin.take().expect("no stdin handle");
-                    write!(
-                        stdin,
-                        "{}",
-                        RefCell::borrow(&cached_file.shader_module).content
-                    )?;
+                    write!(stdin, "{}", &shader_module.content)?;
                 }
                 // Wait for the output and mark it as big edit chunk.
                 let output = child.wait_with_output()?;
                 if output.status.success() {
-                    let shader_module = RefCell::borrow(&cached_file.shader_module);
-                    let original_code = &shader_module.content;
                     let formatted_code = String::from_utf8(output.stdout)
                         .map_err(|e| ShaderError::InternalErr(e.utf8_error().to_string()))?;
                     Ok(vec![TextEdit {
-                        range: Range {
-                            start: Position {
-                                line: 0,
-                                character: 0,
-                            },
-                            end: Position {
-                                line: (original_code.lines().count()) as u32, // Last line
-                                character: match original_code.lines().last() {
-                                    Some(last_line) => (last_line.char_indices().count()) as u32,
-                                    None => (original_code.char_indices().count()) as u32, // No last line, means no line, pick string length
-                                },
-                            },
-                        },
+                        range: shader_range_to_lsp_range(&ShaderRange::whole(
+                            &file_path,
+                            &shader_module.content,
+                        )),
                         new_text: formatted_code,
                     }])
                 } else {

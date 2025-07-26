@@ -32,19 +32,21 @@ use lsp_types::notification::{
 };
 use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, FoldingRangeRequest, Formatting,
-    GotoDefinition, HoverRequest, InlayHintRequest, Request, SemanticTokensFullRequest,
-    SignatureHelpRequest, WorkspaceConfiguration, WorkspaceSymbolRequest,
+    GotoDefinition, HoverRequest, InlayHintRequest, RangeFormatting, Request,
+    SemanticTokensFullRequest, SignatureHelpRequest, WorkspaceConfiguration,
+    WorkspaceSymbolRequest,
 };
 use lsp_types::{
     CompletionOptionsCompletionItem, CompletionParams, CompletionResponse, ConfigurationParams,
     DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentDiagnosticReportResult,
-    DocumentFormattingParams, DocumentSymbolOptions, DocumentSymbolParams, DocumentSymbolResponse,
-    FoldingRange, FoldingRangeKind, FoldingRangeParams, FoldingRangeProviderCapability,
-    FullDocumentDiagnosticReport, GotoDefinitionParams, HoverParams, HoverProviderCapability,
-    InlayHintParams, OneOf, RelatedFullDocumentDiagnosticReport, SemanticTokenType,
-    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
+    DocumentFormattingParams, DocumentRangeFormattingParams, DocumentSymbolOptions,
+    DocumentSymbolParams, DocumentSymbolResponse, FoldingRange, FoldingRangeKind,
+    FoldingRangeParams, FoldingRangeProviderCapability, FullDocumentDiagnosticReport,
+    GotoDefinitionParams, HoverParams, HoverProviderCapability, InlayHintParams, OneOf,
+    RelatedFullDocumentDiagnosticReport, SemanticTokenType, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
     SignatureHelpParams, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
     WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
@@ -61,6 +63,7 @@ use server_language_data::ServerLanguageData;
 use shader_variant::{DidChangeShaderVariant, DidChangeShaderVariantParams};
 
 use crate::profile_scope;
+use crate::server::common::lsp_range_to_shader_range;
 
 pub struct ServerLanguage {
     connection: ServerConnection,
@@ -155,6 +158,9 @@ impl ServerLanguage {
                 }),
             ),
             document_formatting_provider: Some(OneOf::Left(Self::is_clang_format_available())),
+            document_range_formatting_provider: Some(
+                OneOf::Left(Self::is_clang_format_available()),
+            ),
             ..Default::default()
         })?;
         let _client_initialization_params =
@@ -665,7 +671,29 @@ impl ServerLanguage {
                     self.debug(&params)
                 );
                 let uri = clean_url(&params.text_document.uri);
-                match self.recolt_formatting(&uri) {
+                match self.recolt_formatting(&uri, None) {
+                    Ok(formatting) => self
+                        .connection
+                        .send_response::<Formatting>(req.id.clone(), Some(formatting)),
+                    Err(err) => self.connection.send_notification_error(format!(
+                        "Failed to recolt formatting for {}: {}",
+                        uri, err
+                    )),
+                }
+            }
+            RangeFormatting::METHOD => {
+                let params: DocumentRangeFormattingParams = serde_json::from_value(req.params)?;
+                profile_scope!(
+                    "Received formatting range request #{}: {}",
+                    req.id,
+                    self.debug(&params)
+                );
+                let uri = clean_url(&params.text_document.uri);
+                let file_path = uri.to_file_path().unwrap();
+                match self.recolt_formatting(
+                    &uri,
+                    Some(lsp_range_to_shader_range(&params.range, &file_path)),
+                ) {
                     Ok(formatting) => self
                         .connection
                         .send_response::<Formatting>(req.id.clone(), Some(formatting)),
