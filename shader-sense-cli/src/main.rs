@@ -1,0 +1,291 @@
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    path::Path,
+    rc::Rc,
+};
+
+use colored::Colorize;
+use shader_sense::{
+    shader::{
+        GlslShadingLanguageTag, GlslSpirvVersion, GlslTargetClient, HlslShaderModel,
+        HlslShadingLanguageTag, HlslVersion, ShaderStage, ShadingLanguage, ShadingLanguageTag,
+        WgslShadingLanguageTag,
+    },
+    shader_error::ShaderDiagnosticSeverity,
+    symbols::{
+        shader_language::ShaderLanguage, symbol_provider::ShaderSymbolParams,
+        symbols::ShaderSymbolType,
+    },
+    validator::{create_validator, validator::ValidationParams},
+};
+
+fn get_version() -> &'static str {
+    static VERSION: &str = env!("CARGO_PKG_VERSION");
+    return VERSION;
+}
+
+fn print_version() {
+    println!("shader-sense-cli v{}", get_version());
+}
+
+pub fn usage() {
+    print_version();
+    println!("Overview: Command line to validate shaders & inspect symbols.");
+    println!("Usage: shader-sense-cli [OPTIONS] <FILE>");
+    println!();
+    println!("Options:");
+    println!("  --hlsl                Use HLSL shading language (default)");
+    println!("  --glsl                Use GLSL shading language");
+    println!("  --wgsl                Use WGSL shading language");
+    println!("  -D, --define <DEF>    Define a macro");
+    println!("  -I, --include <PATH>  Add an include directory");
+    println!("  -E, --entry-point <NAME>  Specify the shader entry point");
+    println!("  -S, --stage <STAGE>   Specify shader stage (vertex, fragment, compute, mesh, task, control, evaluation, geometry)");
+    println!("  --validate            Validate the shader");
+    println!("  --functions           List functions");
+    println!("  --includes            List includes");
+    println!("  --macros              List macros");
+    println!("  --variables           List variables");
+    println!("  --constants           List constants");
+    println!("  --keywords            List keywords");
+    println!("  --types               List types");
+    println!("  --version, -v         Print version information");
+    println!("  --help, -h            Print this message");
+    println!();
+    println!("Example:");
+    println!("  shader-sense-cli --hlsl -E main -S vertex shader.hlsl");
+}
+
+pub fn main() {
+    let mut args = std::env::args().into_iter();
+
+    let mut file_name: Option<String> = None;
+    let mut should_validate = false;
+    let mut should_parse_symbols: HashSet<ShaderSymbolType> = HashSet::new();
+    let mut shading_language = ShadingLanguage::Hlsl;
+    let mut defines = Vec::new();
+    let mut includes = Vec::new();
+    let mut entry_point = None;
+    let mut shader_stage = None;
+    let _exe = args.next().unwrap();
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--hlsl" => {
+                shading_language = ShadingLanguage::Hlsl;
+            }
+            "--glsl" => {
+                shading_language = ShadingLanguage::Glsl;
+            }
+            "--wgsl" => {
+                shading_language = ShadingLanguage::Wgsl;
+            }
+            "-D" | "--define" => match args.next() {
+                Some(define) => defines.push(define),
+                None => {
+                    println!("Missing define value");
+                    usage();
+                }
+            },
+            "-I" | "--include" => match args.next() {
+                Some(include) => includes.push(include),
+                None => {
+                    println!("Missing include value");
+                    usage();
+                }
+            },
+            "-E" | "--entry-point" => match args.next() {
+                Some(value_entry_point) => entry_point = Some(value_entry_point),
+                None => {
+                    println!("Missing entry point value");
+                    usage();
+                }
+            },
+            "-S" | "--stage" => match args.next() {
+                Some(stage) => match stage.as_str() {
+                    "vertex" => shader_stage = Some(ShaderStage::Vertex),
+                    "fragment" | "pixel" => shader_stage = Some(ShaderStage::Fragment),
+                    "compute" => shader_stage = Some(ShaderStage::Compute),
+                    "mesh" => shader_stage = Some(ShaderStage::Mesh),
+                    "task" | "amplification" => shader_stage = Some(ShaderStage::Task),
+                    "control" | "hull" => shader_stage = Some(ShaderStage::TesselationControl),
+                    "evaluation" | "domain" => {
+                        shader_stage = Some(ShaderStage::TesselationEvaluation)
+                    }
+                    "geometry" => shader_stage = Some(ShaderStage::Geometry),
+                    stage => println!("Unknown shader stage {}", stage),
+                },
+                None => {
+                    println!("Missing stage value");
+                    usage();
+                }
+            },
+            "--validate" => {
+                should_validate = true;
+            }
+            "--functions" => {
+                should_parse_symbols.insert(ShaderSymbolType::Functions);
+            }
+            "--includes" => {
+                should_parse_symbols.insert(ShaderSymbolType::Include);
+            }
+            "--macros" => {
+                should_parse_symbols.insert(ShaderSymbolType::Macros);
+            }
+            "--variables" => {
+                should_parse_symbols.insert(ShaderSymbolType::Variables);
+            }
+            "--constants" => {
+                should_parse_symbols.insert(ShaderSymbolType::Constants);
+            }
+            "--keywords" => {
+                should_parse_symbols.insert(ShaderSymbolType::Keyword);
+            }
+            "--types" => {
+                should_parse_symbols.insert(ShaderSymbolType::Types);
+            }
+            "--version" | "-v" => {
+                print_version();
+            }
+            "--help" | "-h" => {
+                usage();
+            }
+            parsed_file_name => match &mut file_name {
+                Some(_) => usage(),
+                None => {
+                    file_name = Some(parsed_file_name.into());
+                }
+            },
+        }
+    }
+    match file_name {
+        Some(file_name) => {
+            let shader_path = Path::new(&file_name);
+            let shader_content = std::fs::read_to_string(shader_path).unwrap();
+            // By default validate (if we dont parse symbols)
+            if should_validate || should_parse_symbols.is_empty() {
+                // Validator intended to validate a file using standard API.
+                let mut validator = create_validator(shading_language);
+                match validator.validate_shader(
+                    &shader_content,
+                    shader_path,
+                    &ValidationParams {
+                        entry_point: entry_point,
+                        shader_stage: shader_stage,
+                        includes: includes,
+                        defines: defines.into_iter().map(|d| (d, "1".to_owned())).collect(),
+                        path_remapping: HashMap::new(),
+                        hlsl_shader_model: HlslShaderModel::ShaderModel6_8,
+                        hlsl_version: HlslVersion::V2018,
+                        hlsl_enable16bit_types: false,
+                        hlsl_spirv: false,
+                        glsl_client: GlslTargetClient::Vulkan1_3,
+                        glsl_spirv: GlslSpirvVersion::SPIRV1_6,
+                    },
+                    &mut |path: &Path| Some(std::fs::read_to_string(path).unwrap()),
+                ) {
+                    Ok(diagnostic_list) => {
+                        // Pretty print errors
+                        for diagnostic in diagnostic_list.diagnostics {
+                            let filename = diagnostic.range.start.file_path.file_name().unwrap();
+                            let formatted_path = format!(
+                                "{}:{}:{}",
+                                filename.display(),
+                                diagnostic.range.start.line,
+                                diagnostic.range.start.pos
+                            );
+                            let header = match diagnostic.severity {
+                                ShaderDiagnosticSeverity::Error => {
+                                    format!("❌ Error at {}", formatted_path).red().bold()
+                                }
+                                ShaderDiagnosticSeverity::Warning => {
+                                    format!("⚠️ Warning at {}", formatted_path).yellow().bold()
+                                }
+                                ShaderDiagnosticSeverity::Information => {
+                                    format!("ℹ️️  Information at {}", formatted_path)
+                                        .blue()
+                                        .bold()
+                                }
+                                ShaderDiagnosticSeverity::Hint => {
+                                    format!("💡 Hint at {}", formatted_path).blue().bold()
+                                }
+                            };
+                            println!("{}\n{}", header, diagnostic.error);
+                        }
+                    }
+                    Err(err) => println!("Failed to validate file: {:#?}", err),
+                }
+            }
+            if !should_parse_symbols.is_empty() {
+                // SymbolProvider intended to gather file symbol at runtime by inspecting the AST.
+                let mut language = ShaderLanguage::new(match shading_language {
+                    ShadingLanguage::Wgsl => WgslShadingLanguageTag::get_language(),
+                    ShadingLanguage::Hlsl => HlslShadingLanguageTag::get_language(),
+                    ShadingLanguage::Glsl => GlslShadingLanguageTag::get_language(),
+                });
+                let symbol_provider = language.create_symbol_provider();
+                match language.create_module(shader_path, &shader_content) {
+                    Ok(shader_module) => {
+                        let symbols = symbol_provider
+                            .query_symbols(
+                                &shader_module,
+                                ShaderSymbolParams::default(),
+                                &mut |include| {
+                                    let include_module = language.create_module(
+                                        &include.get_absolute_path(),
+                                        std::fs::read_to_string(&include.get_absolute_path())
+                                            .unwrap()
+                                            .as_str(),
+                                    )?;
+                                    Ok(Some(Rc::new(RefCell::new(include_module))))
+                                },
+                                None,
+                            )
+                            .unwrap();
+                        let symbol_list = symbols.get_all_symbols();
+                        for symbol in symbol_list.iter() {
+                            let header = match &symbol.range {
+                                Some(range) => format!(
+                                    "{}:{}:{}",
+                                    range.start.file_path.file_name().unwrap().display(),
+                                    range.start.line,
+                                    range.start.pos
+                                ),
+                                None => symbol.format(),
+                            };
+                            let icon = match &symbol.get_type() {
+                                Some(ty) => {
+                                    if !should_parse_symbols.contains(ty) {
+                                        continue;
+                                    }
+                                    match ty {
+                                        ShaderSymbolType::Types => {
+                                            format!("{} {}", "{}".white().bold(), "Type").yellow()
+                                        }
+                                        ShaderSymbolType::Constants => "♾️ Constant".yellow(),
+                                        ShaderSymbolType::Functions => "⚙️ Function".yellow(),
+                                        ShaderSymbolType::Keyword => {
+                                            format!("{} {}", "</>".white().bold(), "Keyword")
+                                                .yellow()
+                                        }
+                                        ShaderSymbolType::Variables => "🔡 Variable".yellow(),
+                                        ShaderSymbolType::CallExpression => continue,
+                                        ShaderSymbolType::Include => "🔗 Include".yellow(),
+                                        ShaderSymbolType::Macros => "✏️  Macro".yellow(),
+                                    }
+                                }
+                                None => continue,
+                            };
+                            println!("{} {} {}", icon, header.blue(), symbol.format().italic());
+                        }
+                    }
+                    Err(err) => println!("Failed to create ast: {:#?}", err),
+                }
+            }
+        }
+        None => {
+            println!("Missing a filename.");
+            usage();
+        }
+    }
+}

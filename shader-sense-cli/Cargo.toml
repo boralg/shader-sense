@@ -1,0 +1,8 @@
+[package]
+name = "shader-sense-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+colored = "3.0.0"
+shader-sense = { version = "0.4.0", path = "../shader-sense" }
