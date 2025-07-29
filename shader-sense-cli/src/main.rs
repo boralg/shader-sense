@@ -62,7 +62,7 @@ pub fn main() {
 
     let mut file_name: Option<String> = None;
     let mut should_validate = false;
-    let mut should_parse_symbols: HashSet<ShaderSymbolType> = HashSet::new();
+    let mut symbol_type_to_print: HashSet<ShaderSymbolType> = HashSet::new();
     let mut shading_language = ShadingLanguage::Hlsl;
     let mut defines = Vec::new();
     let mut includes = Vec::new();
@@ -124,25 +124,25 @@ pub fn main() {
                 should_validate = true;
             }
             "--functions" => {
-                should_parse_symbols.insert(ShaderSymbolType::Functions);
+                symbol_type_to_print.insert(ShaderSymbolType::Functions);
             }
             "--includes" => {
-                should_parse_symbols.insert(ShaderSymbolType::Include);
+                symbol_type_to_print.insert(ShaderSymbolType::Include);
             }
             "--macros" => {
-                should_parse_symbols.insert(ShaderSymbolType::Macros);
+                symbol_type_to_print.insert(ShaderSymbolType::Macros);
             }
             "--variables" => {
-                should_parse_symbols.insert(ShaderSymbolType::Variables);
+                symbol_type_to_print.insert(ShaderSymbolType::Variables);
             }
             "--constants" => {
-                should_parse_symbols.insert(ShaderSymbolType::Constants);
+                symbol_type_to_print.insert(ShaderSymbolType::Constants);
             }
             "--keywords" => {
-                should_parse_symbols.insert(ShaderSymbolType::Keyword);
+                symbol_type_to_print.insert(ShaderSymbolType::Keyword);
             }
             "--types" => {
-                should_parse_symbols.insert(ShaderSymbolType::Types);
+                symbol_type_to_print.insert(ShaderSymbolType::Types);
             }
             "--version" | "-v" => {
                 print_version();
@@ -163,7 +163,7 @@ pub fn main() {
             let shader_path = Path::new(&file_name);
             let shader_content = std::fs::read_to_string(shader_path).unwrap();
             // By default validate (if we dont parse symbols)
-            if should_validate || should_parse_symbols.is_empty() {
+            if should_validate || symbol_type_to_print.is_empty() {
                 // Validator intended to validate a file using standard API.
                 let mut validator = create_validator(shading_language);
                 match validator.validate_shader(
@@ -185,38 +185,46 @@ pub fn main() {
                     &mut |path: &Path| Some(std::fs::read_to_string(path).unwrap()),
                 ) {
                     Ok(diagnostic_list) => {
-                        // Pretty print errors
-                        for diagnostic in diagnostic_list.diagnostics {
-                            let filename = diagnostic.range.start.file_path.file_name().unwrap();
-                            let formatted_path = format!(
-                                "{}:{}:{}",
-                                filename.display(),
-                                diagnostic.range.start.line,
-                                diagnostic.range.start.pos
+                        if diagnostic_list.is_empty() {
+                            println!(
+                                "{}",
+                                "✅ Success ! Shader validation found no error.".green()
                             );
-                            let header = match diagnostic.severity {
-                                ShaderDiagnosticSeverity::Error => {
-                                    format!("❌ Error at {}", formatted_path).red().bold()
-                                }
-                                ShaderDiagnosticSeverity::Warning => {
-                                    format!("⚠️ Warning at {}", formatted_path).yellow().bold()
-                                }
-                                ShaderDiagnosticSeverity::Information => {
-                                    format!("ℹ️️  Information at {}", formatted_path)
-                                        .blue()
-                                        .bold()
-                                }
-                                ShaderDiagnosticSeverity::Hint => {
-                                    format!("💡 Hint at {}", formatted_path).blue().bold()
-                                }
-                            };
-                            println!("{}\n{}", header, diagnostic.error);
+                        } else {
+                            // Pretty print errors
+                            for diagnostic in diagnostic_list.diagnostics {
+                                let filename =
+                                    diagnostic.range.start.file_path.file_name().unwrap();
+                                let formatted_path = format!(
+                                    "{}:{}:{}",
+                                    filename.display(),
+                                    diagnostic.range.start.line,
+                                    diagnostic.range.start.pos
+                                );
+                                let header = match diagnostic.severity {
+                                    ShaderDiagnosticSeverity::Error => {
+                                        format!("❌ Error at {}", formatted_path).red().bold()
+                                    }
+                                    ShaderDiagnosticSeverity::Warning => {
+                                        format!("⚠️  Warning at {}", formatted_path).yellow().bold()
+                                    }
+                                    ShaderDiagnosticSeverity::Information => {
+                                        format!("ℹ️️  Information at {}", formatted_path)
+                                            .blue()
+                                            .bold()
+                                    }
+                                    ShaderDiagnosticSeverity::Hint => {
+                                        format!("💡 Hint at {}", formatted_path).blue().bold()
+                                    }
+                                };
+                                println!("{}\n{}", header, diagnostic.error.italic());
+                            }
                         }
                     }
                     Err(err) => println!("Failed to validate file: {:#?}", err),
                 }
             }
-            if !should_parse_symbols.is_empty() {
+            if !symbol_type_to_print.is_empty() {
                 // SymbolProvider intended to gather file symbol at runtime by inspecting the AST.
                 let mut language = ShaderLanguage::new(match shading_language {
                     ShadingLanguage::Wgsl => WgslShadingLanguageTag::get_language(),
@@ -243,6 +251,7 @@ pub fn main() {
                             )
                             .unwrap();
                         let symbol_list = symbols.get_all_symbols();
+                        let mut found_some_symbols = false;
                         for symbol in symbol_list.iter() {
                             let header = match &symbol.range {
                                 Some(range) => format!(
@@ -255,7 +264,7 @@ pub fn main() {
                             };
                             let icon = match &symbol.get_type() {
                                 Some(ty) => {
-                                    if !should_parse_symbols.contains(ty) {
+                                    if !symbol_type_to_print.contains(ty) {
                                         continue;
                                     }
                                     match ty {
@@ -263,7 +272,7 @@ pub fn main() {
                                             format!("{} {}", "{}".white().bold(), "Type").yellow()
                                         }
                                         ShaderSymbolType::Constants => "♾️ Constant".yellow(),
-                                        ShaderSymbolType::Functions => "⚙️ Function".yellow(),
+                                        ShaderSymbolType::Functions => "⚙️  Function".yellow(),
                                         ShaderSymbolType::Keyword => {
                                             format!("{} {}", "</>".white().bold(), "Keyword")
                                                 .yellow()
@@ -276,7 +285,34 @@ pub fn main() {
                                 }
                                 None => continue,
                             };
+                            found_some_symbols = true;
                             println!("{} {} {}", icon, header.blue(), symbol.format().italic());
+                        }
+                        if !found_some_symbols {
+                            fn get_type_string(ty: &ShaderSymbolType) -> &'static str {
+                                match ty {
+                                    ShaderSymbolType::Types => "types",
+                                    ShaderSymbolType::Constants => "constants",
+                                    ShaderSymbolType::Variables => "variables",
+                                    ShaderSymbolType::CallExpression => "callExpression",
+                                    ShaderSymbolType::Functions => "functions",
+                                    ShaderSymbolType::Keyword => "keyword",
+                                    ShaderSymbolType::Macros => "macros",
+                                    ShaderSymbolType::Include => "include",
+                                }
+                            }
+                            println!(
+                                "{}",
+                                format!(
+                                    "⚠️  Couldn't find any symbol of type {}",
+                                    symbol_type_to_print
+                                        .iter()
+                                        .map(|t| get_type_string(t))
+                                        .collect::<Vec<&str>>()
+                                        .join(", ")
+                                )
+                                .yellow()
+                            )
                         }
                     }
                     Err(err) => println!("Failed to create ast: {:#?}", err),
