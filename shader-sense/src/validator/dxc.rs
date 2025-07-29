@@ -78,10 +78,10 @@ impl Dxc {
             }
             Err(_) => None,
         };
-        let dxc = hassle_rs::Dxc::new(folder)?;
+        let dxc = hassle_rs::Dxc::new(folder.clone())?;
         let library = dxc.create_library()?;
         let compiler = dxc.create_compiler()?;
-        let (dxil, validator) = match Dxil::new(None) {
+        let (dxil, validator) = match Dxil::new(folder) {
             Ok(dxil) => {
                 let validator_option = match dxil.create_validator() {
                     Ok(validator) => Some(validator),
