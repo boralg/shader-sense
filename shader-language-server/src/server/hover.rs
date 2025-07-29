@@ -28,65 +28,60 @@ impl ServerLanguage {
             &shader_position,
         ) {
             // word_range should be the same as symbol range
-            Ok((word, word_range)) => match self.watched_files.get_file(uri) {
-                Some(target_cached_file) => {
-                    let symbol_list = self
-                        .watched_files
-                        .get_all_symbols(uri, &language_data.language);
-                    let matching_symbols = symbol_list.find_symbols_at(&word, &shader_position);
-                    if matching_symbols.len() == 0 {
-                        Ok(None)
-                    } else {
-                        let symbol = &matching_symbols[0];
-                        let label = symbol.format();
-                        let description = symbol.description.clone();
-                        let link = match &symbol.link {
-                            Some(link) => format!("[Online documentation]({})", link),
-                            None => "".into(),
-                        };
-                        let location = match &symbol.range {
-                            Some(range) => format!(
-                                "Defined in {}, line {}",
-                                if range.start.file_path.as_os_str() == file_path.as_os_str() {
-                                    "this file".into()
-                                } else {
-                                    range.start.file_path.file_name().unwrap().to_string_lossy()
-                                },
-                                range.start.line + 1
-                            ),
-                            None => "".into(),
-                        };
-
-                        Ok(Some(Hover {
-                            contents: HoverContents::Markup(MarkupContent {
-                                kind: lsp_types::MarkupKind::Markdown,
-                                value: format!(
-                                    "```{}\n{}\n```\n{}{}\n{}\n\n{}",
-                                    target_cached_file.shading_language.to_string(),
-                                    label,
-                                    if matching_symbols.len() > 1 {
-                                        format!("(+{} symbol)\n\n", matching_symbols.len() - 1)
-                                    } else {
-                                        "".into()
-                                    },
-                                    description,
-                                    location,
-                                    link
-                                ),
-                            }),
-                            // Range of hovered element.
-                            range: if word_range.start.file_path.as_os_str()
-                                == file_path.as_os_str()
-                            {
-                                Some(shader_range_to_lsp_range(&word_range))
+            Ok((word, word_range)) => {
+                let symbol_list = self
+                    .watched_files
+                    .get_all_symbols(uri, &language_data.language);
+                let matching_symbols = symbol_list.find_symbols_at(&word, &shader_position);
+                if matching_symbols.len() == 0 {
+                    Ok(None)
+                } else {
+                    let symbol = &matching_symbols[0];
+                    let label = symbol.format();
+                    let description = symbol.description.clone();
+                    let link = match &symbol.link {
+                        Some(link) => format!("[Online documentation]({})", link),
+                        None => "".into(),
+                    };
+                    let location = match &symbol.range {
+                        Some(range) => format!(
+                            "Defined in {}, line {}",
+                            if range.start.file_path.as_os_str() == file_path.as_os_str() {
+                                "this file".into()
                             } else {
-                                None
+                                range.start.file_path.file_name().unwrap().to_string_lossy()
                             },
-                        }))
-                    }
+                            range.start.line + 1
+                        ),
+                        None => "".into(),
+                    };
+
+                    Ok(Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: lsp_types::MarkupKind::Markdown,
+                            value: format!(
+                                "```{}\n{}\n```\n{}{}\n{}\n\n{}",
+                                cached_file.shading_language.to_string(),
+                                label,
+                                if matching_symbols.len() > 1 {
+                                    format!("(+{} symbol)\n\n", matching_symbols.len() - 1)
+                                } else {
+                                    "".into()
+                                },
+                                description,
+                                location,
+                                link
+                            ),
+                        }),
+                        // Range of hovered element.
+                        range: if word_range.start.file_path.as_os_str() == file_path.as_os_str() {
+                            Some(shader_range_to_lsp_range(&word_range))
+                        } else {
+                            None
+                        },
+                    }))
                 }
-                None => Ok(None),
-            },
+            }
             Err(err) => {
                 if let ShaderError::NoSymbol = err {
                     Ok(None)
