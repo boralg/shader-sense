@@ -675,7 +675,7 @@ pub struct ShaderSymbol {
     pub scope_stack: Option<Vec<ShaderScope>>, // Stack of declaration
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub enum ShaderSymbolType {
     Types,
     Constants,
@@ -1150,7 +1150,14 @@ impl ShaderSymbol {
             ShaderSymbolData::Functions { signatures } => signatures[0].format(&self.label), // TODO: append +1 symbol
             ShaderSymbolData::Keyword {} => format!("{}", self.label.clone()),
             ShaderSymbolData::Link { target } => {
-                format!("\"{}\":{}:{}", self.label, target.line, target.pos)
+                if target.line == target.pos && target.line == 0 {
+                    format!("#include \"{}\"", self.label) // No need to display it as we are at start of file.
+                } else {
+                    format!(
+                        "#include \"{}\" at {}:{}",
+                        self.label, target.line, target.pos
+                    )
+                }
             }
             ShaderSymbolData::Macro { value } => {
                 format!("#define {} {}", self.label, value)
