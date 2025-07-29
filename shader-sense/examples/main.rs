@@ -36,7 +36,7 @@ fn query_all_symbol<T: ShadingLanguageTag>(shader_path: &Path, shader_content: &
                 .query_symbols(
                     &shader_module,
                     ShaderSymbolParams::default(),
-                    &mut default_include_callback::<GlslShadingLanguageTag>,
+                    &mut default_include_callback::<T>,
                     None,
                 )
                 .unwrap();
