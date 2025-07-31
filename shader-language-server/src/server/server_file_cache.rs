@@ -141,6 +141,9 @@ impl ServerLanguageFileCache {
             Some(dirty_deps) => dirty_deps == file_path,
             None => false,
         };
+        // Get old data and replace it by dummy to avoid empty data on early exit.
+        let old_data = self.files.get_mut(&uri).unwrap().data.take();
+        self.files.get_mut(&uri).unwrap().data = Some(ServerFileCacheData::default());
         // Check open files that depend on this file and require a recache.
         // Only needed if we changed the content. Not if we just opened the file.
         let updated_files = if should_propagate {
@@ -229,7 +232,6 @@ impl ServerLanguageFileCache {
         if let Some(dirty_deps) = dirty_deps {
             context.mark_dirty(dirty_deps);
         }
-        let old_data = self.files.get_mut(&uri).unwrap().data.take();
         // Get symbols for main file.
         let (symbols, symbol_diagnostics) = if config.get_symbols() {
             profile_scope!("Querying symbols for file {}", uri);
@@ -441,8 +443,6 @@ impl ServerLanguageFileCache {
                     "File {} already watched as main.",
                     uri
                 );
-                // Promote to main file.
-                cached_file.data = Some(ServerFileCacheData::default());
                 // Replace its content from request to make sure content is correct.
                 debug_assert!(
                     RefCell::borrow_mut(&cached_file.shader_module).content == *text,
@@ -463,7 +463,7 @@ impl ServerLanguageFileCache {
                 let cached_file = ServerFileCache {
                     shading_language: lang,
                     shader_module: shader_module,
-                    data: Some(ServerFileCacheData::default()),
+                    data: None, // Will be filled by cache_file_data
                 };
                 let none = self.files.insert(uri.clone(), cached_file);
                 assert!(none.is_none());
