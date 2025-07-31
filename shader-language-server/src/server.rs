@@ -924,42 +924,32 @@ impl ServerLanguage {
             DidChangeShaderVariant::METHOD => {
                 let params: DidChangeShaderVariantParams =
                     serde_json::from_value(notification.params)?;
-                let uri = clean_url(&params.text_document.uri);
+                let variant_uri = clean_url(&params.text_document.uri);
                 profile_scope!(
                     "Received did change shader variant notification: {}",
                     self.debug(&params)
                 );
                 // Store it in cache
                 if let Some(shader_variant) = params.shader_variant {
-                    self.watched_files.set_variant(uri.clone(), shader_variant);
+                    self.watched_files
+                        .set_variant(variant_uri.clone(), shader_variant);
                 } else {
-                    self.watched_files.remove_variant(uri.clone());
+                    self.watched_files.remove_variant(variant_uri.clone());
                 }
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        if cached_file.is_main_file() {
-                            let shading_language = cached_file.shading_language;
+                match self.watched_files.get_file(&variant_uri) {
+                    Some(variant_file) => {
+                        if variant_file.is_main_file() {
+                            let shading_language = variant_file.shading_language;
                             // Check all open files that rely on this variant and require a recache.
-                            let relying_on_variant_uris =
-                                self.watched_files.get_relying_files(&uri);
-                            let files_to_update: Vec<(Url, Option<PathBuf>)> = {
-                                let mut base = vec![(uri.clone(), None)];
-                                let mut additional: Vec<(Url, Option<PathBuf>)> =
-                                    relying_on_variant_uris
-                                        .into_iter()
-                                        .map(|f| {
-                                            info!(
-                                                "Updating relying file {} for variant {}",
-                                                f, uri
-                                            );
-                                            (f, Some(uri.to_file_path().unwrap()))
-                                        })
-                                        .collect();
-                                base.append(&mut additional);
-                                base
-                            };
-                            for (file_to_update, dirty_deps) in files_to_update {
-                                // Cache once all changes have been applied.
+                            // Put variant first as dependency will rely on it for update.
+                            let mut files_to_update = vec![variant_uri.clone()];
+                            files_to_update
+                                .extend(self.watched_files.get_relying_files(&variant_uri));
+                            for file_to_update in files_to_update {
+                                info!(
+                                    "Updating relying file {} for variant {}",
+                                    file_to_update, variant_uri
+                                );
                                 let language_data =
                                     self.language_data.get_mut(&shading_language).unwrap();
                                 match self.watched_files.cache_file_data(
@@ -968,7 +958,7 @@ impl ServerLanguage {
                                     &mut language_data.language,
                                     &language_data.symbol_provider,
                                     &self.config,
-                                    dirty_deps.as_ref().map(|e| e.as_path()),
+                                    None,
                                 ) {
                                     // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
                                     Ok(updated_files) => {
