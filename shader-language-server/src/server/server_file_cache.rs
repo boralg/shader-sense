@@ -164,7 +164,7 @@ impl ServerLanguageFileCache {
             // We recompute relying before computing deps, but marking this file as dirty, so should be fine.
             for dependent_file_uri in &files_to_update {
                 profile_scope!(
-                    "Updating file {} as it depend on {}",
+                    "Updating file {} as it depend or rely on {}",
                     dependent_file_uri,
                     uri
                 );
@@ -191,23 +191,10 @@ impl ServerLanguageFileCache {
             )
         } else {
             // Else, look for variant that include this file to get its context.
-            let includer_variant =
-                self.variants
-                    .iter()
-                    .find(|(url, _variant)| match self.files.get(url) {
-                        Some(cached_file) => {
-                            cached_file.is_main_file()
-                                && cached_file
-                                    .get_data()
-                                    .symbol_cache
-                                    .has_dependency(&file_path)
-                        }
-                        None => false,
-                    });
-            if let Some((variant_url, _includer_variant)) = includer_variant {
+            if let Some(variant_url) = self.get_relying_variant(uri) {
                 // Find variant cache & reuse it.
                 info!("Caching file {} from variant {}", uri, variant_url);
-                let variant_cached_file = self.files.get(variant_url).unwrap();
+                let variant_cached_file = self.files.get(&variant_url).unwrap();
                 let cached_file_as_include = variant_cached_file
                     .get_data()
                     .symbol_cache
@@ -233,7 +220,7 @@ impl ServerLanguageFileCache {
                     symbol_cache,
                     diagnostic_cache,
                 });
-                return Ok(updated_files);
+                return Ok([updated_files, vec![uri.clone()]].concat());
             } else {
                 info!("Caching file {} without variant", uri);
                 ShaderPreprocessorContext::main(&file_path, config.into_symbol_params(None))
@@ -287,6 +274,7 @@ impl ServerLanguageFileCache {
             let shader_module = Rc::clone(&self.files.get(uri).unwrap().shader_module);
 
             let mut diagnostic_list = {
+                // TODO: should print warning if validation is too long.
                 profile_scope!("Raw validation");
                 // Get variant & compute diagnostics from it.
                 let variant = if let Some(variant) = self.variants.get(uri) {
@@ -294,19 +282,7 @@ impl ServerLanguageFileCache {
                 } else {
                     // Here if we copied data from includer variant, we should never reach. Simply return None
                     assert!(
-                        self.variants
-                            .iter()
-                            .find(|(url, _variant)| match self.files.get(url) {
-                                Some(cached_file) => {
-                                    cached_file.is_main_file()
-                                        && cached_file
-                                            .get_data()
-                                            .symbol_cache
-                                            .has_dependency(&file_path)
-                                }
-                                None => false,
-                            })
-                            .is_none(),
+                        self.get_relying_variant(uri).is_none(),
                         "Should not be reached"
                     );
                     None
