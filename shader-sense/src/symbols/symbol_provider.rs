@@ -5,6 +5,7 @@ use tree_sitter::{Query, QueryCursor};
 use crate::{
     shader::ShadingLanguageTag,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
+    symbols::symbols::ShaderPreprocessorDefine,
 };
 
 use super::{
@@ -153,6 +154,7 @@ impl SymbolProvider {
         let symbol_list = if let ShaderPreprocessorMode::OnceVisited = preprocessor.mode {
             ShaderSymbolList::default() // if once, no symbols.
         } else {
+            // TODO: should not always need to recompute this.
             self.query_file_symbols(shader_module)?
         };
         Ok(ShaderSymbols {
@@ -168,17 +170,60 @@ impl SymbolProvider {
         old_symbols: Option<ShaderSymbols>,
     ) -> Result<ShaderSymbols, ShaderError> {
         let mut context = ShaderPreprocessorContext::main(&shader_module.file_path, symbol_params);
-        let preprocessor =
-            self.query_preprocessor(shader_module, &mut context, include_callback, old_symbols)?;
-        let symbol_list = if let ShaderPreprocessorMode::OnceVisited = preprocessor.mode {
-            ShaderSymbolList::default() // if once, no symbols.
+        self.query_symbols_with_context(shader_module, &mut context, include_callback, old_symbols)
+    }
+    pub(super) fn process_include<'a>(
+        &self,
+        context: &mut ShaderPreprocessorContext,
+        include: &mut ShaderPreprocessorInclude,
+        include_callback: &'a mut SymbolIncludeCallback<'a>,
+    ) -> Result<(), ShaderError> {
+        if context.increase_depth() {
+            // Get module handle using callback.
+            let result = match include_callback(&include)? {
+                Some(include_module_handle) => {
+                    // Include found, deal with it.
+                    let module = RefCell::borrow(&include_module_handle);
+                    match self.query_symbols_with_context(
+                        &module,
+                        context,
+                        include_callback,
+                        include.cache.take(),
+                    ) {
+                        Ok(cache) => {
+                            include.cache = Some(cache);
+                            Ok(())
+                        }
+                        Err(err) => Err(err),
+                    }
+                }
+                None => {
+                    // Include not found.
+                    Err(ShaderError::SymbolQueryError(
+                        format!("Failed to find include {}", include.get_relative_path()),
+                        include.get_range().clone(),
+                    ))
+                }
+            };
+            context.decrease_depth();
+            assert!(
+                include.cache.is_some(),
+                "Failed to compute cache for file {}",
+                include.get_absolute_path().display()
+            );
+            result
         } else {
-            self.query_file_symbols(shader_module)?
-        };
-        Ok(ShaderSymbols {
-            preprocessor,
-            symbol_list,
-        })
+            // Set empty symbols to avoid crash when getting symbols.
+            include.cache = Some(ShaderSymbols::default());
+            // Notify
+            return Err(ShaderError::SymbolQueryError(
+                format!(
+                    "Include {} reached maximum include depth",
+                    include.get_relative_path()
+                ),
+                include.get_range().clone(),
+            ));
+        }
     }
     fn query_preprocessor<'a>(
         &self,
@@ -189,58 +234,110 @@ impl SymbolProvider {
     ) -> Result<ShaderPreprocessor, ShaderError> {
         let mut preprocessor = ShaderPreprocessor::new(context.clone());
 
-        for parser in &self.preprocessor_parsers {
-            let mut query_cursor = QueryCursor::new();
-            for matches in query_cursor.matches(
-                &parser.1,
+        // Check if context dirty and we need a recompute
+        // or if we can reuse old_symbols instead.
+        let is_dirty = match &old_symbols {
+            Some(old_symbol) => old_symbol
+                .get_preprocessor()
+                .context
+                .is_dirty(&symbol_tree.file_path, &context),
+            None => true, // No old_symbol.
+        };
+        if is_dirty {
+            // Recompute everything as its dirty.
+            for parser in &self.preprocessor_parsers {
+                let mut query_cursor = QueryCursor::new();
+                for matches in query_cursor.matches(
+                    &parser.1,
+                    symbol_tree.tree.root_node(),
+                    symbol_tree.content.as_bytes(),
+                ) {
+                    parser.0.process_match(
+                        matches,
+                        &symbol_tree.file_path,
+                        &symbol_tree.content,
+                        &mut preprocessor,
+                        context,
+                    );
+                }
+            }
+            // Check pragma once macro.
+            if preprocessor.mode == ShaderPreprocessorMode::OnceVisited {
+                // Return a clean preprocessor.
+                let mut empty_preprocessor = ShaderPreprocessor::new(context.clone());
+                empty_preprocessor.mode = preprocessor.mode;
+                return Ok(empty_preprocessor);
+            }
+            // Query regions.
+            // Will filter includes & defines in inactive regions
+            preprocessor.regions = self.region_finder.query_regions_in_node(
+                symbol_tree,
+                self,
+                symbol_tree.tree.root_node(),
+                &mut preprocessor,
+                context,
+                include_callback,
+                old_symbols,
+            )?;
+            // Add errors
+            let mut query_error_cursor = QueryCursor::new();
+            for matches in query_error_cursor.matches(
+                &self.error_query,
                 symbol_tree.tree.root_node(),
                 symbol_tree.content.as_bytes(),
             ) {
-                parser.0.process_match(
-                    matches,
-                    &symbol_tree.file_path,
-                    &symbol_tree.content,
-                    &mut preprocessor,
-                    context,
-                );
+                preprocessor.diagnostics.push(ShaderDiagnostic {
+                    severity: ShaderDiagnosticSeverity::Warning,
+                    error:
+                        "Failed to parse this code. Some symbols might be missing from providers."
+                            .into(),
+                    range: ShaderRange::from_range(
+                        matches.captures[0].node.range(),
+                        &symbol_tree.file_path,
+                    ),
+                });
             }
+            Ok(preprocessor)
+        } else {
+            // Retrieve old symbol, maintain context up to date
+            let mut old_symbols = old_symbols.unwrap();
+            let included_preprocessor = old_symbols.get_preprocessor_mut();
+            let included_includes: Vec<&mut ShaderPreprocessorInclude> =
+                included_preprocessor.includes.iter_mut().collect();
+            let mut last_position = ShaderPosition::zero(symbol_tree.file_path.clone());
+            for included_include in included_includes {
+                // Append directory stack and defines.
+                context.push_directory_stack(included_include.get_absolute_path());
+                context.append_defines(
+                    included_preprocessor
+                        .defines
+                        .iter()
+                        .filter(|define| match define.get_range() {
+                            Some(range) => {
+                                range.start >= last_position
+                                    && range.end <= included_include.get_range().start
+                            }
+                            None => false, // Global define, already filled ?
+                        })
+                        .cloned()
+                        .collect::<Vec<ShaderPreprocessorDefine>>(),
+                );
+                self.process_include(context, included_include, include_callback)?;
+                last_position = included_include.get_range().end.clone();
+            }
+            // Add all defines after last include to context
+            let define_left = included_preprocessor
+                .defines
+                .iter_mut()
+                .filter(|define| match define.get_range() {
+                    Some(range) => range.start > last_position,
+                    None => false, // Global define
+                })
+                .map(|d| d.clone())
+                .collect::<Vec<ShaderPreprocessorDefine>>();
+            context.append_defines(define_left);
+            Ok(old_symbols.preprocessor)
         }
-        // Check pragma once macro.
-        if preprocessor.mode == ShaderPreprocessorMode::OnceVisited {
-            // Return a clean preprocessor.
-            let mut empty_preprocessor = ShaderPreprocessor::new(context.clone());
-            empty_preprocessor.mode = preprocessor.mode;
-            return Ok(empty_preprocessor);
-        }
-        // Query regions.
-        // Will filter includes & defines in inactive regions
-        preprocessor.regions = self.region_finder.query_regions_in_node(
-            symbol_tree,
-            self,
-            symbol_tree.tree.root_node(),
-            &mut preprocessor,
-            context,
-            include_callback,
-            old_symbols,
-        )?;
-        // Add errors
-        let mut query_error_cursor = QueryCursor::new();
-        for matches in query_error_cursor.matches(
-            &self.error_query,
-            symbol_tree.tree.root_node(),
-            symbol_tree.content.as_bytes(),
-        ) {
-            preprocessor.diagnostics.push(ShaderDiagnostic {
-                severity: ShaderDiagnosticSeverity::Warning,
-                error: "Failed to parse this code. Some symbols might be missing from providers."
-                    .into(),
-                range: ShaderRange::from_range(
-                    matches.captures[0].node.range(),
-                    &symbol_tree.file_path,
-                ),
-            });
-        }
-        Ok(preprocessor)
     }
     fn query_file_symbols(
         &self,

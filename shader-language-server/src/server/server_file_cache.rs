@@ -88,7 +88,7 @@ impl ServerLanguageFileCache {
             .map(|(url, _file)| url.clone())
             .collect()
     }
-    pub fn get_relying_on_files(&self, url: &Url) -> Vec<Url> {
+    pub fn get_relying_files(&self, url: &Url) -> Vec<Url> {
         match self.files.get(url) {
             Some(file) => {
                 let mut relying_on_files = Vec::new();
@@ -107,6 +107,22 @@ impl ServerLanguageFileCache {
             None => Vec::new(),
         }
     }
+    pub fn get_relying_variant(&self, url: &Url) -> Option<Url> {
+        let file_path = url.to_file_path().unwrap();
+        self.variants
+            .iter()
+            .find(|(url, _variant)| match self.files.get(url) {
+                Some(cached_file) => {
+                    cached_file.is_main_file()
+                        && cached_file
+                            .get_data()
+                            .symbol_cache
+                            .has_dependency(&file_path)
+                }
+                None => false,
+            })
+            .map(|(url, _)| url.clone())
+    }
     pub fn cache_file_data(
         &mut self,
         uri: &Url,
@@ -119,24 +135,34 @@ impl ServerLanguageFileCache {
         profile_scope!("Caching file data for file {}", uri);
         // Check if we cache this file for the first time.
         // Fill it default to avoid early return and empty cache.
-        let file = self.files.get_mut(uri).unwrap();
-        let is_initial_caching = match &mut file.data {
-            Some(data) => {
-                *data = ServerFileCacheData::default();
-                false
-            }
-            None => {
-                file.data = Some(ServerFileCacheData::default());
-                true
-            }
+        let file_path = uri.to_file_path().unwrap();
+        // Propagate caching only if the requested file is marked as dirty.
+        let should_propagate = match dirty_deps {
+            Some(dirty_deps) => dirty_deps == file_path,
+            None => false,
         };
         // Check open files that depend on this file and require a recache.
         // Only needed if we changed the content. Not if we just opened the file.
-        let updated_files = if !is_initial_caching {
-            let dependent_files_uri = self.get_dependent_files(&uri);
-            let mut updated_files = dependent_files_uri.clone();
+        let updated_files = if should_propagate {
+            // Here we ensure a possible variant is always recomputed first so that deps can copy their data.
+            let dependent_files_uri = match self.get_relying_variant(&uri) {
+                Some(variant_url) => {
+                    let mut dependent_files_uri = self.get_dependent_files(&uri);
+                    dependent_files_uri.retain(|dependent_url| *dependent_url != variant_url);
+                    let mut files_to_update = Vec::new();
+                    files_to_update.push(variant_url); // Update variant first
+                    files_to_update.extend(dependent_files_uri); // Update dependent files
+                    files_to_update
+                }
+                None => self.get_dependent_files(&uri),
+            };
+            let relying_files_uri = self.get_relying_files(&uri);
+            // Update dependent file & relying files as context might have changed for them.
+            let files_to_update = [dependent_files_uri, relying_files_uri].concat();
+
+            let mut updated_files = files_to_update.clone();
             // We recompute relying before computing deps, but marking this file as dirty, so should be fine.
-            for dependent_file_uri in &dependent_files_uri {
+            for dependent_file_uri in &files_to_update {
                 profile_scope!(
                     "Updating file {} as it depend on {}",
                     dependent_file_uri,
@@ -148,7 +174,7 @@ impl ServerLanguageFileCache {
                     shader_language,
                     symbol_provider,
                     config,
-                    Some(&uri.to_file_path().unwrap()),
+                    Some(&file_path),
                 )?);
             }
             updated_files
@@ -156,7 +182,6 @@ impl ServerLanguageFileCache {
             vec![]
         };
         // Prepare context depending on variant.
-        let file_path = uri.to_file_path().unwrap();
         let mut context = if let Some(variant) = self.variants.get(uri) {
             // If we have an active variant for this file, use it.
             info!("Caching file {} as variant", uri);
@@ -217,12 +242,7 @@ impl ServerLanguageFileCache {
         if let Some(dirty_deps) = dirty_deps {
             context.mark_dirty(dirty_deps);
         }
-        // Reset cache
-        let old_data = if is_initial_caching {
-            None
-        } else {
-            self.files.get_mut(&uri).unwrap().data.take()
-        };
+        let old_data = self.files.get_mut(&uri).unwrap().data.take();
         // Get symbols for main file.
         let (symbols, symbol_diagnostics) = if config.get_symbols() {
             profile_scope!("Querying symbols for file {}", uri);
@@ -445,6 +465,8 @@ impl ServerLanguageFileCache {
                     "File {} already watched as main.",
                     uri
                 );
+                // Promote to main file.
+                cached_file.data = Some(ServerFileCacheData::default());
                 // Replace its content from request to make sure content is correct.
                 debug_assert!(
                     RefCell::borrow_mut(&cached_file.shader_module).content == *text,
@@ -465,7 +487,7 @@ impl ServerLanguageFileCache {
                 let cached_file = ServerFileCache {
                     shading_language: lang,
                     shader_module: shader_module,
-                    data: None, // Data will be filled with cache_file_data
+                    data: Some(ServerFileCacheData::default()),
                 };
                 let none = self.files.insert(uri.clone(), cached_file);
                 assert!(none.is_none());
@@ -485,7 +507,7 @@ impl ServerLanguageFileCache {
             shader_language,
             symbol_provider,
             config,
-            None,
+            Some(&file_path), // Force update.
         )?;
         Ok(self.files.get(&uri).unwrap())
     }

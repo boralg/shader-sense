@@ -813,7 +813,7 @@ impl ServerLanguage {
                                             &mut language_data.language,
                                             &language_data.symbol_provider,
                                             &self.config,
-                                            None,
+                                            Some(&uri.to_file_path().unwrap()), // Force update
                                         ) {
                                             Ok(updated_files) => {
                                                 self.publish_diagnostic(&uri, None);
@@ -893,7 +893,7 @@ impl ServerLanguage {
                             &mut language_data.language,
                             &language_data.symbol_provider,
                             &self.config,
-                            None,
+                            Some(&uri.to_file_path().unwrap()),
                         ) {
                             Ok(updated_files) => {
                                 self.publish_diagnostic(&uri, Some(params.text_document.version));
@@ -941,7 +941,7 @@ impl ServerLanguage {
                             let shading_language = cached_file.shading_language;
                             // Check all open files that rely on this variant and require a recache.
                             let relying_on_variant_uris =
-                                self.watched_files.get_relying_on_files(&uri);
+                                self.watched_files.get_relying_files(&uri);
                             let files_to_update: Vec<(Url, Option<PathBuf>)> = {
                                 let mut base = vec![(uri.clone(), None)];
                                 let mut additional: Vec<(Url, Option<PathBuf>)> =
@@ -1035,7 +1035,7 @@ impl ServerLanguage {
                             &mut language_data.language,
                             &language_data.symbol_provider,
                             &server.config,
-                            None,
+                            Some(&url.to_file_path().unwrap()),
                         ) {
                             Ok(updated_files) => {
                                 file_to_republish.push(url.clone());

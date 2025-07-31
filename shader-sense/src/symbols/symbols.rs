@@ -403,6 +403,7 @@ impl ShaderPreprocessorContext {
             }
             true
         }
+        // TODO: should compare includes aswell ?
         !are_defines_equal(&context.defines, &self.defines)
             || context.dirty_files.contains(file_path)
     }
@@ -423,6 +424,7 @@ impl ShaderPreprocessorContext {
 #[derive(Debug, Clone)]
 pub struct ShaderPreprocessorInclude {
     // TODO: move cache to symbol data
+    // TODO: remove pub
     pub cache: Option<ShaderSymbols>,
     pub symbol: ShaderSymbol,
 }

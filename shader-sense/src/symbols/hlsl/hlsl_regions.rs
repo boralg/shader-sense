@@ -1,4 +1,4 @@
-use std::{cell::RefCell, num::ParseIntError, path::PathBuf};
+use std::num::ParseIntError;
 
 use tree_sitter::{Query, QueryCursor};
 
@@ -354,141 +354,6 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 .cloned()
                 .collect::<Vec<ShaderPreprocessorDefine>>()
         }
-        fn process_include<'a>(
-            symbol_provider: &SymbolProvider,
-            context: &mut ShaderPreprocessorContext,
-            include: &mut ShaderPreprocessorInclude,
-            include_callback: &'a mut SymbolIncludeCallback<'a>,
-            old_symbols: &mut Option<ShaderSymbols>,
-        ) -> Result<(), ShaderError> {
-            if context.increase_depth() {
-                let result = __process_include(
-                    symbol_provider,
-                    context,
-                    include,
-                    include_callback,
-                    old_symbols,
-                );
-                context.decrease_depth();
-                assert!(
-                    include.cache.is_some(),
-                    "Failed to compute cache for file {}",
-                    include.get_absolute_path().display()
-                );
-                result
-            } else {
-                // Set empty symbols to avoid crash when getting symbols.
-                include.cache = Some(ShaderSymbols::default());
-                // Notify
-                return Err(ShaderError::SymbolQueryError(
-                    format!(
-                        "Include {} reached maximum include depth",
-                        include.get_relative_path()
-                    ),
-                    include.get_range().clone(),
-                ));
-            }
-        }
-        fn __process_include<'a>(
-            symbol_provider: &SymbolProvider,
-            context: &mut ShaderPreprocessorContext,
-            include: &mut ShaderPreprocessorInclude,
-            include_callback: &'a mut SymbolIncludeCallback<'a>,
-            old_symbols: &mut Option<ShaderSymbols>,
-        ) -> Result<(), ShaderError> {
-            // Get module handle using callback.
-            let include_module_handle = match include_callback(&include)? {
-                Some(include_module_handle) => include_module_handle,
-                None => {
-                    // Include not found.
-                    return Err(ShaderError::SymbolQueryError(
-                        format!("Failed to find include {}", include.get_relative_path()),
-                        include.get_range().clone(),
-                    ));
-                }
-            };
-            // Check if we need to update.
-            let (is_dirty, include_old_cache) = match old_symbols {
-                Some(old_symbol) => match old_symbol
-                    .preprocessor
-                    .includes
-                    .iter_mut()
-                    .find(|i| i.get_absolute_path() == include.get_absolute_path())
-                {
-                    Some(old_include) => match old_include.cache.take() {
-                        Some(old_cache) => {
-                            if old_cache
-                                .get_preprocessor()
-                                .context
-                                .is_dirty(&include.get_absolute_path(), &context)
-                            {
-                                (true, Some(old_cache))
-                            } else {
-                                (false, Some(old_cache))
-                            }
-                        }
-                        None => (true, None), // No cache.
-                    },
-                    None => (true, None), // No cache in old_symbol.
-                },
-                None => (true, None), // No old_symbol.
-            };
-            // Update include symbols if dirty, or simply move from old symbols.
-            if is_dirty {
-                // Include found, deal with it.
-                let module = RefCell::borrow(&include_module_handle);
-                include.cache = Some(symbol_provider.query_symbols_with_context(
-                    &module,
-                    context,
-                    include_callback,
-                    include_old_cache,
-                )?);
-            } else {
-                assert!(include_old_cache.is_some(), "Not dirty, but missing cache.");
-
-                // Update cache.
-                include.cache = include_old_cache;
-
-                // Recurse all childs & update context to be up to date without reprocessing everything.
-                fn update_context_for_include(
-                    file_path: PathBuf,
-                    context: &mut ShaderPreprocessorContext,
-                    include: &mut ShaderPreprocessorInclude,
-                ) {
-                    let included_preprocessor = include.get_cache_mut().get_preprocessor_mut();
-                    let included_includes: Vec<&mut ShaderPreprocessorInclude> =
-                        included_preprocessor.includes.iter_mut().collect();
-                    let mut last_position = ShaderPosition::zero(file_path);
-                    for included_include in included_includes {
-                        // Update include handler macros & include
-                        context.push_directory_stack(&included_include.get_absolute_path());
-                        context.append_defines(get_defined_macros_for_position(
-                            &last_position,
-                            &included_include.get_range().start,
-                            &included_preprocessor.defines,
-                        ));
-                        let included_file_path: PathBuf =
-                            included_include.get_absolute_path().into();
-                        update_context_for_include(included_file_path, context, included_include);
-                        last_position = included_include.get_range().end.clone();
-                    }
-                    // Add all defines after last include to context
-                    let define_left = included_preprocessor
-                        .defines
-                        .iter_mut()
-                        .filter(|define| match define.get_range() {
-                            Some(range) => range.start > last_position,
-                            None => false, // Global define
-                        })
-                        .map(|d| d.clone())
-                        .collect::<Vec<ShaderPreprocessorDefine>>();
-                    context.append_defines(define_left);
-                }
-                let file_path: PathBuf = include.get_absolute_path().into();
-                update_context_for_include(file_path, context, include);
-            }
-            Ok(())
-        }
         // Query regions
         let mut query_cursor = QueryCursor::new();
         let mut regions = Vec::new();
@@ -530,13 +395,8 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         &include_before.get_range().start,
                         &preprocessor.defines,
                     ));
-                    match process_include(
-                        symbol_provider,
-                        context,
-                        include_before,
-                        include_callback,
-                        old_symbols,
-                    ) {
+                    match symbol_provider.process_include(context, include_before, include_callback)
+                    {
                         Ok(_) => {}
                         Err(err) => match err {
                             ShaderError::SymbolQueryError(message, shader_range) => {
@@ -784,13 +644,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 &preprocessor.defines,
             ));
             // Avoid stack overflow
-            match process_include(
-                symbol_provider,
-                context,
-                include_left,
-                include_callback,
-                &mut old_symbols,
-            ) {
+            match symbol_provider.process_include(context, include_left, include_callback) {
                 Ok(_) => {}
                 Err(err) => match err {
                     ShaderError::SymbolQueryError(message, shader_range) => {
