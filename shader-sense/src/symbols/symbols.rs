@@ -379,7 +379,7 @@ impl ShaderPreprocessorContext {
     pub fn is_dirty(&self, file_path: &Path, context: &ShaderPreprocessorContext) -> bool {
         // Compare defines to determine if context is different.
         // Check if we need to force an update aswell.
-        fn compare_defines(lhs: &Vec<ShaderSymbol>, rhs: &Vec<ShaderSymbol>) -> bool {
+        fn are_defines_equal(lhs: &Vec<ShaderSymbol>, rhs: &Vec<ShaderSymbol>) -> bool {
             if lhs.len() != rhs.len() {
                 return false;
             }
@@ -403,7 +403,8 @@ impl ShaderPreprocessorContext {
             }
             true
         }
-        compare_defines(&context.defines, &self.defines) || context.dirty_files.contains(file_path)
+        !are_defines_equal(&context.defines, &self.defines)
+            || context.dirty_files.contains(file_path)
     }
     pub fn get_define_value(&self, name: &str) -> Option<String> {
         self.defines
