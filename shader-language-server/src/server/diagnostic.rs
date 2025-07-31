@@ -16,7 +16,7 @@ impl ServerLanguage {
                 Ok(diagnostics) => {
                     info!(
                         "Publishing diagnostic for file {} ({} diags)",
-                        uri.path(),
+                        uri,
                         diagnostics.len()
                     );
                     for diagnostic in diagnostics {

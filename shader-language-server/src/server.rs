@@ -105,6 +105,7 @@ impl ServerLanguage {
         }
     }
     pub fn initialize(&mut self) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
+        let is_clang_format_available = Self::is_clang_format_available();
         let server_capabilities = serde_json::to_value(&ServerCapabilities {
             text_document_sync: Some(lsp_types::TextDocumentSyncCapability::Kind(
                 TextDocumentSyncKind::INCREMENTAL,
@@ -156,10 +157,8 @@ impl ServerLanguage {
                     full: Some(SemanticTokensFullOptions::Bool(true)),
                 }),
             ),
-            document_formatting_provider: Some(OneOf::Left(Self::is_clang_format_available())),
-            document_range_formatting_provider: Some(
-                OneOf::Left(Self::is_clang_format_available()),
-            ),
+            document_formatting_provider: Some(OneOf::Left(is_clang_format_available)),
+            document_range_formatting_provider: Some(OneOf::Left(is_clang_format_available)),
             ..Default::default()
         })?;
         let _client_initialization_params =
@@ -200,19 +199,19 @@ impl ServerLanguage {
         if self.config.is_verbose() {
             format!("{:#?}", dbg)
         } else {
-            "{?}".into()
+            "{}".into()
         }
     }
     fn on_request(&mut self, req: lsp_server::Request) -> Result<(), serde_json::Error> {
         match req.method.as_str() {
             DocumentDiagnosticRequest::METHOD => {
                 let params: DocumentDiagnosticParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
-                    "Received document diagnostic request #{}: {}",
-                    req.id,
+                    "Received document diagnostic request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(
@@ -275,12 +274,12 @@ impl ServerLanguage {
             }
             GotoDefinition::METHOD => {
                 let params: GotoDefinitionParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 profile_scope!(
-                    "Received gotoDefinition request #{}: {}",
-                    req.id,
+                    "Received gotoDefinition request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(
@@ -308,12 +307,12 @@ impl ServerLanguage {
             }
             Completion::METHOD => {
                 let params: CompletionParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document_position.text_document.uri);
                 profile_scope!(
-                    "Received completion request #{}: {}",
-                    req.id,
+                    "Received completion request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document_position.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(
@@ -348,12 +347,12 @@ impl ServerLanguage {
             }
             SignatureHelpRequest::METHOD => {
                 let params: SignatureHelpParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 profile_scope!(
-                    "Received completion request #{}: {}",
-                    req.id,
+                    "Received completion request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(
@@ -382,12 +381,12 @@ impl ServerLanguage {
             }
             HoverRequest::METHOD => {
                 let params: HoverParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 profile_scope!(
-                    "Received hover request #{}: {}",
-                    req.id,
+                    "Received hover request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document_position_params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(
@@ -415,12 +414,12 @@ impl ServerLanguage {
             }
             InlayHintRequest::METHOD => {
                 let params: InlayHintParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
-                    "Received inlay hint request #{}: {}",
-                    req.id,
+                    "Received inlay hint request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(
@@ -451,12 +450,12 @@ impl ServerLanguage {
             // Provider not enabled as vscode already does this nicely with grammar files
             FoldingRangeRequest::METHOD => {
                 let params: FoldingRangeParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
-                    "Received folding range request #{}: {}",
-                    req.id,
+                    "Received folding range request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(
@@ -520,11 +519,7 @@ impl ServerLanguage {
             }
             WorkspaceSymbolRequest::METHOD => {
                 let params: WorkspaceSymbolParams = serde_json::from_value(req.params)?;
-                profile_scope!(
-                    "Received workspace symbol request #{}: {}",
-                    req.id,
-                    self.debug(&params)
-                );
+                profile_scope!("Received workspace symbol request: {}", self.debug(&params));
                 let _ = params.query; // Should we filter ?
                 match self.recolt_workspace_symbol() {
                     Ok(symbols) => self.connection.send_response::<WorkspaceSymbolRequest>(
@@ -539,12 +534,12 @@ impl ServerLanguage {
             }
             DocumentSymbolRequest::METHOD => {
                 let params: DocumentSymbolParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
-                    "Received document symbol request #{}: {}",
-                    req.id,
+                    "Received document symbol request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(
@@ -573,12 +568,12 @@ impl ServerLanguage {
             // Debug request
             DumpAstRequest::METHOD => {
                 let params: DumpAstParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
-                    "Received dump ast request #{}: {}",
-                    req.id,
+                    "Received dump ast request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(
@@ -598,12 +593,12 @@ impl ServerLanguage {
             }
             DumpDependencyRequest::METHOD => {
                 let params: DumpDependencyParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
-                    "Received dump dependency request #{}: {}",
-                    req.id,
+                    "Received dump dependency request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(
@@ -630,12 +625,12 @@ impl ServerLanguage {
             }
             SemanticTokensFullRequest::METHOD => {
                 let params: SemanticTokensParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
-                    "Received semantic token request #{}: {}",
-                    req.id,
+                    "Received semantic token request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document.uri);
                 match self.watched_files.get_file(&uri) {
                     Some(cached_file) => {
                         assert!(
@@ -664,12 +659,12 @@ impl ServerLanguage {
             }
             Formatting::METHOD => {
                 let params: DocumentFormattingParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
-                    "Received formatting request #{}: {}",
-                    req.id,
+                    "Received formatting request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document.uri);
                 match self.recolt_formatting(&uri, None) {
                     Ok(formatting) => self
                         .connection
@@ -682,12 +677,12 @@ impl ServerLanguage {
             }
             RangeFormatting::METHOD => {
                 let params: DocumentRangeFormattingParams = serde_json::from_value(req.params)?;
+                let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
-                    "Received formatting range request #{}: {}",
-                    req.id,
+                    "Received formatting range request for file {}: {}",
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document.uri);
                 let file_path = uri.to_file_path().unwrap();
                 match self.recolt_formatting(
                     &uri,
@@ -724,12 +719,12 @@ impl ServerLanguage {
             DidOpenTextDocument::METHOD => {
                 let params: DidOpenTextDocumentParams =
                     serde_json::from_value(notification.params)?;
+                let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
                     "Received did open text document notification for {}:{}",
-                    params.text_document.uri,
+                    uri,
                     self.debug(&params)
                 );
-                let uri = clean_url(&params.text_document.uri);
 
                 // Skip non file uri.
                 if uri.scheme() != "file" {
@@ -775,7 +770,7 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
                     "Received did save text document notification for file {}:{}",
-                    params.text_document.uri,
+                    uri,
                     self.debug(&params)
                 );
                 // File content is updated through DidChangeTextDocument.
@@ -845,7 +840,7 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
                     "Received did close text document notification for file {}: {}",
-                    params.text_document.uri,
+                    uri,
                     self.debug(&params)
                 );
                 match self.watched_files.remove_file(&uri) {
@@ -863,7 +858,7 @@ impl ServerLanguage {
                 let uri = clean_url(&params.text_document.uri);
                 profile_scope!(
                     "Received did change text document notification for file {}: {}",
-                    params.text_document.uri,
+                    uri,
                     self.debug(&params)
                 );
                 match self.watched_files.get_file(&uri) {
@@ -925,7 +920,8 @@ impl ServerLanguage {
                     serde_json::from_value(notification.params)?;
                 let variant_uri = clean_url(&params.text_document.uri);
                 profile_scope!(
-                    "Received did change shader variant notification: {}",
+                    "Received did change shader variant notification for file {}: {}",
+                    variant_uri,
                     self.debug(&params)
                 );
                 // Store it in cache
