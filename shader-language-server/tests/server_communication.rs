@@ -158,7 +158,7 @@ fn test_variant_dependency() {
                 .collect();
             assert!(
                 errors.len() == 1,
-                "An error should trigger without the variant context. Got {:?}",
+                "An error should trigger without the variant context. Got {:#?}",
                 errors
             );
         },
@@ -193,7 +193,7 @@ fn test_variant_dependency() {
                 .collect();
             assert!(
                 errors.is_empty(),
-                "Macro should be imported through variant. Got {:?}",
+                "Macro should be imported through variant. Got {:#?}",
                 errors,
             );
         },

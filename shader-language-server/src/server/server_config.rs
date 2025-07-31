@@ -65,6 +65,14 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
+    const DEFAULT_SYMBOLS: bool = true;
+    const DEFAULT_VALIDATE: bool = true;
+    const DEFAULT_SYMBOL_DIAGNOSTIC: bool = false; // Mostly for debug
+    const DEFAULT_SEVERITY: ShaderDiagnosticSeverity = ShaderDiagnosticSeverity::Error;
+    const DEFAULT_TRACE: ServerTrace = ServerTrace {
+        server: ServerTraceLevel::Off,
+    };
+
     pub fn into_validation_params(&self, variant: Option<ShaderVariant>) -> ValidationParams {
         let (mut defines, mut includes, entry_point, shader_stage) = match variant {
             Some(variant) => (
@@ -132,31 +140,31 @@ impl ServerConfig {
     pub fn get_symbols(&self) -> bool {
         match &self.symbols {
             Some(symbols) => *symbols,
-            None => false,
+            None => Self::DEFAULT_SYMBOLS,
         }
     }
     pub fn get_validate(&self) -> bool {
         match &self.validate {
             Some(validate) => *validate,
-            None => false,
+            None => Self::DEFAULT_VALIDATE,
         }
     }
     pub fn get_symbol_diagnostics(&self) -> bool {
         match &self.symbol_diagnostics {
             Some(symbol_diagnostics) => *symbol_diagnostics,
-            None => false,
+            None => Self::DEFAULT_SYMBOL_DIAGNOSTIC,
         }
     }
     pub fn get_severity(&self) -> ShaderDiagnosticSeverity {
         match &self.severity {
             Some(severity) => ShaderDiagnosticSeverity::from(severity.as_str()),
-            None => ShaderDiagnosticSeverity::Error,
+            None => Self::DEFAULT_SEVERITY,
         }
     }
     pub fn is_verbose(&self) -> bool {
         match &self.trace {
             Some(trace) => trace.is_verbose(),
-            None => false,
+            None => Self::DEFAULT_TRACE.is_verbose(),
         }
     }
 }
@@ -167,11 +175,11 @@ impl Default for ServerConfig {
             includes: Some(Vec::new()),
             defines: Some(HashMap::new()),
             path_remapping: Some(HashMap::new()),
-            validate: Some(true),
-            symbols: Some(true),
-            symbol_diagnostics: Some(false),
-            trace: Some(ServerTrace::default()),
-            severity: Some(ShaderDiagnosticSeverity::Hint.to_string()),
+            validate: Some(ServerConfig::DEFAULT_VALIDATE),
+            symbols: Some(ServerConfig::DEFAULT_SYMBOLS),
+            symbol_diagnostics: Some(ServerConfig::DEFAULT_SYMBOL_DIAGNOSTIC),
+            trace: Some(ServerConfig::DEFAULT_TRACE),
+            severity: Some(ServerConfig::DEFAULT_SEVERITY.to_string()),
             hlsl: Some(ServerHlslConfig::default()),
             glsl: Some(ServerGlslConfig::default()),
         }
