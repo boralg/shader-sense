@@ -507,7 +507,7 @@ impl ServerLanguageFileCache {
             shader_language,
             symbol_provider,
             config,
-            Some(&file_path), // Force update.
+            None, // We simply open the file. No change detected.
         )?;
         Ok(self.files.get(&uri).unwrap())
     }
