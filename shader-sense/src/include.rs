@@ -5,7 +5,7 @@ use std::{
 
 #[derive(Debug, Default, Clone)]
 pub struct IncludeHandler {
-    includes: HashSet<PathBuf>, // Dont store it stack to compute them before.
+    includes: HashSet<PathBuf>, // Dont store in stack to compute them before.
     directory_stack: Vec<PathBuf>, // Vec for keeping insertion order. Might own duplicate.
     visited_dependencies: HashMap<PathBuf, usize>,
     path_remapping: HashMap<PathBuf, PathBuf>, // remapping of path / virtual path
@@ -70,6 +70,9 @@ impl IncludeHandler {
             visited_dependencies: visited_dependencies,
             path_remapping: path_remapping,
         }
+    }
+    pub fn get_includes(&self) -> &HashSet<PathBuf> {
+        &self.includes
     }
     pub fn get_visited_count(&self, path: &Path) -> usize {
         self.visited_dependencies.get(path).cloned().unwrap_or(0)

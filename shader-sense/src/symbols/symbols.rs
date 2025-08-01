@@ -403,8 +403,26 @@ impl ShaderPreprocessorContext {
             }
             true
         }
-        // TODO: should compare includes aswell ?
+        fn are_includes_equal(lhs: &HashSet<PathBuf>, rhs: &HashSet<PathBuf>) -> bool {
+            if lhs.len() != rhs.len() {
+                return false;
+            }
+            for lhs_symbol in lhs.iter() {
+                if rhs
+                    .iter()
+                    .find(|rhs_symbol| lhs_symbol.as_os_str() == rhs_symbol.as_os_str())
+                    .is_none()
+                {
+                    return false;
+                }
+            }
+            true
+        }
         !are_defines_equal(&context.defines, &self.defines)
+            || !are_includes_equal(
+                context.include_handler.get_includes(),
+                self.include_handler.get_includes(),
+            )
             || context.dirty_files.contains(file_path)
     }
     pub fn get_define_value(&self, name: &str) -> Option<String> {
@@ -424,14 +442,13 @@ impl ShaderPreprocessorContext {
 #[derive(Debug, Clone)]
 pub struct ShaderPreprocessorInclude {
     // TODO: move cache to symbol data
-    // TODO: remove pub
     pub cache: Option<ShaderSymbols>,
-    pub symbol: ShaderSymbol,
+    symbol: ShaderSymbol,
 }
 
 #[derive(Debug, Clone)]
 pub struct ShaderPreprocessorDefine {
-    pub symbol: ShaderSymbol,
+    symbol: ShaderSymbol,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
