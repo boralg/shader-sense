@@ -65,11 +65,11 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
-    const DEFAULT_SYMBOLS: bool = true;
-    const DEFAULT_VALIDATE: bool = true;
-    const DEFAULT_SYMBOL_DIAGNOSTIC: bool = false; // Mostly for debug
-    const DEFAULT_SEVERITY: ShaderDiagnosticSeverity = ShaderDiagnosticSeverity::Error;
-    const DEFAULT_TRACE: ServerTrace = ServerTrace {
+    pub const DEFAULT_SYMBOLS: bool = true;
+    pub const DEFAULT_VALIDATE: bool = true;
+    pub const DEFAULT_SYMBOL_DIAGNOSTIC: bool = false; // Mostly for debug
+    pub const DEFAULT_SEVERITY: ShaderDiagnosticSeverity = ShaderDiagnosticSeverity::Error;
+    pub const DEFAULT_TRACE: ServerTrace = ServerTrace {
         server: ServerTraceLevel::Off,
     };
 
