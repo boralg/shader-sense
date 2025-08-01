@@ -6,12 +6,13 @@ use shader_sense::{
         shader_language::ShaderLanguage,
         symbol_provider::{default_include_callback, ShaderSymbolParams},
     },
-    validator::{create_validator, validator::ValidationParams},
+    validator::validator::ValidationParams,
 };
 
-fn validate_file(shading_language: ShadingLanguage, shader_path: &Path, shader_content: &str) {
+fn validate_file<T: ShadingLanguageTag>(shader_path: &Path, shader_content: &str) {
     // Validator intended to validate a file using standard API.
-    let mut validator = create_validator(shading_language);
+    let language = ShaderLanguage::new(T::get_language());
+    let mut validator = language.create_validator();
     match validator.validate_shader(
         shader_content,
         shader_path,
@@ -58,6 +59,6 @@ void main() {
 
 fn main() {
     let shader_path = Path::new("dummy/shader.frag.glsl");
-    validate_file(ShadingLanguage::Glsl, shader_path, SHADER);
+    validate_file::<GlslShadingLanguageTag>(shader_path, SHADER);
     query_all_symbol::<GlslShadingLanguageTag>(shader_path, SHADER);
 }
