@@ -32,12 +32,40 @@ impl ServerLanguage {
         let shader_position = {
             let position =
                 ShaderPosition::new(file_path.clone(), position.line, position.character);
-            let byte_offset = position.to_byte_offset(content).unwrap();
-            let offset = match &trigger_character {
+
+            // Get UTF8 offset of trigger character
+            let trigger_offset = match &trigger_character {
                 Some(trigger) => trigger.len(),
                 None => 0,
             };
-            ShaderPosition::from_byte_offset(content, byte_offset - offset, &file_path).unwrap()
+            // Remove offset
+            let byte_offset = position.to_byte_offset(content).unwrap() - trigger_offset;
+            assert!(content.is_char_boundary(byte_offset));
+            if byte_offset == 0 {
+                ShaderPosition::from_byte_offset(content, byte_offset, &file_path).unwrap()
+            } else {
+                let mut new_byte_offset = byte_offset;
+                // Check if the previous character is ')' for getting function call label position
+                let prev = &content[..byte_offset];
+                let mut chars = prev.char_indices().rev();
+                if let Some((_, ')')) = chars.next() {
+                    let mut depth = 1;
+                    for (idx, ch) in chars {
+                        match ch {
+                            ')' => depth += 1,
+                            '(' => {
+                                depth -= 1;
+                                if depth == 0 {
+                                    new_byte_offset = idx;
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                ShaderPosition::from_byte_offset(content, new_byte_offset, &file_path).unwrap()
+            }
         };
         let symbol_list = symbol_list.filter_scoped_symbol(&shader_position);
         match trigger_character {
