@@ -34,16 +34,16 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                         ShaderRange::from_range(node.range(), &symbol_tree.file_path),
                         None,
                     ));
-                },
+                }
                 // TODO: should use string_content instead
                 "string_literal" => {
                     let path = get_name(&symbol_tree.content, node);
                     return Ok(ShaderWordRange::new(
                         path[1..path.len() - 1].into(),
                         ShaderRange::from_range(node.range(), &symbol_tree.file_path),
-                        None
+                        None,
                     ));
-                },
+                }
                 "field_identifier" => {
                     fn set_parent(
                         root: &mut Option<ShaderWordRange>,

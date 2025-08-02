@@ -41,9 +41,9 @@ impl SymbolWordProvider for GlslSymbolWordProvider {
                     return Ok(ShaderWordRange::new(
                         path[1..path.len() - 1].into(),
                         ShaderRange::from_range(node.range(), &symbol_tree.file_path),
-                        None
+                        None,
                     ));
-                },
+                }
                 "field_identifier" => {
                     fn set_parent(
                         root: &mut Option<ShaderWordRange>,
