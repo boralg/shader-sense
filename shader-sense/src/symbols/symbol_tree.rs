@@ -198,35 +198,29 @@ impl ShaderModule {
                         "{}{}: {} [{}, {}] - [{}, {}]\n",
                         " ".repeat(depth * 2),
                         field_name,
-                        cursor.node().kind(),
+                        if cursor.node().is_named() {
+                            cursor.node().kind().into()
+                        } else {
+                            format!("\"{}\"", cursor.node().kind())
+                        },
                         cursor.node().range().start_point.row,
                         cursor.node().range().start_point.column,
                         cursor.node().range().end_point.row,
                         cursor.node().range().end_point.column,
                     ),
-                    None => {
+                    None => format!(
+                        "{}{} [{}, {}] - [{}, {}]\n",
+                        " ".repeat(depth * 2),
                         if cursor.node().is_named() {
-                            format!(
-                                "{}{} [{}, {}] - [{}, {}]\n",
-                                " ".repeat(depth * 2),
-                                cursor.node().kind(),
-                                cursor.node().range().start_point.row,
-                                cursor.node().range().start_point.column,
-                                cursor.node().range().end_point.row,
-                                cursor.node().range().end_point.column,
-                            )
+                            cursor.node().kind().into()
                         } else {
-                            format!(
-                                "{}{:?} [{}, {}] - [{}, {}]\n",
-                                " ".repeat(depth * 2),
-                                cursor.node().kind(),
-                                cursor.node().range().start_point.row,
-                                cursor.node().range().start_point.column,
-                                cursor.node().range().end_point.row,
-                                cursor.node().range().end_point.column,
-                            )
-                        }
-                    }
+                            format!("\"{}\"", cursor.node().kind())
+                        },
+                        cursor.node().range().start_point.row,
+                        cursor.node().range().start_point.column,
+                        cursor.node().range().end_point.row,
+                        cursor.node().range().end_point.column,
+                    ),
                 });
                 if cursor.goto_first_child() {
                     debug_tree.push_str(format_debug_cursor(cursor, depth + 1).as_str());
