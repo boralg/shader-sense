@@ -46,7 +46,10 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                         }
                     }
                     let mut word: Option<ShaderWordRange> = None;
-                    let mut current_node = node.prev_named_sibling().unwrap(); // This might panic
+                    let mut current_node = match node.prev_named_sibling() {
+                        Some(prev_sibling) => prev_sibling,
+                        None => return Err(ShaderError::NoSymbol), // Invalid case.
+                    };
                     loop {
                         let field = current_node.next_named_sibling().unwrap();
                         match field.kind() {
