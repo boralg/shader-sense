@@ -52,45 +52,55 @@ impl ServerLanguage {
                             Ok(vec![])
                         } else {
                             let symbol_type = &symbols[0];
-                            let completion_items = match &symbol_type.data {
-                                ShaderSymbolData::Variables { ty, count: _ } => {
-                                    match symbol_list.find_type_symbol(ty) {
-                                        Some(ty) => match &ty.data {
-                                            ShaderSymbolData::Struct {
-                                                constructors: _,
-                                                members,
-                                                methods,
-                                            } => {
-                                                let mut members_and_methods: Vec<ShaderSymbol> =
-                                                    Vec::new();
-                                                members_and_methods.extend(
-                                                    members
-                                                        .iter()
-                                                        .map(|m| m.as_symbol(None))
-                                                        .collect::<Vec<ShaderSymbol>>(),
-                                                );
-                                                members_and_methods.extend(
-                                                    methods
-                                                        .iter()
-                                                        .map(|m| m.as_symbol(None))
-                                                        .collect::<Vec<ShaderSymbol>>(),
-                                                );
-                                                members_and_methods
-                                                    .into_iter()
-                                                    .map(|s| {
-                                                        convert_completion_item(
-                                                            cached_file.shading_language,
-                                                            &s,
-                                                        )
-                                                    })
-                                                    .collect()
-                                            }
-                                            _ => vec![],
-                                        },
-                                        None => vec![],
-                                    }
+                            let ty = match &symbol_type.data {
+                                ShaderSymbolData::Variables { ty, count: _ } => ty,
+                                ShaderSymbolData::Functions { signatures } => {
+                                    &signatures[0].returnType
                                 }
-                                _ => vec![],
+                                ShaderSymbolData::Parameter {
+                                    context: _,
+                                    ty,
+                                    count: _,
+                                } => ty,
+                                ShaderSymbolData::Method {
+                                    context: _,
+                                    signatures,
+                                } => &signatures[0].returnType,
+                                _ => return Ok(vec![]),
+                            };
+                            let completion_items = match symbol_list.find_type_symbol(ty) {
+                                Some(ty) => match &ty.data {
+                                    ShaderSymbolData::Struct {
+                                        constructors: _,
+                                        members,
+                                        methods,
+                                    } => {
+                                        let mut members_and_methods: Vec<ShaderSymbol> = Vec::new();
+                                        members_and_methods.extend(
+                                            members
+                                                .iter()
+                                                .map(|m| m.as_symbol(None))
+                                                .collect::<Vec<ShaderSymbol>>(),
+                                        );
+                                        members_and_methods.extend(
+                                            methods
+                                                .iter()
+                                                .map(|m| m.as_symbol(None))
+                                                .collect::<Vec<ShaderSymbol>>(),
+                                        );
+                                        members_and_methods
+                                            .into_iter()
+                                            .map(|s| {
+                                                convert_completion_item(
+                                                    cached_file.shading_language,
+                                                    &s,
+                                                )
+                                            })
+                                            .collect()
+                                    }
+                                    _ => vec![],
+                                },
+                                None => vec![],
                             };
                             Ok(completion_items)
                         }
