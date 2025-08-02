@@ -40,51 +40,267 @@ pub fn new_hlsl_scalar(label: &str, description: &str, version: &str) -> ShaderS
 impl HlslIntrinsicParser {
     pub fn add_types(&self, symbols: &mut ShaderSymbolList) {
         fn get_texture_object_methods(context: &str) -> Vec<ShaderMethod> {
-            vec![
-                ShaderMethod {
+            // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2d
+            // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-gather
+            let mut methods = Vec::new();
+            match context {
+                "Texture2D" | "Texture2DArray" | "TextureCube" | "TextureCubeArray" => {
+                    let mut method = ShaderMethod {
+                        context: context.into(),
+                        label: "Gather".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Gets the four samples (red component only) that would be used for bilinear interpolation when sampling a texture.".into(),
+                            parameters: vec![
+                                ShaderParameter {
+                                    ty: "sampler".into(),
+                                    label: "s".into(),
+                                    description: "A Sampler state. This is an object declared in an effect file that contains state assignments.".into(),
+                                    count: None,
+                                    range: None,
+                                },
+                                ShaderParameter {
+                                    ty: match context {
+                                        "Texture2D" => "float2",
+                                        "Texture2DArray" | "TextureCube" => "float3",
+                                        "TextureCubeArray" => "float4",
+                                        _ => unreachable!(),
+                                    }.into(),
+                                    label: "location".into(),
+                                    description: "The texture coordinates. The argument type is dependent on the texture-object type. ".into(),
+                                    count: None,
+                                    range: None,
+                                }
+                            ]
+                        },
+                        range: None,
+                    };
+                    if context == "Texture2D" || context == "Texture2DArray" {
+                        method.signature.parameters.push(ShaderParameter {
+                            ty: match context {
+                                "Texture2D" | "Texture2DArray" => "int2",
+                                _ => unreachable!(),
+                            }.into(),
+                            label: "offset".into(),
+                            description: "An optional texture coordinate offset, which can be used for any texture-object type; the offset is applied to the location before sampling. The argument type is dependent on the texture-object type. For shaders targeting Shader Model 5.0 and above, the 6 least significant bits of each offset value is honored as a signed value, yielding [-32..31] range. For previous shader model shaders, offsets need to be immediate integers between -8 and 7.".into(),
+                            count: None,
+                            range: None,
+                        });
+                    }
+                    methods.push(method);
+                }
+                _ => {} // not supported
+            }
+            // TODO: https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-getdimensions
+            let (dimensions, has_layers) = match context {
+                "Texture1D" => (2, false),
+                "Texture1DArray" => (2, true),
+                "Texture2D" => (2, false),
+                "Texture2DArray" => (2, true),
+                "Texture3D" => (2, false),
+                "Texture3DArray" => (2, true),
+                "Texture2DMS" => (2, false),
+                "Texture2DMSArray" => (2, true),
+                "TextureCube" => (2, true),
+                "TextureCubeArray" => (2, true),
+                _ => unreachable!(),
+            };
+            methods.push(ShaderMethod {
+                context: context.into(),
+                label: "GetDimensions".into(),
+                signature: ShaderSignature {
+                    returnType: "void".into(),
+                    description: "".into(),
+                    parameters: vec![ShaderParameter {
+                        ty: "uint".into(),
+                        label: "dim".into(),
+                        description: "The length, in bytes, of the buffer.".into(),
+                        count: None,
+                        range: None,
+                    }],
+                },
+                range: None,
+            });
+            match context {
+                "Texture2DMS" | "Texture2DMSArray" => methods.push(ShaderMethod {
                     context: context.into(),
-                    label: "GetDimensions".into(),
+                    label: "GetSamplePosition".into(),
                     signature: ShaderSignature {
-                        returnType: "void".into(),
-                        description: "".into(),
-                        parameters: vec![
-                            ShaderParameter {
-                                ty: "uint".into(),
-                                label: "dim".into(),
-                                description: "The length, in bytes, of the buffer.".into(),
-                                count: None,
-                                range: None,
-                            }
-                        ]
+                        returnType: "float2".into(),
+                        description: "Gets the position of the specified sample.".into(),
+                        parameters: vec![ShaderParameter {
+                            ty: "sampler".into(),
+                            label: "s".into(),
+                            description: "The zero-based sample index.".into(),
+                            count: None,
+                            range: None,
+                        }],
                     },
                     range: None,
-                },
-                ShaderMethod {
+                }),
+                _ => {}
+            }
+            if context != "TextureCube" && context != "TextureCubeArray" {
+                // Load
+                let mut method = ShaderMethod {
                     context: context.into(),
                     label: "Load".into(),
                     signature: ShaderSignature {
-                        returnType: "void".into(),
-                        description: "".into(),
+                        returnType: "float4".into(),
+                        description: "Reads texel data without any filtering or sampling.".into(),
                         parameters: vec![
                             ShaderParameter {
-                                ty: "int".into(),
-                                label: "Location".into(),
-                                description: "The location of the buffer".into(),
-                                count: None,
-                                range: None,
-                            },
-                            ShaderParameter {
-                                ty: "uint".into(),
-                                label: "Status".into(),
-                                description: "The status of the operation. You can't access the status directly; instead, pass the status to the CheckAccessFullyMapped intrinsic function. CheckAccessFullyMapped returns TRUE if all values from the corresponding Sample, Gather, or Load operation accessed mapped tiles in a tiled resource. If any values were taken from an unmapped tile, CheckAccessFullyMapped returns FALSE.".into(),
+                                ty: match context {
+                                    "Buffer" => "int",
+                                    "Texture1D" | "Texture2DMS" => "int2",
+                                    "Texture1DArray" | "Texture2D" | "Texture2DMSArray" => "int3",
+                                    "Texture2DArray" | "Texture3D" => "int4",
+                                    str => unreachable!("Reached {}", str)
+                                }.into(),
+                                label: "location".into(),
+                                description: "The texture coordinates; the last component specifies the mipmap level. This method uses a 0-based coordinate system and not a 0.0-1.0 UV system. The argument type is dependent on the texture-object type.".into(),
                                 count: None,
                                 range: None,
                             }
                         ]
                     },
                     range: None,
+                };
+                match context {
+                    "Texture2DMS" | "Texture2DMSArray" => method.signature.parameters.push(ShaderParameter {
+                        ty: "int".into(),
+                        label: "sampleIndex".into(),
+                        description: "A sampling index. Required for multi-sample textures. Not supported for other textures.".into(),
+                        count: None,
+                        range: None,
+                    }),
+                    _ => {}
                 }
-            ]
+                method.signature.parameters.push(ShaderParameter {
+                    ty: match context {
+                        "Texture1D" | "Texture1DArray" => "int",
+                        "Texture2D" | "Texture2DArray" | "Texture2DMS" | "Texture2DMSArray" => "int2",
+                        "Texture3D" => "int3",
+                        _ => unreachable!()
+                    }.into(),
+                    label: "sampleIndex".into(),
+                    description: "A sampling index. Required for multi-sample textures. Not supported for other textures.".into(),
+                    count: None,
+                    range: None,
+                });
+                methods.push(method);
+            }
+            if context != "Texture2DMS" && context != "Texture2DMSArray" {
+                // Sample | SampleBias | SampleCmp | SampleCmpLevelZero | SampleGrad | SampleLevel.
+                let variants = vec![
+                    ("Sample", "Samples a texture."),
+                    ("SampleBias", "Samples a texture, after applying the input bias to the mipmap level."), // Add a bias before offset
+                    ("SampleCmp", "Samples a texture and compares a single component against the specified comparison value."), // Add a CompareValue before offset
+                    ("SampleCmpLevelZero", "Samples a texture and compares the result to a comparison value. This function is identical to calling SampleCmp on mipmap level 0 only."), // Add a CompareValue before offset
+                    ("SampleGrad", "Samples a texture using a gradient to influence the way the sample location is calculated."), // Add a CompareValue before offset
+                    ("SampleLevel", "Samples a texture using a mipmap-level offset. This function is similar to Sample except that it uses the LOD level (in the last component of the location parameter) to choose the mipmap level. For example, a 2D texture uses the first two components for uv coordinates and the third component for the mipmap level."), // Add a lod before offset
+                ];
+                for (variant, variant_description) in variants {
+                    let mut method = ShaderMethod {
+                        context: context.into(),
+                        label: variant.into(),
+                        signature: ShaderSignature {
+                            returnType: "float4".into(),
+                            description:variant_description.into(),
+                            parameters: vec![
+                                ShaderParameter {
+                                    ty: "sampler".into(),
+                                    label: "s".into(),
+                                    description: "A Sampler state. This is an object declared in an effect file that contains state assignments.".into(),
+                                    count: None,
+                                    range: None,
+                                },
+                                ShaderParameter {
+                                    ty: match context {
+                                        "Texture1D" => "float",
+                                        "Texture1DArray" | "Texture2D" => "float2",
+                                        "Texture2DArray" | "Texture3D" | "TextureCube" => "float3",
+                                        "TextureCubeArray" => "float4",
+                                        _ => unreachable!()
+                                    }.into(),
+                                    label: "location".into(),
+                                    description: "The texture coordinates. The argument type is dependent on the texture-object type. If the texture object is an array, the last component is the array index.".into(),
+                                    count: None,
+                                    range: None,
+                                },
+                            ]
+                        },
+                        range: None,
+                    };
+                    match context {
+                        "SampleBias" => method.signature.parameters.push(ShaderParameter {
+                            ty: "float".into(),
+                            label: "bias".into(),
+                            description: "The bias value, which is a floating-point number between -16.0 and 15.99, is applied to a mip level before sampling.".into(),
+                            count: None,
+                            range: None,
+                        }),
+                        "SampleCmp" | "SampleCmpLevelZero" => method.signature.parameters.push(ShaderParameter {
+                            ty: "float".into(),
+                            label: "CompareValue".into(),
+                            description: "A floating-point value to use as a comparison value.".into(),
+                            count: None,
+                            range: None,
+                        }),
+                        "SampleGrad" => {
+                            method.signature.parameters.push(ShaderParameter {
+                                ty: match context {
+                                    "Texture1D" |  "Texture1DArray" => "float",
+                                    "Texture2D" | "Texture2DArray" => "float2",
+                                    "Texture3D" | "TextureCubeArray" | "TextureCube" => "float3",
+                                    _ => unreachable!()
+                                }.into(),
+                                label: "DDX".into(),
+                                description: "The rate of change of the surface geometry in the x direction. The argument type is dependent on the texture-object type.".into(),
+                                count: None,
+                                range: None,
+                            });
+                            method.signature.parameters.push(ShaderParameter {
+                                ty: match context {
+                                    "Texture1D" |  "Texture1DArray" => "float",
+                                    "Texture2D" | "Texture2DArray" => "float2",
+                                    "Texture3D" | "TextureCubeArray" | "TextureCube" => "float3",
+                                    _ => unreachable!()
+                                }.into(),
+                                label: "DDY".into(),
+                                description: "The rate of change of the surface geometry in the y direction. The argument type is dependent on the texture-object type.".into(),
+                                count: None,
+                                range: None,
+                            });
+                        },
+                        "SampleLevel" => method.signature.parameters.push(ShaderParameter {
+                            ty: "float".into(),
+                            label: "LOD".into(),
+                            description: "A number that specifies the mipmap level (internally clamped to the smallest map level). If the value is = 0, the zero'th (biggest map) is used. The fractional value (if supplied) is used to interpolate between two mipmap levels.".into(),
+                            count: None,
+                            range: None,
+                        }),
+                        _ => {} // Nothing
+                    }
+                    match context {
+                        "TextureCube" | "TextureCubeArray" => {} // not supported
+                        _ => method.signature.parameters.push(ShaderParameter {
+                            ty: match context {
+                                "Texture1D" | "Texture1DArray" => "int",
+                                "Texture2D" | "Texture2DArray" => "int2",
+                                "Texture3D" => "int3",
+                                _ => unreachable!()
+                            }.into(),
+                            label: "offset".into(),
+                            description: "An optional texture coordinate offset, which can be used for any texture-object type; the offset is applied to the location before sampling. The texture offsets need to be static. The argument type is dependent on the texture-object type. For more info, see Applying texture coordinate offsets.".into(),
+                            count: None,
+                            range: None,
+                        }),
+                    }
+                    methods.push(method);
+                }
+            }
+            methods
         }
         fn get_buffer_object_methods() -> Vec<ShaderMethod> {
             vec![] // Load
