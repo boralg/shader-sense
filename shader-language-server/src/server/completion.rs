@@ -28,15 +28,16 @@ impl ServerLanguage {
         let symbol_list = self
             .watched_files
             .get_all_symbols(uri, &language_data.language);
-        let shader_position = ShaderPosition {
-            file_path: file_path.clone(),
-            line: position.line as u32,
-            // TODO: -1 should be able to go up a line.
-            pos: if position.character == 0 {
-                0
-            } else {
-                position.character - 1
-            },
+        let content = &RefCell::borrow(&cached_file.shader_module).content;
+        let shader_position = {
+            let position =
+                ShaderPosition::new(file_path.clone(), position.line, position.character);
+            let byte_offset = position.to_byte_offset(content).unwrap();
+            let offset = match &trigger_character {
+                Some(trigger) => trigger.len(),
+                None => 0,
+            };
+            ShaderPosition::from_byte_offset(content, byte_offset - offset, &file_path).unwrap()
         };
         let symbol_list = symbol_list.filter_scoped_symbol(&shader_position);
         match trigger_character {
@@ -200,15 +201,23 @@ fn convert_completion_item(
         detail: None,
         label_details: Some(CompletionItemLabelDetails {
             detail: None,
-            description: if let ShaderSymbolData::Functions { signatures } = &shader_symbol.data {
-                Some(if signatures.len() > 1 {
-                    format!("{} (+ {})", signatures[0].format(shader_symbol.label.as_str()), signatures.len() - 1)
-                } else {
-                    signatures[0].format(shader_symbol.label.as_str())
-                })
-            } else {
-                None
-            },
+            description: match &shader_symbol.data {
+                ShaderSymbolData::Functions { signatures } => {
+                    Some(if signatures.len() > 1 {
+                        format!("{} (+ {})", signatures[0].format(shader_symbol.label.as_str()), signatures.len() - 1)
+                    } else {
+                        signatures[0].format(shader_symbol.label.as_str())
+                    })
+                },
+                ShaderSymbolData::Method { context, signatures } => {
+                    Some(if signatures.len() > 1 {
+                        format!("{} (+ {})", signatures[0].format_with_context(shader_symbol.label.as_str(), context), signatures.len() - 1)
+                    } else {
+                        signatures[0].format(shader_symbol.label.as_str())
+                    })
+                },
+                _ => Some(shader_symbol.format())
+            }
         }),
         filter_text: Some(shader_symbol.label.clone()),
         documentation: Some(lsp_types::Documentation::MarkupContent(MarkupContent {
