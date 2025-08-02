@@ -5,14 +5,14 @@ use tree_sitter::{Query, QueryCursor};
 use crate::{
     shader::ShadingLanguageTag,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
-    symbols::symbols::ShaderPreprocessorDefine,
+    symbols::{symbol_parser::ShaderWordRange, symbols::ShaderPreprocessorDefine},
 };
 
 use super::{
     shader_language::ShaderLanguage,
     symbol_parser::{
-        ShaderSymbolListBuilder, SymbolLabelChainProvider, SymbolLabelProvider, SymbolRegionFinder,
-        SymbolTreeFilter, SymbolTreeParser, SymbolTreePreprocessorParser,
+        ShaderSymbolListBuilder, SymbolRegionFinder, SymbolTreeFilter, SymbolTreeParser,
+        SymbolTreePreprocessorParser, SymbolWordProvider,
     },
     symbol_tree::{ShaderModule, ShaderModuleHandle, ShaderSymbols, SymbolTree},
     symbols::{
@@ -36,8 +36,7 @@ pub struct SymbolProvider {
 
     preprocessor_parsers: Vec<(Box<dyn SymbolTreePreprocessorParser>, tree_sitter::Query)>,
     region_finder: Box<dyn SymbolRegionFinder>,
-    word_chain_provider: Box<dyn SymbolLabelChainProvider>,
-    word_provider: Box<dyn SymbolLabelProvider>,
+    word_provider: Box<dyn SymbolWordProvider>,
 }
 
 pub type SymbolIncludeCallback<'a> =
@@ -63,8 +62,7 @@ impl SymbolProvider {
         filters: Vec<Box<dyn SymbolTreeFilter>>,
         preprocessor_parsers: Vec<Box<dyn SymbolTreePreprocessorParser>>,
         region_finder: Box<dyn SymbolRegionFinder>,
-        word_chain_provider: Box<dyn SymbolLabelChainProvider>,
-        word_provider: Box<dyn SymbolLabelProvider>,
+        word_provider: Box<dyn SymbolWordProvider>,
     ) -> Self {
         let scope_query = r#"(compound_statement
             "{"? @scope.start
@@ -92,7 +90,6 @@ impl SymbolProvider {
                 })
                 .collect(),
             region_finder: region_finder,
-            word_chain_provider,
             word_provider,
         }
     }
@@ -379,24 +376,12 @@ impl SymbolProvider {
         }
         Ok(symbol_list_builder.get_shader_symbol_list())
     }
-    pub fn get_word_chain_range_at_position(
-        &self,
-        symbol_tree: &SymbolTree,
-        position: &ShaderPosition,
-    ) -> Result<Vec<(String, ShaderRange)>, ShaderError> {
-        self.word_chain_provider
-            .find_label_chain_at_position_in_node(
-                symbol_tree,
-                symbol_tree.tree.root_node(),
-                position,
-            )
-    }
     pub fn get_word_range_at_position(
         &self,
         symbol_tree: &SymbolTree,
         position: &ShaderPosition,
-    ) -> Result<(String, ShaderRange), ShaderError> {
-        self.word_provider.find_label_at_position_in_node(
+    ) -> Result<ShaderWordRange, ShaderError> {
+        self.word_provider.find_word_at_position_in_node(
             symbol_tree,
             symbol_tree.tree.root_node(),
             position,

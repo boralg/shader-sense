@@ -28,11 +28,11 @@ impl ServerLanguage {
             &shader_position,
         ) {
             // word_range should be the same as symbol range
-            Ok((word, word_range)) => {
+            Ok(word) => {
                 let symbol_list = self
                     .watched_files
                     .get_all_symbols(uri, &language_data.language);
-                let matching_symbols = symbol_list.find_symbols_at(&word, &shader_position);
+                let matching_symbols = word.find_symbol_from_parent(&symbol_list);
                 if matching_symbols.len() == 0 {
                     Ok(None)
                 } else {
@@ -74,8 +74,10 @@ impl ServerLanguage {
                             ),
                         }),
                         // Range of hovered element.
-                        range: if word_range.start.file_path.as_os_str() == file_path.as_os_str() {
-                            Some(shader_range_to_lsp_range(&word_range))
+                        range: if word.get_range().start.file_path.as_os_str()
+                            == file_path.as_os_str()
+                        {
+                            Some(shader_range_to_lsp_range(&word.get_range()))
                         } else {
                             None
                         },

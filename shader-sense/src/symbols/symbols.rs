@@ -853,7 +853,11 @@ impl<'a> ShaderSymbolListRef<'a> {
             None => true, // intrinsics
         }
     }
-    pub fn find_symbols_at(&self, label: &String, position: &ShaderPosition) -> Vec<&ShaderSymbol> {
+    pub fn find_symbols_at(
+        &'a self,
+        label: &str,
+        position: &ShaderPosition,
+    ) -> Vec<&'a ShaderSymbol> {
         self.iter()
             .filter(|s| {
                 !s.is_transient() && s.label == *label && Self::is_symbol_defined_at(s, position)
@@ -868,24 +872,24 @@ impl<'a> ShaderSymbolListRef<'a> {
             !symbol_type.is_transient() && Self::is_symbol_defined_at(symbol, cursor_position)
         })
     }
-    pub fn find_symbols(&self, label: &String) -> Vec<&ShaderSymbol> {
+    pub fn find_symbols(&'a self, label: &String) -> Vec<&'a ShaderSymbol> {
         self.iter()
             .filter(|s| s.label == *label && !s.is_transient())
             .collect::<Vec<&ShaderSymbol>>()
     }
-    pub fn find_symbol(&self, label: &String) -> Option<&ShaderSymbol> {
+    pub fn find_symbol(&'a self, label: &String) -> Option<&'a ShaderSymbol> {
         match self.iter().find(|e| e.label == *label) {
             Some(symbol) => return Some(symbol),
             None => None,
         }
     }
-    pub fn find_type_symbol(&self, label: &String) -> Option<&ShaderSymbol> {
+    pub fn find_type_symbol(&'a self, label: &String) -> Option<&'a ShaderSymbol> {
         self.types.iter().find(|s| s.label == *label).map(|s| *s)
     }
     pub fn filter<P: Fn(ShaderSymbolType, &ShaderSymbol) -> bool>(
-        &self,
+        &'a self,
         predicate: P,
-    ) -> ShaderSymbolListRef {
+    ) -> ShaderSymbolListRef<'a> {
         ShaderSymbolListRef {
             types: self
                 .types

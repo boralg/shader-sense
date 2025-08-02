@@ -33,8 +33,8 @@ impl ServerLanguage {
             &RefCell::borrow(&cached_file.shader_module),
             &shader_position,
         ) {
-            Ok((word, word_range)) => {
-                let matching_symbols = symbol_list.find_symbols_at(&word, &shader_position);
+            Ok(word) => {
+                let matching_symbols = word.find_symbol_from_parent(&symbol_list);
                 Ok(Some(GotoDefinitionResponse::Link(
                     matching_symbols
                         .iter()
@@ -44,7 +44,7 @@ impl ServerLanguage {
                                     // _range here should be equal to selected_range.
                                     Some(_range) => Some(lsp_types::LocationLink {
                                         origin_selection_range: Some(shader_range_to_lsp_range(
-                                            &word_range,
+                                            &word.get_range(),
                                         )),
                                         target_uri: Url::from_file_path(&target.file_path).unwrap(),
                                         target_range: shader_range_to_lsp_range(&ShaderRange::new(
@@ -61,7 +61,7 @@ impl ServerLanguage {
                                 match &symbol.range {
                                     Some(range) => Some(lsp_types::LocationLink {
                                         origin_selection_range: Some(shader_range_to_lsp_range(
-                                            &word_range,
+                                            &word.get_range(),
                                         )),
                                         target_uri: Url::from_file_path(&range.start.file_path)
                                             .unwrap(),
