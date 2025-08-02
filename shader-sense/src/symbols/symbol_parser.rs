@@ -147,7 +147,7 @@ impl ShaderWordRange {
         if self.parent.is_none() {
             // Could be either a variable, a link, or a type.
             symbol_list
-                .find_symbols_at(&self.word, &self.range.start)
+                .find_symbols_at(&self.word, &self.range.end)
                 .iter()
                 .map(|s| (*s).clone())
                 .collect()
