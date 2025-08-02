@@ -28,7 +28,6 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                 // type_identifier = struct name, class name...
                 // primitive_type = float, uint...
                 // string_content = include, should check preproc_include as parent.
-                // TODO: handle function call for return type chaining aswell
                 "identifier" | "type_identifier" | "primitive_type" => {
                     return Ok(ShaderWordRange::new(
                         get_name(&symbol_tree.content, node).into(),
@@ -47,29 +46,47 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                         }
                     }
                     let mut word: Option<ShaderWordRange> = None;
-                    let mut current_node = node.prev_named_sibling().unwrap();
+                    let mut current_node = node.prev_named_sibling().unwrap(); // This might panic
                     loop {
                         let field = current_node.next_named_sibling().unwrap();
-                        if field.kind() == "field_identifier" {
-                            set_parent(
+                        match field.kind() {
+                            "field_identifier" => set_parent(
                                 &mut word,
                                 ShaderWordRange::new(
                                     get_name(&symbol_tree.content, field).into(),
                                     ShaderRange::from_range(field.range(), &symbol_tree.file_path),
                                     None,
                                 ),
-                            );
-                        } else {
-                            return Err(ShaderError::InternalErr(format!(
-                                "Unhandled case in find_label_chain_at_position_in_node: {}",
-                                field.kind()
-                            )));
-                        }
-                        match current_node.child_by_field_name("argument") {
-                            Some(child) => {
-                                current_node = child;
+                            ),
+                            _ => {
+                                return Err(ShaderError::InternalErr(format!(
+                                    "Unknown word field {}",
+                                    field.kind()
+                                )))
                             }
-                            None => {
+                        }
+                        let mut cursor = current_node.walk();
+                        match cursor.node().kind() {
+                            "field_expression" => {
+                                cursor.goto_first_child();
+                                current_node = cursor.node();
+                            }
+                            "call_expression" => {
+                                cursor.goto_first_child();
+                                match cursor.node().kind() {
+                                    "field_expression" => {
+                                        cursor.goto_first_child();
+                                        current_node = cursor.node();
+                                    }
+                                    _ => {
+                                        return Err(ShaderError::InternalErr(format!(
+                                            "Failed to get word from call {}",
+                                            field.kind()
+                                        )))
+                                    }
+                                }
+                            }
+                            _ => {
                                 let identifier = current_node;
                                 set_parent(
                                     &mut word,
