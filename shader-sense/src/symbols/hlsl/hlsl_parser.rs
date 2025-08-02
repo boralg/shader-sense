@@ -277,20 +277,20 @@ impl SymbolTreeParser for HlslVariableTreeParser {
                     declarator: [
                         (identifier) @variable.label
                         (array_declarator
-                            declarator: (identifier) @variable.label
+                            declarator: ({}identifier) @variable.label
                             size: (_) @variable.size
                         )
                     ]
                     value: (_)
                 ) 
                 (array_declarator
-                    declarator: (identifier) @variable.label
+                    declarator: ({}identifier) @variable.label
                     size: (_) @variable.size
                 )
                 ({}identifier) @variable.label
             ]
         )"#,
-            field_prestring, field_prestring
+            field_prestring, field_prestring, field_prestring, field_prestring
         )
     }
     fn process_match(
