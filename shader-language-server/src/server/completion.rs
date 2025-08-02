@@ -51,35 +51,44 @@ impl ServerLanguage {
                         if symbols.is_empty() {
                             Ok(vec![])
                         } else {
-                            let symbol_type = symbols[0];
+                            let symbol_type = &symbols[0];
                             let completion_items = match &symbol_type.data {
-                                ShaderSymbolData::Struct {
-                                    constructors: _,
-                                    members,
-                                    methods,
-                                } => {
-                                    let mut members_and_methods: Vec<ShaderSymbol> = Vec::new();
-                                    members_and_methods.extend(
-                                        members
-                                            .iter()
-                                            .map(|m| m.as_symbol())
-                                            .collect::<Vec<ShaderSymbol>>(),
-                                    );
-                                    members_and_methods.extend(
-                                        methods
-                                            .iter()
-                                            .map(|m| m.as_symbol())
-                                            .collect::<Vec<ShaderSymbol>>(),
-                                    );
-                                    members_and_methods
-                                        .into_iter()
-                                        .map(|s| {
-                                            convert_completion_item(
-                                                cached_file.shading_language,
-                                                &s,
-                                            )
-                                        })
-                                        .collect()
+                                ShaderSymbolData::Variables { ty, count: _ } => {
+                                    match symbol_list.find_type_symbol(ty) {
+                                        Some(ty) => match &ty.data {
+                                            ShaderSymbolData::Struct {
+                                                constructors: _,
+                                                members,
+                                                methods,
+                                            } => {
+                                                let mut members_and_methods: Vec<ShaderSymbol> =
+                                                    Vec::new();
+                                                members_and_methods.extend(
+                                                    members
+                                                        .iter()
+                                                        .map(|m| m.as_symbol())
+                                                        .collect::<Vec<ShaderSymbol>>(),
+                                                );
+                                                members_and_methods.extend(
+                                                    methods
+                                                        .iter()
+                                                        .map(|m| m.as_symbol())
+                                                        .collect::<Vec<ShaderSymbol>>(),
+                                                );
+                                                members_and_methods
+                                                    .into_iter()
+                                                    .map(|s| {
+                                                        convert_completion_item(
+                                                            cached_file.shading_language,
+                                                            &s,
+                                                        )
+                                                    })
+                                                    .collect()
+                                            }
+                                            _ => vec![],
+                                        },
+                                        None => vec![],
+                                    }
                                 }
                                 _ => vec![],
                             };

@@ -85,6 +85,7 @@ impl<'a> ShaderSymbolListBuilder<'a> {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct ShaderWordRange {
     parent: Option<Box<ShaderWordRange>>, // Box to avoid recursive struct
     word: String,
@@ -142,13 +143,14 @@ impl ShaderWordRange {
         self.parent.is_some()
     }
     // Look for matching symbol in symbol_list
-    pub fn find_symbol_from_parent<'a>(
-        &self,
-        symbol_list: &'a ShaderSymbolListRef,
-    ) -> Vec<&'a ShaderSymbol> {
+    pub fn find_symbol_from_parent(&self, symbol_list: &ShaderSymbolListRef) -> Vec<ShaderSymbol> {
         if self.parent.is_none() {
             // Could be either a variable, a link, or a type.
-            symbol_list.find_symbols_at(&self.word, &self.range.start)
+            symbol_list
+                .find_symbols_at(&self.word, &self.range.start)
+                .iter()
+                .map(|s| (*s).clone())
+                .collect()
         } else {
             // Will be a variable or a function if chained.
             let stack = self.get_word_stack();
@@ -160,13 +162,13 @@ impl ShaderWordRange {
                         match &symbol.data {
                             ShaderSymbolData::Functions { signatures } => {
                                 match symbol_list.find_type_symbol(&signatures[0].returnType) {
-                                    Some(ty_symbol) => ty_symbol,
+                                    Some(ty_symbol) => ty_symbol.clone(),
                                     None => return vec![], // Did not found corresponding type symbol
                                 }
                             }
                             ShaderSymbolData::Variables { ty, count: _ } => {
                                 match symbol_list.find_type_symbol(ty) {
-                                    Some(ty_symbol) => ty_symbol,
+                                    Some(ty_symbol) => ty_symbol.clone(),
                                     None => return vec![], // Did not found corresponding type symbol
                                 }
                             }
@@ -179,6 +181,7 @@ impl ShaderWordRange {
                 },
                 None => unreachable!("Should always have at least one "),
             };
+            let mut current_word = None;
             while let Some(next_item) = &rev_stack.next() {
                 let symbol = match &current_symbol.data {
                     ShaderSymbolData::Struct {
@@ -187,6 +190,7 @@ impl ShaderWordRange {
                         methods,
                     } => {
                         if let Some(member) = members.iter().find(|m| m.label == next_item.word) {
+                            //member.as_symbol();
                             match symbol_list.find_type_symbol(&member.ty) {
                                 Some(ty_symbol) => ty_symbol,
                                 None => return vec![], // parent is not a known type
@@ -194,6 +198,7 @@ impl ShaderWordRange {
                         } else if let Some(method) =
                             methods.iter().find(|m| m.label == next_item.word)
                         {
+                            // method.as_symbol();
                             match symbol_list.find_type_symbol(&method.signature.returnType) {
                                 Some(ty_symbol) => ty_symbol,
                                 None => return vec![], // parent is not a known type
@@ -210,10 +215,26 @@ impl ShaderWordRange {
                     }
                     _ => return vec![], // Data useless.
                 };
-                current_symbol = symbol;
+                current_word = Some((**next_item).clone());
+                current_symbol = symbol.clone();
             }
             // TODO: This should return variable or function. Method and Members should be symbol for this to work.
-            vec![current_symbol]
+            // Here we should have a type word. Transform it to a
+            vec![ShaderSymbol {
+                label: current_word.unwrap().get_word().into(),
+                description: "".into(),
+                version: "".into(),
+                stages: vec![],
+                link: None,
+                data: ShaderSymbolData::Variables {
+                    ty: current_symbol.label,
+                    count: None,
+                },
+                range: current_symbol.range,
+                scope: None,
+                scope_stack: None,
+            }]
+            //vec![current_symbol.clone()]
         }
     }
 }
