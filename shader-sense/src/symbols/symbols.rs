@@ -16,6 +16,8 @@ pub struct ShaderParameter {
     pub label: String,
     pub count: Option<u32>,
     pub description: String,
+    #[serde(skip)] // Runtime only
+    pub range: Option<ShaderRange>,
 }
 
 #[allow(non_snake_case)] // for JSON
@@ -41,6 +43,20 @@ impl ShaderSignature {
             .map(|p| format!("{} {}", p.ty, p.label))
             .collect::<Vec<String>>();
         format!("{} {}({})", self.returnType, label, signature.join(", "))
+    }
+    pub fn format_with_context(&self, label: &str, context: &str) -> String {
+        let signature = self
+            .parameters
+            .iter()
+            .map(|p| format!("{} {}", p.ty, p.label))
+            .collect::<Vec<String>>();
+        format!(
+            "{} {}::{}({})",
+            self.returnType,
+            context,
+            label,
+            signature.join(", ")
+        )
     }
 }
 
@@ -591,46 +607,55 @@ impl ShaderPreprocessor {
     }
 }
 
-pub type ShaderMember = ShaderParameter;
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub struct ShaderMember {
+    pub context: String,
+    pub parameters: ShaderParameter,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShaderMethod {
     pub label: String,
+    pub context: String,
     pub signature: ShaderSignature,
+    #[serde(skip)] // Runtime only
+    pub range: Option<ShaderRange>,
 }
 
 impl ShaderMember {
-    pub fn as_symbol(&self) -> ShaderSymbol {
+    pub fn as_symbol(&self, scope: Option<ShaderScope>) -> ShaderSymbol {
         ShaderSymbol {
-            label: self.label.clone(),
-            description: self.description.clone(),
+            label: self.parameters.label.clone(),
+            description: self.parameters.description.clone(),
             version: "".into(),
             stages: vec![],
             link: None,
-            data: ShaderSymbolData::Variables {
-                ty: self.ty.clone(),
-                count: self.count,
+            data: ShaderSymbolData::Parameter {
+                context: self.context.clone(),
+                ty: self.parameters.ty.clone(),
+                count: self.parameters.count.clone(),
             },
-            range: None, // Should have a position ?
-            scope: None, // TODO: Should be scope of parent
+            range: self.parameters.range.clone(),
+            scope: scope,
             scope_stack: None,
         }
     }
 }
 
 impl ShaderMethod {
-    pub fn as_symbol(&self) -> ShaderSymbol {
+    pub fn as_symbol(&self, scope: Option<ShaderScope>) -> ShaderSymbol {
         ShaderSymbol {
             label: self.label.clone(),
             description: self.signature.description.clone(),
             version: "".into(),
             stages: vec![],
             link: None,
-            data: ShaderSymbolData::Functions {
+            data: ShaderSymbolData::Method {
+                context: self.context.clone(),
                 signatures: vec![self.signature.clone()],
             },
-            range: None, // Should have a position ?
-            scope: None, // TODO: Should be scope of parent
+            range: self.range.clone(),
+            scope: scope,
             scope_stack: None,
         }
     }
@@ -653,6 +678,15 @@ pub enum ShaderSymbolData {
         value: String,
     },
     Functions {
+        signatures: Vec<ShaderSignature>,
+    },
+    Parameter {
+        context: String,
+        ty: String,
+        count: Option<u32>,
+    },
+    Method {
+        context: String,
         signatures: Vec<ShaderSignature>,
     },
     Keyword {},
@@ -882,6 +916,12 @@ impl<'a> ShaderSymbolListRef<'a> {
             Some(symbol) => return Some(symbol),
             None => None,
         }
+    }
+    pub fn find_function_symbol(&'a self, label: &String) -> Option<&'a ShaderSymbol> {
+        self.functions
+            .iter()
+            .find(|s| s.label == *label)
+            .map(|s| *s)
     }
     pub fn find_type_symbol(&'a self, label: &String) -> Option<&'a ShaderSymbol> {
         self.types.iter().find(|s| s.label == *label).map(|s| *s)
@@ -1130,6 +1170,15 @@ impl ShaderSymbol {
                 value: _,
             } => Some(ShaderSymbolType::Constants),
             ShaderSymbolData::Variables { ty: _, count: _ } => Some(ShaderSymbolType::Variables),
+            ShaderSymbolData::Parameter {
+                context: _,
+                ty: _,
+                count: _,
+            } => Some(ShaderSymbolType::Variables),
+            ShaderSymbolData::Method {
+                context: _,
+                signatures: _,
+            } => Some(ShaderSymbolType::Functions),
             ShaderSymbolData::CallExpression {
                 label: _,
                 range: _,
@@ -1158,6 +1207,14 @@ impl ShaderSymbol {
                 Some(count) => format!("{} {}[{}]", ty, self.label, count),
                 None => format!("{} {}", ty, self.label),
             },
+            ShaderSymbolData::Parameter { context, ty, count } => match count {
+                Some(count) => format!("{} {}::{}[{}]", ty, context, self.label, count),
+                None => format!("{} {}::{}", ty, context, self.label),
+            },
+            ShaderSymbolData::Method {
+                context,
+                signatures,
+            } => signatures[0].format_with_context(&self.label, context), // TODO: append +1 symbol
             ShaderSymbolData::CallExpression {
                 label,
                 range: _,

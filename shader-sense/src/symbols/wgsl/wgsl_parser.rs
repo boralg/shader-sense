@@ -2,7 +2,9 @@ use std::path::Path;
 
 use crate::symbols::{
     symbol_parser::{get_name, ShaderSymbolListBuilder, SymbolTreeParser},
-    symbols::{ShaderParameter, ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolData},
+    symbols::{
+        ShaderMember, ShaderParameter, ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolData,
+    },
 };
 
 pub fn get_wgsl_parsers() -> Vec<Box<dyn SymbolTreeParser>> {
@@ -36,8 +38,9 @@ impl SymbolTreeParser for WgslStructTreeParser {
         let label_node = matches.captures[0].node;
         let range = ShaderRange::from_range(label_node.range(), file_path.into());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
+        let struct_name: String = get_name(shader_content, matches.captures[0].node).into();
         symbols.add_type(ShaderSymbol {
-            label: get_name(shader_content, matches.captures[0].node).into(),
+            label: struct_name.clone(),
             description: "".into(),
             version: "".into(),
             stages: vec![],
@@ -46,13 +49,17 @@ impl SymbolTreeParser for WgslStructTreeParser {
                 constructors: vec![], // Constructor in wgsl ?
                 members: matches.captures[1..]
                     .chunks(2)
-                    .map(|w| ShaderParameter {
-                        ty: get_name(shader_content, w[1].node).into(),
-                        label: get_name(shader_content, w[0].node).into(),
-                        count: None,
-                        description: "".into(),
+                    .map(|w| ShaderMember {
+                        context: struct_name.clone(),
+                        parameters: ShaderParameter {
+                            ty: get_name(shader_content, w[1].node).into(),
+                            label: get_name(shader_content, w[0].node).into(),
+                            count: None,
+                            description: "".into(),
+                            range: Some(ShaderRange::from_range(w[0].node.range(), file_path)),
+                        },
                     })
-                    .collect::<Vec<ShaderParameter>>(),
+                    .collect(),
                 methods: vec![],
             },
             scope: None, // TODO: compute

@@ -1,7 +1,8 @@
 use shader_sense::{
     shader::ShaderStage,
     symbols::symbols::{
-        ShaderParameter, ShaderSignature, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
+        ShaderMethod, ShaderParameter, ShaderSignature, ShaderSymbol, ShaderSymbolData,
+        ShaderSymbolList,
     },
 };
 
@@ -26,6 +27,7 @@ pub fn new_hlsl_scalar(label: &str, description: &str, version: &str) -> ShaderS
                     label: "value".into(),
                     count: None,
                     description: "".into(),
+                    range: None,
                 }],
             }],
         },
@@ -37,9 +39,10 @@ pub fn new_hlsl_scalar(label: &str, description: &str, version: &str) -> ShaderS
 
 impl HlslIntrinsicParser {
     pub fn add_types(&self, symbols: &mut ShaderSymbolList) {
-        /*fn get_texture_object_methods() -> Vec<ShaderMethod> {
+        fn get_texture_object_methods(context: &str) -> Vec<ShaderMethod> {
             vec![
                 ShaderMethod {
+                    context: context.into(),
                     label: "GetDimensions".into(),
                     signature: ShaderSignature {
                         returnType: "void".into(),
@@ -49,11 +52,15 @@ impl HlslIntrinsicParser {
                                 ty: "uint".into(),
                                 label: "dim".into(),
                                 description: "The length, in bytes, of the buffer.".into(),
+                                count: None,
+                                range: None,
                             }
                         ]
-                    }
+                    },
+                    range: None,
                 },
                 ShaderMethod {
+                    context: context.into(),
                     label: "Load".into(),
                     signature: ShaderSignature {
                         returnType: "void".into(),
@@ -63,20 +70,25 @@ impl HlslIntrinsicParser {
                                 ty: "int".into(),
                                 label: "Location".into(),
                                 description: "The location of the buffer".into(),
+                                count: None,
+                                range: None,
                             },
                             ShaderParameter {
                                 ty: "uint".into(),
                                 label: "Status".into(),
                                 description: "The status of the operation. You can't access the status directly; instead, pass the status to the CheckAccessFullyMapped intrinsic function. CheckAccessFullyMapped returns TRUE if all values from the corresponding Sample, Gather, or Load operation accessed mapped tiles in a tiled resource. If any values were taken from an unmapped tile, CheckAccessFullyMapped returns FALSE.".into(),
+                                count: None,
+                                range: None,
                             }
                         ]
-                    }
+                    },
+                    range: None,
                 }
             ]
         }
         fn get_buffer_object_methods() -> Vec<ShaderMethod> {
             vec![] // Load
-        }*/
+        }
         // sm 4.0 : Object<Type, Samples> name
         // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-type
         symbols.types.push(ShaderSymbol {
@@ -106,7 +118,7 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: get_texture_object_methods("Texture1D"),
             },
             scope_stack: None,
             range: None,
@@ -121,7 +133,7 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: get_texture_object_methods("Texture1DArray"),
             },
             scope_stack: None,
             range: None,
@@ -139,7 +151,7 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: get_texture_object_methods("Texture2D"),
             },
             scope_stack: None,
             range: None,
@@ -154,7 +166,7 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: get_texture_object_methods("Texture2DArray"),
             },
             scope_stack: None,
             range: None,
@@ -172,7 +184,7 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: get_texture_object_methods("Texture3D"),
             },
             scope_stack: None,
             range: None,
@@ -187,7 +199,7 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: get_texture_object_methods("TextureCube"),
             },
             scope_stack: None,
             range: None,
@@ -202,7 +214,7 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: get_texture_object_methods("TextureCubeArray"),
             },
             scope_stack: None,
             range: None,
@@ -217,7 +229,7 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: get_texture_object_methods("Texture2DMS"),
             },
             scope_stack: None,
             range: None,
@@ -232,7 +244,7 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: get_texture_object_methods("Texture2DMSArray"),
             },
             scope_stack: None,
             range: None,
@@ -692,6 +704,7 @@ impl HlslIntrinsicParser {
                                 label: "value".into(),
                                 count: None,
                                 description: "".into(),
+                                range:None,
                             }],
                         },
                         ShaderSignature {
@@ -702,6 +715,7 @@ impl HlslIntrinsicParser {
                                 label: get_vector_component_label(parameter_index),
                                 count: None,
                                 description: "".into(),
+                                range:None,
                             }).collect(),
                         }
                     ]},
@@ -734,6 +748,7 @@ impl HlslIntrinsicParser {
                                     label: "value".into(),
                                     count: None,
                                     description: "".into(),
+                                    range:None,
                                 }],
                             },
                             ShaderSignature {
@@ -745,6 +760,7 @@ impl HlslIntrinsicParser {
                                         label: get_matrix_component_label(col_index, row_index),
                                         count: None,
                                         description: "".into(),
+                                        range:None,
                                     }).collect::<Vec<ShaderParameter>>()
                                 ).collect::<Vec<Vec<ShaderParameter>>>().concat(),
                             }

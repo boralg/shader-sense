@@ -66,13 +66,13 @@ impl ServerLanguage {
                                                 members_and_methods.extend(
                                                     members
                                                         .iter()
-                                                        .map(|m| m.as_symbol())
+                                                        .map(|m| m.as_symbol(None))
                                                         .collect::<Vec<ShaderSymbol>>(),
                                                 );
                                                 members_and_methods.extend(
                                                     methods
                                                         .iter()
-                                                        .map(|m| m.as_symbol())
+                                                        .map(|m| m.as_symbol(None))
                                                         .collect::<Vec<ShaderSymbol>>(),
                                                 );
                                                 members_and_methods

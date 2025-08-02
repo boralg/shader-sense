@@ -60,6 +60,7 @@ impl GlslIntrinsicParser {
                                             label: param_name.trim().into(),
                                             count: None,
                                             description: "".into(),
+                                            range: None,
                                         })
                                     }
                                     None => None,
