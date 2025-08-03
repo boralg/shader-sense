@@ -68,20 +68,42 @@ impl Dxc {
     pub fn new() -> Result<Self, hassle_rs::HassleError> {
         // Pick the bundled dxc dll if available.
         // Else it will ignore it and pick the globally available one.
-        let folder = match std::env::current_dir() {
-            Ok(parent_path) => {
-                if parent_path.join("dxcompiler.dll").is_file() {
-                    parent_path.into()
-                } else {
-                    None
+        #[cfg(target_os = "windows")]
+        fn dxc_lib_name() -> (&'static Path, &'static Path) {
+            (Path::new("dxcompiler.dll"), Path::new("dxil.dll"))
+        }
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        fn dxc_lib_name() -> (&'static Path, &'static Path) {
+            (Path::new("libdxcompiler.so"), Path::new("libdxil.so"))
+        }
+        #[cfg(target_os = "macos")]
+        fn dxc_lib_name() -> (&'static Path, &'static Path) {
+            (Path::new("libdxcompiler.dylib"), Path::new("libdxil.dylib"))
+        }
+        let (dxcompiler_lib_name, dxil_lib_name) = dxc_lib_name();
+        fn find_dll_path(dll: &Path) -> Option<PathBuf> {
+            // Rely on current_exe as current_dir might be changed by process.
+            // Else return dll and hope that they are accessible in path.
+            match std::env::current_exe() {
+                Ok(executable_path) => {
+                    if let Some(parent_path) = executable_path.parent() {
+                        let dll_path = parent_path.join(dll);
+                        if dll_path.is_file() {
+                            Some(dll_path)
+                        } else {
+                            Some(dll.into())
+                        }
+                    } else {
+                        Some(dll.into())
+                    }
                 }
+                Err(_) => Some(dll.into()),
             }
-            Err(_) => None,
-        };
-        let dxc = hassle_rs::Dxc::new(folder.clone())?;
+        }
+        let dxc = hassle_rs::Dxc::new(find_dll_path(dxcompiler_lib_name))?;
         let library = dxc.create_library()?;
         let compiler = dxc.create_compiler()?;
-        let (dxil, validator) = match Dxil::new(folder) {
+        let (dxil, validator) = match Dxil::new(find_dll_path(dxil_lib_name)) {
             Ok(dxil) => {
                 let validator_option = match dxil.create_validator() {
                     Ok(validator) => Some(validator),
