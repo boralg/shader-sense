@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
+
+## [0.8.0] - 2025-08-03
+
 ### Added
 
-- Struct completion features has been hugely improved. You will now benefit of structure field completion in HLSL & GLSL.
-- Added formatting for HLSL & GLSL code through clang format (for full & partial formatting). Support for a .clang-format configuration file.
-- Added an option for DXC SPIRV support to remove warning related to SPIRV (shader-validator.hlsl.spirv).
+- **Struct completion** features has been hugely improved. You will now benefit of structure field completion in HLSL & GLSL.
+- HLSL database now include methods for Texture & Buffer Objects to be used along struct completion.
+- Added **formatting** for HLSL & GLSL code through clang format (for full & partial formatting). Support for a .clang-format configuration file.
+- Added an option for **DXC SPIRV** support to remove warning related to SPIRV (shader-validator.hlsl.spirv).
 - Every field of the config is now optional for third party client and server will not crash if its missing some.
 - Improvement on caching and dependencies handling aswell as performances.
 - Add a CLI tool for validating shaders.
@@ -21,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix an issue where DXC was picking globally accessible DXC instead of bundled one.
 - Fix an issue with region missing some defines.
 - Fix an issue with dirty files being wrongly tracked.
+- Fix an issue with HLSL array variable in struct not being captured.
 
 
 ## [0.7.0] - 2025-07-22
@@ -286,7 +291,8 @@ Initial release of this extension
 
 
 <!-- Below are link for above changelog titles-->
-[unreleased]: https://github.com/antaalt/shader-sense/compare/v0.7.0...HEAD
+[unreleased]: https://github.com/antaalt/shader-sense/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/antaalt/shader-sense/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/antaalt/shader-sense/compare/v0.6.1...v0.7.0
 [0.6.2]: https://github.com/antaalt/shader-sense/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/antaalt/shader-sense/compare/v0.6.0...v0.6.1
