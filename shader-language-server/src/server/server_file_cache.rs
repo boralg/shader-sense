@@ -333,11 +333,13 @@ impl ServerLanguageFileCache {
                     },
                 ) {
                     Ok(diagnostics) => diagnostics,
-                    Err(err) => ShaderDiagnosticList { diagnostics: vec![ShaderDiagnostic {
-                        severity: ShaderDiagnosticSeverity::Error,
-                        error: format!("Failed to validate shader: {:?}", err), 
-                        range: ShaderRange::whole(&file_path, &RefCell::borrow(&variant_shader_module).content) }]
-                    },
+                    Err(err) => ShaderDiagnosticList { diagnostics: vec![
+                        ShaderDiagnostic {
+                            severity: ShaderDiagnosticSeverity::Error,
+                            error: format!("Failed to validate shader: {:?}", err),
+                            range: ShaderRange::zero(file_path.clone())
+                        }
+                    ]},
                 };
                 diagnostics
             };

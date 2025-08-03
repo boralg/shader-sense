@@ -170,10 +170,14 @@ impl Dxc {
         }
 
         if shader_error_list.is_empty() {
-            Err(ShaderError::InternalErr(format!(
-                "Failed to parse errors: {}",
-                errors
-            )))
+            Ok(ShaderDiagnosticList {
+                diagnostics: vec![ShaderDiagnostic {
+                    severity: ShaderDiagnosticSeverity::Error,
+                    error: format!("Failed to parse errors: {}", &errors),
+                    // Minimize impact of error by showing it only at beginning.
+                    range: ShaderRange::zero(file_path.into()),
+                }],
+            })
         } else {
             Ok(shader_error_list)
         }
