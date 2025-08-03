@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use shader_sense::{
-    shader::{GlslShadingLanguageTag, ShadingLanguage, ShadingLanguageTag},
+    shader::{GlslShadingLanguageTag, ShadingLanguageTag},
     symbols::{
         shader_language::ShaderLanguage,
         symbol_provider::{default_include_callback, ShaderSymbolParams},
