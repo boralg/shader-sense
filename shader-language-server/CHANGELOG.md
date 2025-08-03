@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
+## [0.8.1] - 2025-08-03
+
+### Fixed
+
+- Fixed an issue with invalid position computed using UTF8 characters
+- Fixed a crash when triggering completion on position at start of line due to invalid line computation from byte offset.
+- Updated shader-sense-cli Cargo.toml for a crates.io release.
 
 ## [0.8.0] - 2025-08-03
 
@@ -291,7 +298,8 @@ Initial release of this extension
 
 
 <!-- Below are link for above changelog titles-->
-[unreleased]: https://github.com/antaalt/shader-sense/compare/v0.8.0...HEAD
+[unreleased]: https://github.com/antaalt/shader-sense/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/antaalt/shader-sense/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/antaalt/shader-sense/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/antaalt/shader-sense/compare/v0.6.1...v0.7.0
 [0.6.2]: https://github.com/antaalt/shader-sense/compare/v0.6.1...v0.6.2
