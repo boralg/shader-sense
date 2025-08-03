@@ -314,24 +314,28 @@ mod tests {
         let utf8_file_path = Path::new("./test/hlsl/utf8.hlsl");
         let utf8_shader_content = std::fs::read_to_string(utf8_file_path).unwrap();
 
+        #[cfg(windows)]
+        const EOL: &str = "\r\n";
+        #[cfg(not(windows))]
+        const EOL: &str = "\n";
         let test_data = vec![
             (
-                "\r\n}",
+                "\n}".replace("\n", EOL),
                 ShaderPosition::new(utf8_file_path.into(), 5, 0),
                 &utf8_shader_content,
             ),
             (
-                "",
+                "".replace("\n", EOL),
                 ShaderPosition::new(utf8_file_path.into(), 6, 1),
                 &utf8_shader_content,
             ),
             (
-                "id main() {\r\n\r\n}",
+                "id main() {\n\n}".replace("\n", EOL),
                 ShaderPosition::new(utf8_file_path.into(), 4, 2),
                 &utf8_shader_content,
             ),
             (
-                "にちは世界!\r\n\r\nvoid main() {\r\n\r\n}",
+                "にちは世界!\n\nvoid main() {\n\n}".replace("\n", EOL),
                 ShaderPosition::new(utf8_file_path.into(), 2, 5),
                 &utf8_shader_content,
             ),
