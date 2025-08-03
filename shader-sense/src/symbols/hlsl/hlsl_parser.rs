@@ -97,6 +97,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
                     label: label,
                     count: None,
                     description: "".into(),
+                    range: Some(ShaderRange::from_range(w[1].node.range(), file_path)),
                 }
             })
             .collect::<Vec<ShaderParameter>>();
@@ -159,6 +160,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
         symbols: &mut ShaderSymbolListBuilder,
     ) {
         let label_node = matches.captures[0].node;
+        let struct_name: String = get_name(shader_content, matches.captures[0].node).into();
         let range = ShaderRange::from_range(label_node.range(), file_path.into());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
 
@@ -184,12 +186,14 @@ impl SymbolTreeParser for HlslStructTreeParser {
                     .functions
                     .into_iter()
                     .map(|f| ShaderMethod {
+                        context: struct_name.clone(),
                         label: f.label.clone(),
                         signature: if let ShaderSymbolData::Functions { signatures } = &f.data {
                             signatures[0].clone()
                         } else {
                             panic!("Invalid function type");
                         },
+                        range: f.range,
                     })
                     .collect::<Vec<ShaderMethod>>()
             })
@@ -218,25 +222,29 @@ impl SymbolTreeParser for HlslStructTreeParser {
                     .variables
                     .into_iter()
                     .map(|f| ShaderMember {
-                        label: f.label.clone(),
-                        ty: if let ShaderSymbolData::Variables { ty, count: _ } = &f.data {
-                            ty.clone()
-                        } else {
-                            panic!("Invalid variable type");
+                        context: struct_name.clone(),
+                        parameters: ShaderParameter {
+                            label: f.label.clone(),
+                            ty: if let ShaderSymbolData::Variables { ty, count: _ } = &f.data {
+                                ty.clone()
+                            } else {
+                                panic!("Invalid variable type");
+                            },
+                            count: if let ShaderSymbolData::Variables { ty: _, count } = &f.data {
+                                count.clone()
+                            } else {
+                                panic!("Invalid variable type");
+                            },
+                            description: "".into(),
+                            range: f.range,
                         },
-                        count: if let ShaderSymbolData::Variables { ty: _, count } = &f.data {
-                            count.clone()
-                        } else {
-                            panic!("Invalid variable type");
-                        },
-                        description: "".into(),
                     })
                     .collect::<Vec<ShaderMember>>()
             })
             .collect::<Vec<Vec<ShaderMember>>>()
             .concat();
         symbols.add_type(ShaderSymbol {
-            label: get_name(shader_content, matches.captures[0].node).into(),
+            label: struct_name,
             description: "".into(),
             version: "".into(),
             stages: vec![],
@@ -269,20 +277,20 @@ impl SymbolTreeParser for HlslVariableTreeParser {
                     declarator: [
                         (identifier) @variable.label
                         (array_declarator
-                            declarator: (identifier) @variable.label
+                            declarator: ({}identifier) @variable.label
                             size: (_) @variable.size
                         )
                     ]
                     value: (_)
                 ) 
                 (array_declarator
-                    declarator: (identifier) @variable.label
+                    declarator: ({}identifier) @variable.label
                     size: (_) @variable.size
                 )
                 ({}identifier) @variable.label
             ]
         )"#,
-            field_prestring, field_prestring
+            field_prestring, field_prestring, field_prestring, field_prestring
         )
     }
     fn process_match(
@@ -399,8 +407,8 @@ mod hlsl_parser_tests {
             shader_language::ShaderLanguage,
             symbol_parser::{ShaderSymbolListBuilder, SymbolTreeParser},
             symbols::{
-                ShaderMember, ShaderMethod, ShaderParameter, ShaderSignature, ShaderSymbol,
-                ShaderSymbolData, ShaderSymbolList,
+                ShaderMember, ShaderMethod, ShaderParameter, ShaderPosition, ShaderRange,
+                ShaderSignature, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
             },
         },
     };
@@ -533,25 +541,44 @@ mod hlsl_parser_tests {
                     constructors: vec![],
                     members: vec![
                         ShaderMember {
-                            ty: "float".into(),
-                            label: "member0".into(),
-                            description: "".into(),
-                            count: None,
+                            context: "TestStruct".into(),
+                            parameters: ShaderParameter {
+                                ty: "float".into(),
+                                label: "member0".into(),
+                                description: "".into(),
+                                count: None,
+                                range: Some(ShaderRange::new(
+                                    ShaderPosition::new(path.into(), 1, 0),
+                                    ShaderPosition::new(path.into(), 2, 0),
+                                )),
+                            },
                         },
                         ShaderMember {
-                            ty: "float".into(),
-                            label: "member1".into(),
-                            description: "".into(),
-                            count: None,
+                            context: "TestStruct".into(),
+                            parameters: ShaderParameter {
+                                ty: "float".into(),
+                                label: "member1".into(),
+                                description: "".into(),
+                                count: None,
+                                range: Some(ShaderRange::new(
+                                    ShaderPosition::new(path.into(), 1, 0),
+                                    ShaderPosition::new(path.into(), 2, 0),
+                                )),
+                            },
                         },
                     ],
                     methods: vec![ShaderMethod {
+                        context: "TestStruct".into(),
                         label: "method".into(),
                         signature: ShaderSignature {
                             returnType: "float".into(),
                             description: "".into(),
                             parameters: vec![],
                         },
+                        range: Some(ShaderRange::new(
+                            ShaderPosition::new(path.into(), 1, 0),
+                            ShaderPosition::new(path.into(), 2, 0),
+                        )),
                     }],
                 },
                 range: None,
@@ -587,12 +614,20 @@ mod hlsl_parser_tests {
                                 label: "p0".into(),
                                 description: "".into(),
                                 count: None,
+                                range: Some(ShaderRange::new(
+                                    ShaderPosition::new(path.into(), 1, 0),
+                                    ShaderPosition::new(path.into(), 2, 0),
+                                )),
                             },
                             ShaderParameter {
                                 ty: "uint".into(),
                                 label: "p1".into(),
                                 description: "".into(),
                                 count: None,
+                                range: Some(ShaderRange::new(
+                                    ShaderPosition::new(path.into(), 1, 0),
+                                    ShaderPosition::new(path.into(), 2, 0),
+                                )),
                             },
                         ],
                     }],

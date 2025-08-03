@@ -1,7 +1,4 @@
-use std::{
-    cell::RefCell,
-    io::{BufRead, BufReader},
-};
+use std::{cell::RefCell, ops::Range};
 
 use lsp_types::{
     MarkupContent, ParameterInformation, ParameterLabel, Position, SignatureHelp,
@@ -11,7 +8,7 @@ use regex::Regex;
 
 use shader_sense::{
     shader_error::ShaderError,
-    symbols::symbols::{ShaderPosition, ShaderSymbol, ShaderSymbolData},
+    symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolData},
 };
 
 use super::ServerLanguage;
@@ -23,111 +20,138 @@ impl ServerLanguage {
         position: Position,
     ) -> Result<Option<SignatureHelp>, ShaderError> {
         let cached_file = self.watched_files.get_file(uri).unwrap();
+        let file_path = uri.to_file_path().unwrap();
+        let shader_position = ShaderPosition {
+            file_path: file_path.clone(),
+            line: position.line as u32,
+            pos: position.character as u32,
+        };
         let language_data = self
             .language_data
             .get(&cached_file.shading_language)
             .unwrap();
-        // TODO: rely on symbol provider for stronger result.
-        // Should simply get symbol & read parameters. Need to get parameter index though...
         let all_symbol_list = self
             .watched_files
             .get_all_symbols(uri, &language_data.language);
-        let item_parameter = get_function_parameter_at_position(
-            &RefCell::borrow(&cached_file.shader_module).content,
-            position,
-        );
-
-        let file_path = uri.to_file_path().unwrap();
-        let completion = all_symbol_list.filter_scoped_symbol(&ShaderPosition {
-            file_path: file_path.clone(),
-            line: position.line as u32,
-            pos: position.character as u32,
-        });
-        let (shader_symbols, parameter_index): (Vec<&ShaderSymbol>, u32) =
-            if let (Some(item_label), Some(parameter_index)) = item_parameter {
-                (completion.find_symbols(&item_label), parameter_index)
+        let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);
+        let content = &RefCell::borrow(&cached_file.shader_module).content;
+        let function_parameter = get_function_parameter_at_position(content, position);
+        let (word_range, parameter_index) = if let Some((function_label_range, parameter_index)) =
+            function_parameter
+        {
+            let function_label_range = ShaderRange::new(
+                ShaderPosition::from_byte_offset(content, function_label_range.start, &file_path)
+                    .unwrap(),
+                ShaderPosition::from_byte_offset(content, function_label_range.end, &file_path)
+                    .unwrap(),
+            );
+            let word_range = language_data.symbol_provider.get_word_range_at_position(
+                &RefCell::borrow(&cached_file.shader_module),
+                &function_label_range.start,
+            );
+            if let Some(parameter_index) = parameter_index {
+                (word_range, parameter_index)
             } else {
-                (Vec::new(), 0)
-            };
-        let signatures: Vec<SignatureInformation> = shader_symbols
-            .iter()
-            .filter_map(|shader_symbol| {
-                let functions = match &shader_symbol.data {
-                    ShaderSymbolData::Functions { signatures } => signatures,
-                    ShaderSymbolData::Struct {
-                        constructors,
-                        members: _,
-                        methods: _,
-                    } => constructors,
-                    ShaderSymbolData::Types { constructors } => constructors,
-                    _ => return None,
-                };
-                Some(
-                    functions
+                (word_range, 0)
+            }
+        } else {
+            (Err(ShaderError::NoSymbol), 0)
+        };
+        match word_range {
+            Ok(word) => {
+                let matching_symbols = word.find_symbol_from_parent(&symbol_list);
+                if matching_symbols.len() == 0 {
+                    Ok(None)
+                } else {
+                    // We need to find one to fill
+                    let signatures = matching_symbols
                         .iter()
-                        .map(|signature| SignatureInformation {
-                            label: signature.format(shader_symbol.label.as_str()),
-                            documentation: Some(lsp_types::Documentation::MarkupContent(
-                                MarkupContent {
-                                    kind: lsp_types::MarkupKind::Markdown,
-                                    value: shader_symbol.description.clone(),
-                                },
-                            )),
-                            parameters: Some(
-                                signature
-                                    .parameters
+                        .filter_map(|shader_symbol| {
+                            let signatures = match &shader_symbol.data {
+                                ShaderSymbolData::Types { constructors } => constructors,
+                                ShaderSymbolData::Struct {
+                                    constructors,
+                                    members: _,
+                                    methods: _,
+                                } => constructors,
+                                ShaderSymbolData::Functions { signatures } => signatures,
+                                ShaderSymbolData::Method {
+                                    context: _,
+                                    signatures,
+                                } => signatures,
+                                _ => return None,
+                            };
+                            Some(
+                                signatures
                                     .iter()
-                                    .map(|e| ParameterInformation {
-                                        label: ParameterLabel::Simple(e.label.clone()),
+                                    .map(|signature| SignatureInformation {
+                                        label: signature.format(shader_symbol.label.as_str()),
                                         documentation: Some(
                                             lsp_types::Documentation::MarkupContent(
                                                 MarkupContent {
                                                     kind: lsp_types::MarkupKind::Markdown,
-                                                    value: e.description.clone(),
+                                                    value: shader_symbol.description.clone(),
                                                 },
                                             ),
                                         ),
+                                        parameters: Some(
+                                            signature
+                                                .parameters
+                                                .iter()
+                                                .map(|e| ParameterInformation {
+                                                    label: ParameterLabel::Simple(e.label.clone()),
+                                                    documentation: Some(
+                                                        lsp_types::Documentation::MarkupContent(
+                                                            MarkupContent {
+                                                                kind:
+                                                                    lsp_types::MarkupKind::Markdown,
+                                                                value: e.description.clone(),
+                                                            },
+                                                        ),
+                                                    ),
+                                                })
+                                                .collect(),
+                                        ),
+                                        active_parameter: None,
                                     })
-                                    .collect(),
-                            ),
-                            active_parameter: None,
+                                    .collect::<Vec<SignatureInformation>>(),
+                            )
                         })
-                        .collect::<Vec<SignatureInformation>>(),
-                )
-            })
-            .collect::<Vec<Vec<SignatureInformation>>>()
-            .concat();
-        if signatures.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(SignatureHelp {
-                signatures: signatures,
-                active_signature: None,
-                active_parameter: Some(parameter_index), // TODO: check out of bounds.
-            }))
+                        .collect::<Vec<Vec<SignatureInformation>>>()
+                        .concat();
+                    if signatures.is_empty() {
+                        Ok(None)
+                    } else {
+                        Ok(Some(SignatureHelp {
+                            signatures: signatures,
+                            active_signature: None,
+                            active_parameter: Some(parameter_index), // TODO: check out of bounds.
+                        }))
+                    }
+                }
+            }
+            Err(err) => {
+                if let ShaderError::NoSymbol = err {
+                    Ok(None)
+                } else {
+                    Err(err)
+                }
+            }
         }
     }
 }
-// This could be replaced by an API for inlay parameters.
-// Function definition should store range aswell for each parameter.
-// Issue is that it then rely on updated symbols which might take some time to process.
-// With this, we can update completion instantly in a multithread context, using only content.
+
 fn get_function_parameter_at_position(
-    shader: &String,
+    shader: &str,
     position: Position,
-) -> (Option<String>, Option<u32>) {
-    let reader = BufReader::new(shader.as_bytes());
-    let line = reader
-        .lines()
-        .nth(position.line as usize)
-        .expect("Text position is out of bounds")
-        .expect("Could not read line");
+) -> Option<(Range<usize>, Option<u32>)> {
+    let line = shader.lines().nth(position.line as usize).unwrap();
     // Check this regex is working for all lang.
     let regex =
         Regex::new("\\b([a-zA-Z_][a-zA-Z0-9_]*)(\\(.*?)(\\))").expect("Failed to init regex");
-    for capture in regex.captures_iter(line.as_str()) {
-        let file_name = capture.get(1).expect("Failed to get function name");
-        let parenthesis = capture.get(2).expect("Failed to get paranthesis");
+    for capture in regex.captures_iter(line) {
+        let function_name = capture.get(1).unwrap();
+        let parenthesis = capture.get(2).unwrap();
         let parameter_index = if position.character >= parenthesis.start() as u32
             && position.character <= parenthesis.end() as u32
         {
@@ -148,15 +172,16 @@ fn get_function_parameter_at_position(
         } else {
             None
         };
-        if position.character >= file_name.start() as u32
+        let byte_offset = line.as_ptr() as usize - shader.as_ptr() as usize;
+        if position.character >= function_name.start() as u32
             && position.character <= parenthesis.end() as u32
         {
-            return (
-                Some(line[file_name.start()..file_name.end()].to_string()),
+            return Some((
+                ((byte_offset + function_name.start())..(byte_offset + function_name.end())),
                 parameter_index,
-            );
+            ));
         }
     }
     // No signature
-    (None, None)
+    None
 }

@@ -2,6 +2,7 @@ use std::path::Path;
 
 use crate::symbols::symbol_parser::ShaderSymbolListBuilder;
 
+use crate::symbols::symbols::ShaderMember;
 use crate::symbols::{
     symbol_parser::{get_name, SymbolTreeParser},
     symbols::{
@@ -79,6 +80,7 @@ impl SymbolTreeParser for GlslFunctionTreeParser {
                             label: get_name(shader_content, w[1].node).into(),
                             count: None,
                             description: "".into(),
+                            range: Some(ShaderRange::from_range(w[1].node.range(), file_path)),
                         })
                         .collect::<Vec<ShaderParameter>>(),
                 }],
@@ -120,8 +122,9 @@ impl SymbolTreeParser for GlslUniformBlock {
             let identifier_node = matches.captures[0].node;
             let identifier_range =
                 ShaderRange::from_range(identifier_node.range(), file_path.into());
+            let uniform_block_name: String = get_name(shader_content, identifier_node).into();
             symbols.add_type(ShaderSymbol {
-                label: get_name(shader_content, identifier_node).into(),
+                label: uniform_block_name.clone(),
                 description: "".into(),
                 version: "".into(),
                 stages: vec![],
@@ -130,13 +133,17 @@ impl SymbolTreeParser for GlslUniformBlock {
                     constructors: vec![], // No constructor for uniform.
                     members: matches.captures[1..capture_count - 1]
                         .chunks(2)
-                        .map(|w| ShaderParameter {
-                            ty: get_name(shader_content, w[0].node).into(),
-                            label: get_name(shader_content, w[1].node).into(),
-                            count: None,
-                            description: "".into(),
+                        .map(|w| ShaderMember {
+                            context: uniform_block_name.clone(),
+                            parameters: ShaderParameter {
+                                ty: get_name(shader_content, w[0].node).into(),
+                                label: get_name(shader_content, w[1].node).into(),
+                                count: None,
+                                description: "".into(),
+                                range: Some(ShaderRange::from_range(w[1].node.range(), file_path)),
+                            },
                         })
-                        .collect::<Vec<ShaderParameter>>(),
+                        .collect(),
                     methods: vec![],
                 },
                 scope: None,
@@ -209,6 +216,7 @@ impl SymbolTreeParser for GlslStructTreeParser {
         symbols: &mut ShaderSymbolListBuilder,
     ) {
         let label_node = matches.captures[0].node;
+        let label = get_name(shader_content, label_node).to_string();
         let range = ShaderRange::from_range(label_node.range(), file_path.into());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
         let members = matches.captures[1..]
@@ -218,9 +226,9 @@ impl SymbolTreeParser for GlslStructTreeParser {
                 label: get_name(shader_content, w[1].node).into(),
                 count: None,
                 description: "".into(),
+                range: Some(ShaderRange::from_range(w[1].node.range(), file_path)),
             })
             .collect::<Vec<ShaderParameter>>();
-        let label = get_name(shader_content, label_node).to_string();
         symbols.add_type(ShaderSymbol {
             label: label.clone(),
             description: "".into(),
@@ -228,13 +236,19 @@ impl SymbolTreeParser for GlslStructTreeParser {
             stages: vec![],
             link: None,
             data: ShaderSymbolData::Struct {
-                // In Glsl, constructor are auto built from all there members.
+                // In Glsl, constructor are auto built from all their members.
                 constructors: vec![ShaderSignature {
                     returnType: "void".into(),
                     description: format!("{} constructor", label),
                     parameters: members.clone(),
                 }],
-                members: members,
+                members: members
+                    .into_iter()
+                    .map(|m| ShaderMember {
+                        context: label.clone(),
+                        parameters: m,
+                    })
+                    .collect(),
                 methods: vec![],
             },
             scope: None, // TODO: compute

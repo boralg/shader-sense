@@ -22,6 +22,7 @@ impl GlslIntrinsicParser {
                             label: "value".into(),
                             count: None,
                             description: "".into(),
+                            range: None,
                         }],
                     }],
                 },
@@ -65,6 +66,7 @@ impl GlslIntrinsicParser {
                                 label: "value".into(),
                                 count: None,
                                 description: "".into(),
+                                range: None,
                             }],
                         },
                         ShaderSignature {
@@ -76,6 +78,7 @@ impl GlslIntrinsicParser {
                                     label: get_vector_component_label(parameter_index),
                                     count: None,
                                     description: "".into(),
+                                    range: None,
                                 })
                                 .collect(),
                         },
@@ -110,6 +113,7 @@ impl GlslIntrinsicParser {
                                 label: "value".into(),
                                 count: None,
                                 description: "".into(),
+                                range: None,
                             }],
                         },
                         ShaderSignature {
@@ -123,6 +127,7 @@ impl GlslIntrinsicParser {
                                             label: get_matrix_component_label(col_index, row_index),
                                             count: None,
                                             description: "".into(),
+                                            range: None,
                                         })
                                         .collect::<Vec<ShaderParameter>>()
                                 })

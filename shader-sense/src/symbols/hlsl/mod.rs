@@ -3,7 +3,6 @@ mod hlsl_parser;
 mod hlsl_preprocessor;
 mod hlsl_regions;
 mod hlsl_word;
-mod hlsl_word_chain;
 
 use hlsl_filter::get_hlsl_filters;
 use hlsl_parser::get_hlsl_parsers;
@@ -21,8 +20,7 @@ pub fn create_hlsl_symbol_provider(tree_sitter_language: tree_sitter::Language) 
         get_hlsl_filters(),
         get_hlsl_preprocessor_parser(),
         Box::new(HlslSymbolRegionFinder::new(tree_sitter_language.clone())),
-        Box::new(hlsl_word_chain::HlslSymbolLabelChainProvider {}),
-        Box::new(hlsl_word::HlslSymbolLabelProvider {}),
+        Box::new(hlsl_word::HlslSymbolWordProvider {}),
     )
 }
 
