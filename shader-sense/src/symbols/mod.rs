@@ -313,29 +313,25 @@ mod tests {
         // Testing file
         let utf8_file_path = Path::new("./test/hlsl/utf8.hlsl");
         let utf8_shader_content = std::fs::read_to_string(utf8_file_path).unwrap();
-
-        #[cfg(windows)]
-        const EOL: &str = "\r\n";
-        #[cfg(not(windows))]
-        const EOL: &str = "\n";
+        // End of line are enforced to \n through gitattributes for hlsl / glsl / wgsl in this repo.
         let test_data = vec![
             (
-                "\n}".replace("\n", EOL),
+                "\n}",
                 ShaderPosition::new(utf8_file_path.into(), 5, 0),
                 &utf8_shader_content,
             ),
             (
-                "".replace("\n", EOL),
+                "",
                 ShaderPosition::new(utf8_file_path.into(), 6, 1),
                 &utf8_shader_content,
             ),
             (
-                "id main() {\n\n}".replace("\n", EOL),
+                "id main() {\n\n}",
                 ShaderPosition::new(utf8_file_path.into(), 4, 2),
                 &utf8_shader_content,
             ),
             (
-                "にちは世界!\n\nvoid main() {\n\n}".replace("\n", EOL),
+                "にちは世界!\n\nvoid main() {\n\n}",
                 ShaderPosition::new(utf8_file_path.into(), 2, 5),
                 &utf8_shader_content,
             ),
