@@ -30,7 +30,17 @@ impl ServerLanguageData {
             #[cfg(target_os = "wasi")]
             validator: Box::new(Glslang::hlsl()),
             #[cfg(not(target_os = "wasi"))]
-            validator: Box::new(Dxc::new().unwrap()),
+            validator: match Dxc::new() {
+                Ok(dxc) => Box::new(dxc),
+                Err(err) => {
+                    use log::error;
+                    error!(
+                        "Failed to instantiate DXC: {}\nFallback to glslang instead.",
+                        err.to_string()
+                    );
+                    Box::new(Glslang::hlsl())
+                }
+            },
             language,
             symbol_provider,
         }

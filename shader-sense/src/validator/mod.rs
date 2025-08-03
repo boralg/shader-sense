@@ -12,7 +12,10 @@ pub fn create_validator(shading_language: ShadingLanguage) -> Box<dyn Validator>
     match shading_language {
         ShadingLanguage::Wgsl => Box::new(naga::Naga::new()),
         #[cfg(not(target_os = "wasi"))]
-        ShadingLanguage::Hlsl => Box::new(dxc::Dxc::new().unwrap()),
+        ShadingLanguage::Hlsl => match dxc::Dxc::new() {
+            Ok(dxc) => Box::new(dxc),
+            Err(_) => Box::new(glslang::Glslang::hlsl()), // Failed to instantiate dxc. Fallback to glslang.
+        },
         #[cfg(target_os = "wasi")]
         ShadingLanguage::Hlsl => Box::new(glslang::Glslang::hlsl()),
         ShadingLanguage::Glsl => Box::new(glslang::Glslang::glsl()),
