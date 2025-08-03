@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
+## [0.8.2] - 2025-08-03
+
+### Fixed
+
+- Fixed a crash when DXC fail to instantiate. Fallback to glslang for validation instead.
+- Fixed an issue with dxil dll loading on Linux as dxcompiler.so seems to load it from path while we create it from absolute path.
+
 ## [0.8.1] - 2025-08-03
 
 ### Fixed
@@ -298,7 +305,8 @@ Initial release of this extension
 
 
 <!-- Below are link for above changelog titles-->
-[unreleased]: https://github.com/antaalt/shader-sense/compare/v0.8.1...HEAD
+[unreleased]: https://github.com/antaalt/shader-sense/compare/v0.8.2...HEAD
+[0.8.1]: https://github.com/antaalt/shader-sense/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/antaalt/shader-sense/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/antaalt/shader-sense/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/antaalt/shader-sense/compare/v0.6.1...v0.7.0
