@@ -43,6 +43,68 @@ impl HlslIntrinsicParser {
             // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2d
             // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-gather
             let mut methods = Vec::new();
+            if context != "Texture2DMS" && context != "Texture2DMSArray" {
+                methods.push(ShaderMethod {
+                    context: context.into(),
+                    label: "CalculateLevelOfDetail".into(),
+                    signature: ShaderSignature {
+                        returnType: "float".into(),
+                        description: "Calculates the level of detail.".into(),
+                        parameters: vec![
+                            ShaderParameter {
+                                ty: "sampler".into(),
+                                label: "s".into(),
+                                description: "A Sampler state. This is an object declared in an effect file that contains state assignments.".into(),
+                                count: None,
+                                range: None,
+                            },
+                            ShaderParameter {
+                                ty: match context {
+                                    "Texture1D" | "Texture1DArray" => "float",
+                                    "Texture2D" | "Texture2DArray" => "float2",
+                                    "Texture3D" | "TextureCube" | "TextureCubeArray" => "float3",
+                                    str => unreachable!("Reached {}", str)
+                                }.into(),
+                                label: "location".into(),
+                                description: "The linear interpolation value or values, which is a floating-point number between 0.0 and 1.0 inclusive. The number of components is dependent on the texture-object type. ".into(),
+                                count: None,
+                                range: None,
+                            }
+                        ]
+                    },
+                    range: None,
+                });
+                methods.push(ShaderMethod {
+                    context: context.into(),
+                    label: "CalculateLevelOfDetailUnclamped".into(),
+                    signature: ShaderSignature {
+                        returnType: "float".into(),
+                        description: "Calculates the LOD without clamping the result.".into(),
+                        parameters: vec![
+                            ShaderParameter {
+                                ty: "sampler".into(),
+                                label: "s".into(),
+                                description: "A Sampler state. This is an object declared in an effect file that contains state assignments.".into(),
+                                count: None,
+                                range: None,
+                            },
+                            ShaderParameter {
+                                ty: match context {
+                                    "Texture1D" | "Texture1DArray" => "float",
+                                    "Texture2D" | "Texture2DArray" => "float2",
+                                    "Texture3D" | "TextureCube" | "TextureCubeArray" => "float3",
+                                    str => unreachable!("Reached {}", str)
+                                }.into(),
+                                label: "location".into(),
+                                description: "The linear interpolation value or values, which is a floating-point number between 0.0 and 1.0 inclusive. The number of components is dependent on the texture-object type. ".into(),
+                                count: None,
+                                range: None,
+                            }
+                        ]
+                    },
+                    range: None,
+                });
+            }
             match context {
                 "Texture2D" | "Texture2DArray" | "TextureCube" | "TextureCubeArray" => {
                     let mut method = ShaderMethod {
@@ -92,20 +154,20 @@ impl HlslIntrinsicParser {
                 _ => {} // not supported
             }
             // TODO: https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-getdimensions
-            let (dimensions, has_layers) = match context {
-                "Texture1D" => (2, false),
-                "Texture1DArray" => (2, true),
-                "Texture2D" => (2, false),
-                "Texture2DArray" => (2, true),
-                "Texture3D" => (2, false),
-                "Texture3DArray" => (2, true),
-                "Texture2DMS" => (2, false),
-                "Texture2DMSArray" => (2, true),
-                "TextureCube" => (2, true),
-                "TextureCubeArray" => (2, true),
+            let (dimensions, has_layers, has_mips) = match context {
+                "Texture1D" => (1, false, true),
+                "Texture1DArray" => (1, true, true),
+                "Texture2D" => (2, false, true),
+                "Texture2DArray" => (2, true, true),
+                "Texture3D" => (3, false, true),
+                "Texture3DArray" => (3, true, true),
+                "TextureCube" => (2, false, true),
+                "TextureCubeArray" => (2, true, true),
+                "Texture2DMS" => (2, false, false),
+                "Texture2DMSArray" => (2, true, false),
                 _ => unreachable!(),
             };
-            methods.push(ShaderMethod {
+            let mut base_get = ShaderMethod {
                 context: context.into(),
                 label: "GetDimensions".into(),
                 signature: ShaderSignature {
@@ -113,14 +175,69 @@ impl HlslIntrinsicParser {
                     description: "".into(),
                     parameters: vec![ShaderParameter {
                         ty: "uint".into(),
-                        label: "dim".into(),
-                        description: "The length, in bytes, of the buffer.".into(),
+                        label: "width".into(),
+                        description: "The resource width, in texels.".into(),
                         count: None,
                         range: None,
                     }],
                 },
                 range: None,
-            });
+            };
+            if dimensions > 1 {
+                base_get.signature.parameters.push(ShaderParameter {
+                    ty: "uint".into(),
+                    label: "height".into(),
+                    description: "The resource height, in texels.".into(),
+                    count: None,
+                    range: None,
+                });
+            }
+            if dimensions > 2 {
+                base_get.signature.parameters.push(ShaderParameter {
+                    ty: "uint".into(),
+                    label: "depth".into(),
+                    description: "The resource depth, in texels.".into(),
+                    count: None,
+                    range: None,
+                });
+            }
+            if has_layers {
+                base_get.signature.parameters.push(ShaderParameter {
+                    ty: "uint".into(),
+                    label: "elements".into(),
+                    description: "The height of the texture.".into(),
+                    count: None,
+                    range: None,
+                });
+            }
+            if has_mips {
+                // Push version without mips.
+                methods.push(base_get.clone());
+                let mip_level = ShaderParameter {
+                    ty: "uint".into(),
+                    label: "mipLevel".into(),
+                    description:
+                        "Optional. Mipmap level (must be specified if NumberOfLevels is used)."
+                            .into(),
+                    count: None,
+                    range: None,
+                };
+                let nb_level = ShaderParameter {
+                    ty: "uint".into(),
+                    label: "numberOfLevel".into(),
+                    description: "The number of mipmap levels (requires MipLevel also).".into(),
+                    count: None,
+                    range: None,
+                };
+                base_get.signature.parameters = [
+                    vec![mip_level],
+                    base_get.signature.parameters,
+                    vec![nb_level],
+                ]
+                .concat();
+                // Push version with mips.
+                methods.push(base_get);
+            }
             match context {
                 "Texture2DMS" | "Texture2DMSArray" => methods.push(ShaderMethod {
                     context: context.into(),
@@ -302,9 +419,6 @@ impl HlslIntrinsicParser {
             }
             methods
         }
-        fn get_buffer_object_methods() -> Vec<ShaderMethod> {
-            vec![] // Load
-        }
         // sm 4.0 : Object<Type, Samples> name
         // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-type
         symbols.types.push(ShaderSymbol {
@@ -316,7 +430,40 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "Buffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "The length, in elements, of the Buffer as set in the Unordered Resource View.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dim".into(),
+                                count: None,
+                                description: "The length, in bytes, of the buffer.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load".into(),
+                        context: "Buffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "T".into(),
+                            description: "Reads buffer data.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "location".into(),
+                                count: None,
+                                description: "The location of the buffer.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }
+                ],
             },
             scope_stack: None,
             range: None,
@@ -477,11 +624,46 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![/*ShaderMethod {
-                    // GetDimensions
-                    // Load
-                    // Operator[]
-                }*/],
+                methods: vec![
+                    ShaderMethod {
+                        label: "Append".into(),
+                        context: "AppendStructuredBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Appends a value to the end of the buffer.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "value".into(),
+                                count: None,
+                                description: "The input value.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "AppendStructuredBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Returns the dimensions of the resource.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "numStructs".into(),
+                                count: None,
+                                description: "The number of structures in the resource.".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint".into(),
+                                label: "stride".into(),
+                                count: None,
+                                description: "The number of bytes in each element.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }
+                ],
             },
             scope_stack: None,
             range: None,
@@ -496,22 +678,88 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
-            },
-            scope_stack: None,
-            range: None,
-            scope: None,
-        });
-        symbols.types.push(ShaderSymbol {
-            label: "ByteAddressBuffer".into(),
-            description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-ByteAddressBuffer".into()),
-            data: ShaderSymbolData::Struct {
-                constructors: vec![],
-                members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "ByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Gets the length of the buffer.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dim".into(),
+                                count: None,
+                                description: "The length, in bytes, of the buffer.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load".into(),
+                        context: "ByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "uint".into(),
+                            description: "Gets one value.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load2".into(),
+                        context: "ByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "uint2".into(),
+                            description: "Gets two values.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load3".into(),
+                        context: "ByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "uint3".into(),
+                            description: "Gets three values.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load4".into(),
+                        context: "ByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "uint4".into(),
+                            description: "Gets four values.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }
+                ],
             },
             scope_stack: None,
             range: None,
@@ -526,7 +774,40 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "Consume".into(),
+                        context: "ConsumeStructuredBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "T".into(),
+                            description: "Removes a value from the end of the buffer.".into(),
+                            parameters: vec![]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "ConsumeStructuredBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Returns the dimensions of the resource.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "numStructs".into(),
+                                count: None,
+                                description: "The number of structures in the resource.".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint".into(),
+                                label: "stride".into(),
+                                count: None,
+                                description: "The number of bytes in each element.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }
+                ],
             },
             scope_stack: None,
             range: None,
@@ -541,7 +822,7 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![], // Only [] operator
             },
             scope_stack: None,
             range: None,
@@ -556,7 +837,7 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![], // Only [] operator
             },
             scope_stack: None,
             range: None,
@@ -574,7 +855,40 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "RWBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "The length, in elements, of the Buffer as set in the Unordered Resource View.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dim".into(),
+                                count: None,
+                                description: "The length, in bytes, of the buffer.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load".into(),
+                        context: "RWBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "T".into(),
+                            description: "Reads buffer data.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "location".into(),
+                                count: None,
+                                description: "The location of the buffer.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }
+                ],
             },
             scope_stack: None,
             range: None,
@@ -589,7 +903,456 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "RWBufRWByteAddressBufferfer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Gets the length of the buffer.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dim".into(),
+                                count: None,
+                                description: "The length, in bytes, of the buffer.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    // Interlocked
+                    ShaderMethod {
+                        label: "InterlockedAdd".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Adds the value, atomically.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dest".into(),
+                                count: None,
+                                description: "The destination address.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "value".into(),
+                                count: None,
+                                description: "The input value.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "original_value".into(),
+                                count: None,
+                                description: "The original value as output.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "InterlockedAnd".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Ands the value, atomically.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dest".into(),
+                                count: None,
+                                description: "The destination address.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "value".into(),
+                                count: None,
+                                description: "The input value.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "original_value".into(),
+                                count: None,
+                                description: "The original value as output.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "InterlockedCompareExchange".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Compares the input to the comparison value and exchanges the result, atomically.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dest".into(),
+                                count: None,
+                                description: "The destination address.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "compare_value".into(),
+                                count: None,
+                                description: "The comparison value.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "value".into(),
+                                count: None,
+                                description: "The input value.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "original_value".into(),
+                                count: None,
+                                description: "The original value as output.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "InterlockedCompareStore".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Compares the input to the comparison value, atomically.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dest".into(),
+                                count: None,
+                                description: "The destination address.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "compare_value".into(),
+                                count: None,
+                                description: "The comparison value.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "original_value".into(),
+                                count: None,
+                                description: "The original value as output.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "InterlockedExchange".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Exchanges a value, atomically.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dest".into(),
+                                count: None,
+                                description: "The destination address.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "value".into(),
+                                count: None,
+                                description: "The input value.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "original_value".into(),
+                                count: None,
+                                description: "The original value as output.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "InterlockedMax".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Finds the maximum value, atomically.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dest".into(),
+                                count: None,
+                                description: "The destination address.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "value".into(),
+                                count: None,
+                                description: "The input value.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "original_value".into(),
+                                count: None,
+                                description: "The original value as output.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "InterlockedMin".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Finds the minimum value, atomically.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dest".into(),
+                                count: None,
+                                description: "The destination address.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "value".into(),
+                                count: None,
+                                description: "The input value.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "original_value".into(),
+                                count: None,
+                                description: "The original value as output.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "InterlockedOr".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Performs an atomic OR on the value.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dest".into(),
+                                count: None,
+                                description: "The destination address.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "value".into(),
+                                count: None,
+                                description: "The input value.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "original_value".into(),
+                                count: None,
+                                description: "The original value as output.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "InterlockedXor".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Performs an atomic XOR on the value.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "dest".into(),
+                                count: None,
+                                description: "The destination address.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "value".into(),
+                                count: None,
+                                description: "The input value.".into(),
+                                range: None
+                            },
+                            ShaderParameter {
+                                ty: "uint".into(),
+                                label: "original_value".into(),
+                                count: None,
+                                description: "The original value as output.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    // Load
+                    ShaderMethod {
+                        label: "Load".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "uint".into(),
+                            description: "Gets one value.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load2".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "uint2".into(),
+                            description: "Gets two values.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load3".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "uint3".into(),
+                            description: "Gets three values.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load4".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "uint4".into(),
+                            description: "Gets four values.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    // Store
+                    ShaderMethod {
+                        label: "Store".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Set one value.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint".into(),
+                                label: "values".into(),
+                                count: None,
+                                description: "Input value.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Store2".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Sets two values.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint2".into(),
+                                label: "values".into(),
+                                count: None,
+                                description: "Two input values.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Store3".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Sets three values.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint3".into(),
+                                label: "values".into(),
+                                count: None,
+                                description: "Three input values.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Store4".into(),
+                        context: "RWByteAddressBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Sets four values.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "address".into(),
+                                count: None,
+                                description: "The input address in bytes, which must be a multiple of 4.".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint4".into(),
+                                label: "values".into(),
+                                count: None,
+                                description: "Four input values.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }
+                ],
             },
             scope_stack: None,
             range: None,
@@ -604,7 +1367,66 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "RWStructuredBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Returns the dimensions of the resource.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "numStructs".into(),
+                                count: None,
+                                description: "The number of structures in the resource.".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint".into(),
+                                label: "stride".into(),
+                                count: None,
+                                description: "The stride, in bytes, of each structure element.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load".into(),
+                        context: "RWStructuredBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "T".into(),
+                            description: "Reads buffer data.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "location".into(),
+                                count: None,
+                                description: "The location of the buffer.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "DecrementCounter".into(),
+                        context: "RWStructuredBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "uint".into(),
+                            description: "Decrements the object's hidden counter.".into(),
+                            parameters: vec![]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "IncrementCounter".into(),
+                        context: "RWStructuredBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "uint".into(),
+                            description: "Increments the object's hidden counter.".into(),
+                            parameters: vec![]
+                        },
+                        range: None,
+                    }
+                ],
             },
             scope_stack: None,
             range: None,
@@ -619,7 +1441,39 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "RWTexture1D".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Returns the dimensions of the resource.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "width".into(),
+                                count: None,
+                                description: "The resource width, in texels".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load".into(),
+                        context: "RWTexture1D".into(),
+                        signature: ShaderSignature {
+                            returnType: "T".into(),
+                            description: "Reads texture data.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "location".into(),
+                                count: None,
+                                description: "The location of the texture.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }],
             },
             scope_stack: None,
             range: None,
@@ -634,7 +1488,46 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "RWTexture1DArray".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Returns the dimensions of the resource.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "width".into(),
+                                count: None,
+                                description: "The resource width, in texels".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint".into(),
+                                label: "elements".into(),
+                                count: None,
+                                description: "The number of elements in the array.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load".into(),
+                        context: "RWTexture1DArray".into(),
+                        signature: ShaderSignature {
+                            returnType: "T".into(),
+                            description: "Reads texture data.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "location".into(),
+                                count: None,
+                                description: "The location of the texture.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }
+                ],
             },
             scope_stack: None,
             range: None,
@@ -649,7 +1542,46 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "RWTexture2D".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Returns the dimensions of the resource.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "width".into(),
+                                count: None,
+                                description: "The resource width, in texels".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint".into(),
+                                label: "height".into(),
+                                count: None,
+                                description: "The resource height, in texels".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load".into(),
+                        context: "RWTexture2D".into(),
+                        signature: ShaderSignature {
+                            returnType: "T".into(),
+                            description: "Reads texture data.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "location".into(),
+                                count: None,
+                                description: "The location of the texture.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }
+                ],
             },
             scope_stack: None,
             range: None,
@@ -664,7 +1596,51 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "RWTexture2DArray".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Returns the dimensions of the resource.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "width".into(),
+                                count: None,
+                                description: "The resource width, in texels".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint".into(),
+                                label: "height".into(),
+                                count: None,
+                                description: "The resource height, in texels".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint".into(),
+                                label: "elements".into(),
+                                count: None,
+                                description: "The number of elements in the array.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load".into(),
+                        context: "RWTexture2DArray".into(),
+                        signature: ShaderSignature {
+                            returnType: "T".into(),
+                            description: "Reads texture data.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "location".into(),
+                                count: None,
+                                description: "The location of the texture.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }],
             },
             scope_stack: None,
             range: None,
@@ -679,22 +1655,52 @@ impl HlslIntrinsicParser {
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
-            },
-            scope_stack: None,
-            range: None,
-            scope: None,
-        });
-        symbols.types.push(ShaderSymbol {
-            label: "StructuredBuffer".into(),
-            description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-StructuredBuffer".into()),
-            data: ShaderSymbolData::Struct {
-                constructors: vec![],
-                members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "RWTexture3D".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Returns the dimensions of the resource.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "width".into(),
+                                count: None,
+                                description: "The resource width, in texels".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint".into(),
+                                label: "height".into(),
+                                count: None,
+                                description: "The resource height, in texels".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint".into(),
+                                label: "depth".into(),
+                                count: None,
+                                description: "The resource depth, in texels.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load".into(),
+                        context: "RWTexture3D".into(),
+                        signature: ShaderSignature {
+                            returnType: "T".into(),
+                            description: "Reads texture data.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "location".into(),
+                                count: None,
+                                description: "The location of the texture.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }
+                ],
             },
             scope_stack: None,
             range: None,
@@ -704,138 +1710,162 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "StructuredBuffer".into(),
             description: "".into(),
-            version: "sm5.1".into(),
+            version: "sm5".into(),
             stages: vec![],
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-StructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
-                methods: vec![],
+                methods: vec![
+                    ShaderMethod {
+                        label: "GetDimensions".into(),
+                        context: "StructuredBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "void".into(),
+                            description: "Returns the dimensions of the resource.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "uint".into(),
+                                label: "numStructs".into(),
+                                count: None,
+                                description: "The number of structures in the resource.".into(),
+                                range: None
+                            }, ShaderParameter {
+                                ty: "uint".into(),
+                                label: "stride".into(),
+                                count: None,
+                                description: "The stride, in bytes, of each structure element.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    },
+                    ShaderMethod {
+                        label: "Load".into(),
+                        context: "StructuredBuffer".into(),
+                        signature: ShaderSignature {
+                            returnType: "T".into(),
+                            description: "Reads texture data.".into(),
+                            parameters: vec![ShaderParameter {
+                                ty: "int".into(),
+                                label: "location".into(),
+                                count: None,
+                                description: "The location of the texture.".into(),
+                                range: None
+                            }]
+                        },
+                        range: None,
+                    }
+                ],
             },
             scope_stack: None,
             range: None,
             scope: None,
         });
-        symbols.types.push(ShaderSymbol {
-            label: "RasterizerOrderedBuffer".into(),
-            description: "".into(),
-            version: "sm5.1".into(),
-            stages: vec![],
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
-            data: ShaderSymbolData::Struct {
-                constructors: vec![],
-                members: vec![],
-                methods: vec![],
-            },
-            scope_stack: None,
-            range: None,
-            scope: None,
-        });
-        symbols.types.push(ShaderSymbol {
-            label: "RasterizerOrderedByteAddressBuffer".into(),
-            description: "".into(),
-            version: "sm5.1".into(),
-            stages: vec![],
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
-            data: ShaderSymbolData::Struct {
-                constructors: vec![],
-                members: vec![],
-                methods: vec![],
-            },
-            scope_stack: None,
-            range: None,
-            scope: None,
-        });
-        symbols.types.push(ShaderSymbol {
-            label: "RasterizerOrderedStructuredBuffer".into(),
-            description: "".into(),
-            version: "sm5.1".into(),
-            stages: vec![],
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
-            data: ShaderSymbolData::Struct {
-                constructors: vec![],
-                members: vec![],
-                methods: vec![],
-            },
-            scope_stack: None,
-            range: None,
-            scope: None,
-        });
-        symbols.types.push(ShaderSymbol {
-            label: "RasterizerOrderedTexture1D".into(),
-            description: "".into(),
-            version: "sm5.1".into(),
-            stages: vec![],
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
-            data: ShaderSymbolData::Struct {
-                constructors: vec![],
-                members: vec![],
-                methods: vec![],
-            },
-            scope_stack: None,
-            range: None,
-            scope: None,
-        });
-        symbols.types.push(ShaderSymbol {
-            label: "RasterizerOrderedTexture1DArray".into(),
-            description: "".into(),
-            version: "sm5.1".into(),
-            stages: vec![],
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
-            data: ShaderSymbolData::Struct {
-                constructors: vec![],
-                members: vec![],
-                methods: vec![],
-            },
-            scope_stack: None,
-            range: None,
-            scope: None,
-        });
-        symbols.types.push(ShaderSymbol {
-            label: "RasterizerOrderedTexture2D".into(),
-            description: "".into(),
-            version: "sm5.1".into(),
-            stages: vec![],
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
-            data: ShaderSymbolData::Struct {
-                constructors: vec![],
-                members: vec![],
-                methods: vec![],
-            },
-            scope_stack: None,
-            range: None,
-            scope: None,
-        });
-        symbols.types.push(ShaderSymbol {
-            label: "RasterizerOrderedTexture2DArray".into(),
-            description: "".into(),
-            version: "sm5.1".into(),
-            stages: vec![],
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
-            data: ShaderSymbolData::Struct {
-                constructors: vec![],
-                members: vec![],
-                methods: vec![],
-            },
-            scope_stack: None,
-            range: None,
-            scope: None,
-        });
-        symbols.types.push(ShaderSymbol {
-            label: "RasterizerOrderedTexture3D".into(),
-            description: "".into(),
-            version: "sm5.1".into(),
-            stages: vec![],
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/shader-model-5-1-objects".into()),
-            data: ShaderSymbolData::Struct {
-                constructors: vec![],
-                members: vec![],
-                methods: vec![],
-            },
-            scope_stack: None,
-            range: None,
-            scope: None,
-        });
+        // The following types are alias, so copy existing types.
+        // RasterizerOrderedBuffer
+        symbols.types.push(
+            symbols
+                .types
+                .iter()
+                .find(|t| t.label == "RWBuffer")
+                .map(|s| {
+                    let mut s = s.clone();
+                    s.label = "RasterizerOrderedBuffer".into();
+                    s
+                })
+                .unwrap(),
+        );
+        // RasterizerOrderedByteAddressBuffer
+        symbols.types.push(
+            symbols
+                .types
+                .iter()
+                .find(|t| t.label == "RWByteAddressBuffer")
+                .map(|s| {
+                    let mut s = s.clone();
+                    s.label = "RasterizerOrderedByteAddressBuffer".into();
+                    s
+                })
+                .unwrap(),
+        );
+        // RasterizerOrderedStructuredBuffer
+        symbols.types.push(
+            symbols
+                .types
+                .iter()
+                .find(|t| t.label == "RWStructuredBuffer")
+                .map(|s| {
+                    let mut s = s.clone();
+                    s.label = "RasterizerOrderedStructuredBuffer".into();
+                    s
+                })
+                .unwrap(),
+        );
+        // RasterizerOrderedTexture1D
+        symbols.types.push(
+            symbols
+                .types
+                .iter()
+                .find(|t| t.label == "RWTexture1D")
+                .map(|s| {
+                    let mut s = s.clone();
+                    s.label = "RasterizerOrderedTexture1D".into();
+                    s
+                })
+                .unwrap(),
+        );
+        //RasterizerOrderedTexture1DArray
+        symbols.types.push(
+            symbols
+                .types
+                .iter()
+                .find(|t| t.label == "RWTexture1DArray")
+                .map(|s| {
+                    let mut s = s.clone();
+                    s.label = "RasterizerOrderedTexture1DArray".into();
+                    s
+                })
+                .unwrap(),
+        );
+        // RasterizerOrderedTexture2D
+        symbols.types.push(
+            symbols
+                .types
+                .iter()
+                .find(|t| t.label == "RWTexture2D")
+                .map(|s| {
+                    let mut s = s.clone();
+                    s.label = "RasterizerOrderedTexture2D".into();
+                    s
+                })
+                .unwrap(),
+        );
+        // RasterizerOrderedTexture2DArray
+        symbols.types.push(
+            symbols
+                .types
+                .iter()
+                .find(|t| t.label == "RWTexture2DArray")
+                .map(|s| {
+                    let mut s = s.clone();
+                    s.label = "RasterizerOrderedTexture2DArray".into();
+                    s
+                })
+                .unwrap(),
+        );
+        // RasterizerOrderedTexture3D
+        symbols.types.push(
+            symbols
+                .types
+                .iter()
+                .find(|t| t.label == "RWTexture3D")
+                .map(|s| {
+                    let mut s = s.clone();
+                    s.label = "RasterizerOrderedTexture3D".into();
+                    s
+                })
+                .unwrap(),
+        );
 
         // Manually push types as they are not in documentation
         let mut scalar_types = Vec::new();
