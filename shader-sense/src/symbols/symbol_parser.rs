@@ -190,9 +190,11 @@ impl ShaderWordRange {
                 None => unreachable!("Should always have at least one symbol on this path."),
             };
             // Now loop over child for matching member elements
-            let mut current_symbol = root_symbol.clone();
+            let mut current_symbols = vec![root_symbol.clone()];
             while let Some(next_item) = &rev_stack.next() {
-                let ty = match &current_symbol.data {
+                // TODO: for now, we naively pick the first signature.
+                // But we should pick instead the one closest by analyzing parameters.
+                let ty = match &current_symbols[0].data {
                     // CallExpression & variable will only be called on first iteration
                     ShaderSymbolData::CallExpression {
                         label,
@@ -229,33 +231,36 @@ impl ShaderWordRange {
                     None => return vec![], // No matching type found
                 };
                 // Find the variable chained from the type.
-                let symbol = match &symbol_ty.data {
+                let symbols: Vec<ShaderSymbol> = match &symbol_ty.data {
                     ShaderSymbolData::Struct {
                         constructors: _,
                         members,
                         methods,
                     } => {
-                        if let Some(member) = members
+                        let member_symbols: Vec<ShaderSymbol> = members
                             .iter()
-                            .find(|m| m.parameters.label == next_item.word)
-                        {
-                            member.as_symbol(None)
-                        } else if let Some(method) =
-                            methods.iter().find(|m| m.label == next_item.word)
-                        {
-                            method.as_symbol(None)
-                        } else {
-                            return vec![]; // No fit found.
-                        }
+                            .filter(|m| m.parameters.label == next_item.word)
+                            .map(|m| m.as_symbol(None))
+                            .collect();
+                        let method_symbols: Vec<ShaderSymbol> = methods
+                            .iter()
+                            .filter(|m| m.label == next_item.word)
+                            .map(|m| m.as_symbol(None))
+                            .collect();
+                        [member_symbols, method_symbols].concat()
                     }
                     ShaderSymbolData::Types { constructors: _ } => {
                         return vec![]; // Cannot chain a default type.
                     }
                     _ => return vec![], // Data useless.
                 };
-                current_symbol = symbol.clone();
+                if symbols.is_empty() {
+                    return vec![]; // No matching member / methods found.
+                } else {
+                    current_symbols = symbols;
+                }
             }
-            vec![current_symbol.clone()]
+            current_symbols
         }
     }
 }
