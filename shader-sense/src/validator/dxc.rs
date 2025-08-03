@@ -93,7 +93,6 @@ impl Dxc {
         let library = dxc.create_library()?;
         let compiler = dxc.create_compiler()?;
         // For some reason, there is a sneaky LoadLibrary call to dxil.dll from dxcompiler.dll that forces it to be in global path on Linux.
-        // So do not use globally one and hope for the best.
         let (dxil, validator) = match Dxil::new(find_dll_path(Path::new(&dxil_lib_name))) {
             Ok(dxil) => {
                 let validator_option = match dxil.create_validator() {
@@ -187,10 +186,10 @@ impl Dxc {
 
         if shader_error_list.is_empty() {
             let errors_to_ignore = vec![
-                // Anoying error that seems to be coming from dxc doing a sneaky call to LoadLibrary 
-                // for loading DXIL even though we loaded the DLL explicitely already from a 
+                // Anoying error that seems to be coming from dxc doing a sneaky call to LoadLibrary
+                // for loading DXIL even though we loaded the DLL explicitely already from a
                 // specific path. Only on Linux though...
-                "warning: DXIL signing library (dxil.dll,libdxil.so) not found."
+                "warning: DXIL signing library (dxil.dll,libdxil.so) not found.",
             ];
             for error_to_ignore in errors_to_ignore {
                 if errors.starts_with(error_to_ignore) {
