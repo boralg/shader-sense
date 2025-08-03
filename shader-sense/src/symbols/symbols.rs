@@ -122,22 +122,27 @@ impl ShaderPosition {
                 std::io::ErrorKind::InvalidInput,
                 "Content is empty.",
             ))
-        } else if byte_offset >= content.len() {
+        } else if byte_offset > content.len() {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "byte_offset is out of bounds.",
             ))
         } else {
-            let line = content[..byte_offset].lines().count() - 1;
+            // lines iterator does the same, but skip the last empty line by relying on split_inclusive.
+            // We need it so use split instead to keep it.
+            // We only care about line start, so \r being there or not on Windows should not be an issue.
+            let line = content[..byte_offset].split('\n').count() - 1;
             let line_start = content[..byte_offset]
-                .lines()
-                .last()
+                .split('\n')
+                .rev()
+                .next()
                 .expect("No last line available.");
-            let pos = content[byte_offset..].as_ptr() as usize - line_start.as_ptr() as usize;
-            if line_start.is_char_boundary(pos) {
+            let pos_in_byte =
+                content[byte_offset..].as_ptr() as usize - line_start.as_ptr() as usize;
+            if line_start.is_char_boundary(pos_in_byte) {
                 Ok(ShaderPosition {
                     line: line as u32,
-                    pos: pos as u32,
+                    pos: line_start[..pos_in_byte].chars().count() as u32,
                     file_path: PathBuf::from(file_path),
                 })
             } else {

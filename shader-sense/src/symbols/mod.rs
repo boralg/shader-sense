@@ -26,7 +26,7 @@ mod tests {
         symbols::{
             shader_language::ShaderLanguage,
             symbol_provider::ShaderSymbolParams,
-            symbols::{ShaderPosition, ShaderSymbolData},
+            symbols::{ShaderPosition, ShaderRange, ShaderSymbolData},
         },
     };
 
@@ -272,5 +272,89 @@ mod tests {
             .iter()
             .find(|e| e.label == "u_modelviewHidden")
             .is_none());
+    }
+    #[test]
+    fn test_position_conversion() {
+        fn test_to_byte_offset(
+            shader_content: &str,
+            expected_content: &str,
+            position: &ShaderPosition,
+        ) -> usize {
+            let byte_offset = position.to_byte_offset(&shader_content).unwrap();
+            if expected_content.len() > 0 {
+                let content_from_offset = &shader_content[byte_offset..];
+                assert!(content_from_offset.len() >= expected_content.len());
+                assert!(
+                    content_from_offset == expected_content,
+                    "Offseted content {:?} with offset {} is incorrect.",
+                    &shader_content[byte_offset..],
+                    byte_offset
+                );
+            } else {
+                assert!(byte_offset == shader_content.len());
+            }
+            byte_offset
+        }
+        fn test_back_to_position(
+            shader_content: &str,
+            expected_position: &ShaderPosition,
+            byte_offset: usize,
+        ) {
+            let converted_position = ShaderPosition::from_byte_offset(
+                &shader_content,
+                byte_offset,
+                &expected_position.file_path,
+            )
+            .unwrap();
+            let converted_byte_offset = converted_position.to_byte_offset(&shader_content).unwrap();
+            assert!(converted_position == *expected_position, "Position {:#?} with byte offset {} is different from converted position: {:#?} with byte offset {}", expected_position, byte_offset, converted_position, converted_byte_offset);
+        }
+
+        // Testing file
+        let utf8_file_path = Path::new("./test/hlsl/utf8.hlsl");
+        let utf8_shader_content = std::fs::read_to_string(utf8_file_path).unwrap();
+
+        let test_data = vec![
+            (
+                "\r\n}",
+                ShaderPosition::new(utf8_file_path.into(), 5, 0),
+                &utf8_shader_content,
+            ),
+            (
+                "",
+                ShaderPosition::new(utf8_file_path.into(), 6, 1),
+                &utf8_shader_content,
+            ),
+            (
+                "id main() {\r\n\r\n}",
+                ShaderPosition::new(utf8_file_path.into(), 4, 2),
+                &utf8_shader_content,
+            ),
+            (
+                "にちは世界!\r\n\r\nvoid main() {\r\n\r\n}",
+                ShaderPosition::new(utf8_file_path.into(), 2, 5),
+                &utf8_shader_content,
+            ),
+        ];
+        for (index, (expected_content, position, shader_content)) in test_data.iter().enumerate() {
+            println!("Testing conversion {} for {:?}", index, position);
+            println!(
+                "Content: {:?} (len {})",
+                shader_content,
+                shader_content.len()
+            );
+            let byte_offset = test_to_byte_offset(&shader_content, expected_content, &position);
+            println!("Found byte_offset {}", byte_offset);
+            test_back_to_position(&shader_content, &position, byte_offset);
+        }
+    }
+    #[test]
+    fn test_end_range() {
+        let file_path = Path::new("./test/hlsl/utf8.hlsl");
+        let shader_content = std::fs::read_to_string(file_path).unwrap();
+        let range = ShaderRange::whole(file_path.into(), &shader_content);
+        println!("File range: {:#?}", range);
+        let end_byte_offset = range.end.to_byte_offset(&shader_content).unwrap();
+        assert!(end_byte_offset == shader_content.len());
     }
 }
