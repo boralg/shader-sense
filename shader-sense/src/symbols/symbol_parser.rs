@@ -155,7 +155,7 @@ impl ShaderWordRange {
             // Will be a variable or function (root only), method, or member if chained.
             let stack = self.get_word_stack();
             let mut rev_stack = stack.iter().rev();
-            // TODO: should act on scoped symbols only.
+            let symbol_list = symbol_list.filter_scoped_symbol(&self.range.end);
             // Look for root symbol (either a function or variable)
             let root_symbol = match rev_stack.next() {
                 Some(current_word) => match symbol_list.find_symbol(&current_word.word) {
