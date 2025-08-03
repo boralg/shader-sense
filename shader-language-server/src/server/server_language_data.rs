@@ -28,13 +28,25 @@ impl ServerLanguageData {
         let symbol_provider = language.create_symbol_provider();
         Self {
             #[cfg(target_os = "wasi")]
-            validator: Box::new(Glslang::hlsl()),
+            validator: {
+                log::info!("Using glslang for HLSL validation as DXC is unsupported on WASI.");
+                Box::new(Glslang::hlsl())
+            },
             #[cfg(not(target_os = "wasi"))]
             validator: match Dxc::new() {
-                Ok(dxc) => Box::new(dxc),
+                Ok(dxc) => {
+                    log::info!(
+                        "Using Dxc for HLSL. DXIL validation {}",
+                        if dxc.is_dxil_validation_available() {
+                            "available"
+                        } else {
+                            "unavailable"
+                        }
+                    );
+                    Box::new(dxc)
+                }
                 Err(err) => {
-                    use log::error;
-                    error!(
+                    log::error!(
                         "Failed to instantiate DXC: {}\nFallback to glslang instead.",
                         err.to_string()
                     );
