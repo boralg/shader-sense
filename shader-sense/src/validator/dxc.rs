@@ -68,19 +68,8 @@ impl Dxc {
     pub fn new() -> Result<Self, hassle_rs::HassleError> {
         // Pick the bundled dxc dll if available.
         // Else it will ignore it and pick the globally available one.
-        #[cfg(target_os = "windows")]
-        fn dxc_lib_name() -> (&'static Path, &'static Path) {
-            (Path::new("dxcompiler.dll"), Path::new("dxil.dll"))
-        }
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        fn dxc_lib_name() -> (&'static Path, &'static Path) {
-            (Path::new("libdxcompiler.so"), Path::new("libdxil.so"))
-        }
-        #[cfg(target_os = "macos")]
-        fn dxc_lib_name() -> (&'static Path, &'static Path) {
-            (Path::new("libdxcompiler.dylib"), Path::new("libdxil.dylib"))
-        }
-        let (dxcompiler_lib_name, dxil_lib_name) = dxc_lib_name();
+        let dxc_compiler_lib_name = libloading::library_filename("dxcompiler");
+        let dxil_lib_name = libloading::library_filename("dxil");
         fn find_dll_path(dll: &Path) -> Option<PathBuf> {
             // Rely on current_exe as current_dir might be changed by process.
             // Else return dll and hope that they are accessible in path.
@@ -100,10 +89,12 @@ impl Dxc {
                 Err(_) => Some(dll.into()),
             }
         }
-        let dxc = hassle_rs::Dxc::new(find_dll_path(dxcompiler_lib_name))?;
+        let dxc = hassle_rs::Dxc::new(find_dll_path(Path::new(&dxc_compiler_lib_name)))?;
         let library = dxc.create_library()?;
         let compiler = dxc.create_compiler()?;
-        let (dxil, validator) = match Dxil::new(find_dll_path(dxil_lib_name)) {
+        // For some reason, there is a sneaky LoadLibrary call to dxil.dll from dxcompiler.dll that forces it to be in global path on Linux.
+        // So do not use globally one and hope for the best.
+        let (dxil, validator) = match Dxil::new(find_dll_path(Path::new(&dxil_lib_name))) {
             Ok(dxil) => {
                 let validator_option = match dxil.create_validator() {
                     Ok(validator) => Some(validator),
@@ -123,6 +114,9 @@ impl Dxc {
             internal_diagnostic_regex: regex::Regex::new(r"(?s)^(.*?):(\d+):(\d+): (.*?):(.*)")
                 .unwrap(),
         })
+    }
+    pub fn is_dxil_validation_available(&self) -> bool {
+        self.dxil.is_some() && self.validator.is_some()
     }
     fn parse_dxc_errors(
         &self,
@@ -192,6 +186,17 @@ impl Dxc {
         }
 
         if shader_error_list.is_empty() {
+            let errors_to_ignore = vec![
+                // Anoying error that seems to be coming from dxc doing a sneaky call to LoadLibrary 
+                // for loading DXIL even though we loaded the DLL explicitely already from a 
+                // specific path. Only on Linux though...
+                "warning: DXIL signing library (dxil.dll,libdxil.so) not found."
+            ];
+            for error_to_ignore in errors_to_ignore {
+                if errors.starts_with(error_to_ignore) {
+                    return Ok(ShaderDiagnosticList::default());
+                }
+            }
             Ok(ShaderDiagnosticList {
                 diagnostics: vec![ShaderDiagnostic {
                     severity: ShaderDiagnosticSeverity::Error,
