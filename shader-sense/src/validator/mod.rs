@@ -28,7 +28,7 @@ mod tests {
 
     use super::validator::*;
     use super::*;
-    
+
     fn create_validator(shading_language: ShadingLanguage) -> Box<dyn Validator> {
         match shading_language {
             ShadingLanguage::Wgsl => Box::new(naga::Naga::new()),
