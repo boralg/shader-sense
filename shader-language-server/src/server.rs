@@ -996,7 +996,7 @@ impl ServerLanguage {
                 let mut parsed_config: Vec<Option<ServerConfig>> =
                     serde_json::from_value(value).expect("Failed to parse received config");
                 let config = parsed_config.remove(0).unwrap_or_default();
-                profile_scope!("Updating server config: {}", server.debug(&config));
+                profile_scope!("Updating server config: {:#?}", config);
                 server.config = config.clone();
                 // Republish all diagnostics
                 let mut file_to_republish = Vec::new();
