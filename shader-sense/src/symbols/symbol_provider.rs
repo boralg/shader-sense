@@ -174,6 +174,7 @@ impl SymbolProvider {
         context: &mut ShaderPreprocessorContext,
         include: &mut ShaderPreprocessorInclude,
         include_callback: &'a mut SymbolIncludeCallback<'a>,
+        old_symbols: Option<ShaderSymbols>,
     ) -> Result<(), ShaderError> {
         if context.increase_depth() {
             // Get module handle using callback.
@@ -185,7 +186,7 @@ impl SymbolProvider {
                         &module,
                         context,
                         include_callback,
-                        include.cache.take(),
+                        old_symbols,
                     ) {
                         Ok(cache) => {
                             include.cache = Some(cache);
@@ -319,7 +320,14 @@ impl SymbolProvider {
                         .cloned()
                         .collect::<Vec<ShaderPreprocessorDefine>>(),
                 );
-                self.process_include(context, included_include, include_callback)?;
+                // Here we take old include cache as we want to compute it.
+                let old_include_cache = included_include.cache.take();
+                self.process_include(
+                    context,
+                    included_include,
+                    include_callback,
+                    old_include_cache,
+                )?;
                 last_position = included_include.get_range().end.clone();
             }
             // Add all defines after last include to context

@@ -369,7 +369,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 found_active_region: bool,
                 context: &mut ShaderPreprocessorContext,
                 include_callback: &mut SymbolIncludeCallback<'a>,
-                old_symbols: &mut Option<ShaderSymbols>,
+                mut old_symbols: &mut Option<ShaderSymbols>,
                 last_processed_position: &mut ShaderPosition,
             ) -> Result<Vec<ShaderRegion>, ShaderError> {
                 assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
@@ -395,8 +395,24 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         &include_before.get_range().start,
                         &preprocessor.defines,
                     ));
-                    match symbol_provider.process_include(context, include_before, include_callback)
-                    {
+                    // Find include and take its data.
+                    let include_old_symbol = match &mut old_symbols {
+                        Some(old_symbols) => {
+                            match old_symbols.preprocessor.includes.iter_mut().find(|i| {
+                                i.get_absolute_path() == include_before.get_absolute_path()
+                            }) {
+                                Some(include) => include.cache.take(),
+                                None => None,
+                            }
+                        }
+                        None => None,
+                    };
+                    match symbol_provider.process_include(
+                        context,
+                        include_before,
+                        include_callback,
+                        include_old_symbol,
+                    ) {
                         Ok(_) => {}
                         Err(err) => match err {
                             ShaderError::SymbolQueryError(message, shader_range) => {
@@ -643,8 +659,27 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 &include_left.get_range().start,
                 &preprocessor.defines,
             ));
-            // Avoid stack overflow
-            match symbol_provider.process_include(context, include_left, include_callback) {
+            // Find include and take its data.
+            let include_old_symbol = match &mut old_symbols {
+                Some(old_symbols) => {
+                    match old_symbols
+                        .preprocessor
+                        .includes
+                        .iter_mut()
+                        .find(|i| i.get_absolute_path() == include_left.get_absolute_path())
+                    {
+                        Some(include) => include.cache.take(),
+                        None => None,
+                    }
+                }
+                None => None,
+            };
+            match symbol_provider.process_include(
+                context,
+                include_left,
+                include_callback,
+                include_old_symbol,
+            ) {
                 Ok(_) => {}
                 Err(err) => match err {
                     ShaderError::SymbolQueryError(message, shader_range) => {
