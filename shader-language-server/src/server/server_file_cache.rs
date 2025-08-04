@@ -546,12 +546,6 @@ impl ServerLanguageFileCache {
         }
         Ok(self.files.get(&uri).unwrap())
     }
-    pub fn set_variant(&mut self, uri: Url, shader_variant: ShaderVariant) {
-        self.variants.insert(uri, shader_variant);
-    }
-    pub fn remove_variant(&mut self, uri: Url) {
-        self.variants.remove(&uri);
-    }
     pub fn update_file(
         &mut self,
         uri: &Url,

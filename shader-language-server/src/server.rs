@@ -925,59 +925,34 @@ impl ServerLanguage {
                     self.debug(&params)
                 );
                 // Store it in cache
-                if let Some(shader_variant) = params.shader_variant {
-                    self.watched_files
-                        .set_variant(variant_uri.clone(), shader_variant);
+                let is_updated = if let Some(shader_variant) = params.shader_variant {
+                    let new_variant = shader_variant.clone();
+                    match self
+                        .watched_files
+                        .variants
+                        .insert(variant_uri.clone(), shader_variant)
+                    {
+                        Some(old_variant) => new_variant != old_variant,
+                        None => true,
+                    }
                 } else {
-                    self.watched_files.remove_variant(variant_uri.clone());
-                }
-                match self.watched_files.get_file(&variant_uri) {
-                    Some(variant_file) => {
-                        if variant_file.is_main_file() {
-                            let shading_language = variant_file.shading_language;
-                            // Relying files might changes due to variant macros.
-                            // So check previous relying file
-                            let old_relying_files =
-                                self.watched_files.get_relying_files(&variant_uri);
+                    self.watched_files.variants.remove(&variant_uri).is_some()
+                };
+                if is_updated {
+                    match self.watched_files.get_file(&variant_uri) {
+                        Some(variant_file) => {
+                            if variant_file.is_main_file() {
+                                let shading_language = variant_file.shading_language;
+                                // Relying files might changes due to variant macros.
+                                // So check previous relying file
+                                let old_relying_files =
+                                    self.watched_files.get_relying_files(&variant_uri);
 
-                            info!("Updating variant {}", variant_uri);
-                            let language_data =
-                                self.language_data.get_mut(&shading_language).unwrap();
-                            match self.watched_files.cache_file_data(
-                                &variant_uri,
-                                language_data.validator.as_mut(),
-                                &mut language_data.language,
-                                &language_data.symbol_provider,
-                                &self.config,
-                                None,
-                            ) {
-                                // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
-                                Ok(updated_files) => {
-                                    self.publish_diagnostic(&variant_uri, None);
-                                    for updated_file in updated_files {
-                                        self.publish_diagnostic(&updated_file, None);
-                                    }
-                                }
-                                Err(err) => {
-                                    self.connection.send_notification_error(format!("{}", err))
-                                }
-                            };
-                            // Check all open files that rely on this variant and require a recache.
-                            let new_relying_files =
-                                self.watched_files.get_relying_files(&variant_uri);
-                            let mut files_to_update = HashSet::new();
-                            files_to_update.extend(old_relying_files);
-                            files_to_update.extend(new_relying_files);
-
-                            for file_to_update in files_to_update {
-                                info!(
-                                    "Updating relying file {} for variant {}",
-                                    file_to_update, variant_uri
-                                );
+                                info!("Updating variant {}", variant_uri);
                                 let language_data =
                                     self.language_data.get_mut(&shading_language).unwrap();
                                 match self.watched_files.cache_file_data(
-                                    &file_to_update,
+                                    &variant_uri,
                                     language_data.validator.as_mut(),
                                     &mut language_data.language,
                                     &language_data.symbol_provider,
@@ -986,7 +961,7 @@ impl ServerLanguage {
                                 ) {
                                     // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
                                     Ok(updated_files) => {
-                                        self.publish_diagnostic(&file_to_update, None);
+                                        self.publish_diagnostic(&variant_uri, None);
                                         for updated_file in updated_files {
                                             self.publish_diagnostic(&updated_file, None);
                                         }
@@ -995,12 +970,50 @@ impl ServerLanguage {
                                         self.connection.send_notification_error(format!("{}", err))
                                     }
                                 };
+                                // Check all open files that rely on this variant and require a recache.
+                                let new_relying_files =
+                                    self.watched_files.get_relying_files(&variant_uri);
+                                let mut files_to_update = HashSet::new();
+                                files_to_update.extend(old_relying_files);
+                                files_to_update.extend(new_relying_files);
+
+                                for file_to_update in files_to_update {
+                                    info!(
+                                        "Updating relying file {} for variant {}",
+                                        file_to_update, variant_uri
+                                    );
+                                    let language_data =
+                                        self.language_data.get_mut(&shading_language).unwrap();
+                                    match self.watched_files.cache_file_data(
+                                        &file_to_update,
+                                        language_data.validator.as_mut(),
+                                        &mut language_data.language,
+                                        &language_data.symbol_provider,
+                                        &self.config,
+                                        None,
+                                    ) {
+                                        // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
+                                        Ok(updated_files) => {
+                                            self.publish_diagnostic(&file_to_update, None);
+                                            for updated_file in updated_files {
+                                                self.publish_diagnostic(&updated_file, None);
+                                            }
+                                        }
+                                        Err(err) => self
+                                            .connection
+                                            .send_notification_error(format!("{}", err)),
+                                    };
+                                }
+                            } else {
+                                // Not main file, no need to update.
+                                // Here we should add the file as Variant (watch_variant) and update it.
+                                // Opened as variant should be the same as a main file, except we dont send data. Or do we ?
+
+                                // Should close the file aswell.
                             }
-                        } else {
-                            // Not main file, no need to update.
                         }
+                        None => {} // Not watched, no need to update.
                     }
-                    None => {} // Not watched, no need to update.
                 }
             }
             _ => info!(
