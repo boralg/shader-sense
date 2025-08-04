@@ -34,11 +34,12 @@ pub struct ServerFileCache {
     pub shading_language: ShadingLanguage,
     pub shader_module: ShaderModuleHandle, // Store content on change as its not on disk.
     pub data: Option<ServerFileCacheData>, // Data for file opened and edited.
+    is_main_file: bool,
 }
 
 impl ServerFileCache {
     pub fn is_main_file(&self) -> bool {
-        self.data.is_some()
+        self.is_main_file
     }
     pub fn get_data(&self) -> &ServerFileCacheData {
         assert!(
@@ -133,6 +134,11 @@ impl ServerLanguageFileCache {
         dirty_deps: Option<&Path>,
     ) -> Result<Vec<Url>, ShaderError> {
         profile_scope!("Caching file data for file {}", uri);
+        assert!(
+            self.files.get(&uri).unwrap().is_main_file(),
+            "Trying to cache data of dependency {}...",
+            uri
+        );
         // Check if we cache this file for the first time.
         // Fill it default to avoid early return and empty cache.
         let file_path = uri.to_file_path().unwrap();
@@ -148,20 +154,19 @@ impl ServerLanguageFileCache {
         // Only needed if we changed the content. Not if we just opened the file.
         let updated_files = if should_propagate {
             // Here we ensure a possible variant is always recomputed first so that deps can copy their data.
-            let dependent_files_uri = match self.get_relying_variant(&uri) {
+            let files_to_update = match self.get_relying_variant(&uri) {
                 Some(variant_url) => {
                     let mut dependent_files_uri = self.get_dependent_files(&uri);
+                    let relying_files_uri = self.get_relying_files(&uri);
                     dependent_files_uri.retain(|dependent_url| *dependent_url != variant_url);
                     let mut files_to_update = Vec::new();
                     files_to_update.push(variant_url); // Update variant first
+                    files_to_update.extend(relying_files_uri); // Update file relying on it aswell.
                     files_to_update.extend(dependent_files_uri); // Update dependent files
                     files_to_update
                 }
                 None => self.get_dependent_files(&uri),
             };
-            let relying_files_uri = self.get_relying_files(&uri);
-            // Update dependent file & relying files as context might have changed for them.
-            let files_to_update = [dependent_files_uri, relying_files_uri].concat();
 
             let mut updated_files = files_to_update.clone();
             // We recompute relying before computing deps, but marking this file as dirty, so should be fine.
@@ -441,10 +446,11 @@ impl ServerLanguageFileCache {
         match self.files.get_mut(&uri) {
             Some(cached_file) => {
                 assert!(
-                    !cached_file.is_main_file(),
+                    !cached_file.is_main_file,
                     "File {} already watched as main.",
                     uri
                 );
+                cached_file.is_main_file = true;
                 // Replace its content from request to make sure content is correct.
                 debug_assert!(
                     RefCell::borrow_mut(&cached_file.shader_module).content == *text,
@@ -465,7 +471,8 @@ impl ServerLanguageFileCache {
                 let cached_file = ServerFileCache {
                     shading_language: lang,
                     shader_module: shader_module,
-                    data: None, // Will be filled by cache_file_data
+                    data: None,
+                    is_main_file: true,
                 };
                 let none = self.files.insert(uri.clone(), cached_file);
                 assert!(none.is_none());
@@ -524,7 +531,8 @@ impl ServerLanguageFileCache {
                 let cached_file = ServerFileCache {
                     shading_language: lang,
                     shader_module: shader_module,
-                    data: None, // No data means deps.
+                    data: None,
+                    is_main_file: false,
                 };
                 let none = self.files.insert(uri.clone(), cached_file);
                 assert!(none.is_none());
@@ -606,6 +614,7 @@ impl ServerLanguageFileCache {
                 Some(cached_file) => {
                     // Used as deps. Reset cache only.
                     cached_file.data = None;
+                    cached_file.is_main_file = false;
                     info!(
                         "Converting {:#?} main file to deps at {}. {} files in cache.",
                         cached_file.shading_language, uri, file_count
@@ -618,12 +627,13 @@ impl ServerLanguageFileCache {
                 ))),
             },
             None => match self.files.remove(uri) {
-                Some(cached_file) => {
+                Some(mut cached_file) => {
                     assert!(
                         cached_file.data.is_some(),
                         "Removing main file without data"
                     );
                     let data = cached_file.data.unwrap();
+                    cached_file.is_main_file = false; // Just to be sure.
                     info!(
                         "Removing {:#?} main file at {}. {} files in cache.",
                         cached_file.shading_language,

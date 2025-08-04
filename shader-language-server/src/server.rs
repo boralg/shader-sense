@@ -1033,6 +1033,7 @@ impl ServerLanguage {
                     .watched_files
                     .files
                     .iter()
+                    .filter(|(_, file)| file.is_main_file())
                     .map(|(url, file)| (url.clone(), file.shading_language))
                     .collect();
                 for (url, shading_language) in watched_urls {
