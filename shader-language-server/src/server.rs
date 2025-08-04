@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::str::FromStr;
 
@@ -935,11 +935,40 @@ impl ServerLanguage {
                     Some(variant_file) => {
                         if variant_file.is_main_file() {
                             let shading_language = variant_file.shading_language;
+                            // Relying files might changes due to variant macros.
+                            // So check previous relying file
+                            let old_relying_files =
+                                self.watched_files.get_relying_files(&variant_uri);
+
+                            info!("Updating variant {}", variant_uri);
+                            let language_data =
+                                self.language_data.get_mut(&shading_language).unwrap();
+                            match self.watched_files.cache_file_data(
+                                &variant_uri,
+                                language_data.validator.as_mut(),
+                                &mut language_data.language,
+                                &language_data.symbol_provider,
+                                &self.config,
+                                None,
+                            ) {
+                                // TODO: symbols should be republished here aswell as they might change but there is no way to do so...
+                                Ok(updated_files) => {
+                                    self.publish_diagnostic(&variant_uri, None);
+                                    for updated_file in updated_files {
+                                        self.publish_diagnostic(&updated_file, None);
+                                    }
+                                }
+                                Err(err) => {
+                                    self.connection.send_notification_error(format!("{}", err))
+                                }
+                            };
                             // Check all open files that rely on this variant and require a recache.
-                            // Put variant first as dependency will rely on it for update.
-                            let mut files_to_update = vec![variant_uri.clone()];
-                            files_to_update
-                                .extend(self.watched_files.get_relying_files(&variant_uri));
+                            let new_relying_files =
+                                self.watched_files.get_relying_files(&variant_uri);
+                            let mut files_to_update = HashSet::new();
+                            files_to_update.extend(old_relying_files);
+                            files_to_update.extend(new_relying_files);
+
                             for file_to_update in files_to_update {
                                 info!(
                                     "Updating relying file {} for variant {}",
