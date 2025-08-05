@@ -26,6 +26,8 @@ pub fn create_validator(shading_language: ShadingLanguage) -> Box<dyn Validator>
 mod tests {
     use std::{collections::HashMap, path::Path};
 
+    use crate::shader::ShaderStage;
+
     use super::validator::*;
     use super::*;
 
@@ -241,6 +243,8 @@ mod tests {
             file_path,
             &ValidationParams {
                 includes: vec!["./test/hlsl/inc0/".into()],
+                entry_point: Some("compute".into()),
+                shader_stage: Some(ShaderStage::Compute),
                 ..Default::default()
             },
             &mut default_include_callback,
