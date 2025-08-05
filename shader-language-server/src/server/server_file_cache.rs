@@ -156,7 +156,7 @@ impl ServerLanguageFileCache {
             context.mark_dirty(dirty_deps);
         }
         // Get symbols for main file.
-        let (symbols, symbol_diagnostics) = if config.get_symbols() {
+        let (mut symbols, symbol_diagnostics) = if config.get_symbols() {
             profile_scope!("Querying symbols for file {}", uri);
             let shading_language = self.files.get(uri).unwrap().shading_language;
             let shader_module = Rc::clone(&self.files.get(uri).unwrap().shader_module);
@@ -319,20 +319,11 @@ impl ServerLanguageFileCache {
             ShaderDiagnosticList::default()
         };
 
-        let preprocessor_diagnostics = symbols.get_preprocessor().diagnostics.clone();
-        self.create_data(
-            uri,
-            symbols,
-            if config.get_symbol_diagnostics() {
-                diagnostics.diagnostics.extend(preprocessor_diagnostics);
-                diagnostics
-                    .diagnostics
-                    .extend(symbol_diagnostics.diagnostics);
-                diagnostics
-            } else {
-                diagnostics
-            },
-        );
+        symbols
+            .get_preprocessor_mut()
+            .diagnostics
+            .extend(symbol_diagnostics.diagnostics);
+        self.create_data(uri, symbols, diagnostics);
         Ok(())
     }
     pub fn cache_file_data(

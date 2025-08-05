@@ -49,7 +49,14 @@ impl ServerLanguage {
             publish_diagnostics_params,
         );
     }
-
+    fn get_lsp_severity(severity: &ShaderDiagnosticSeverity) -> lsp_types::DiagnosticSeverity {
+        match severity {
+            ShaderDiagnosticSeverity::Hint => lsp_types::DiagnosticSeverity::HINT,
+            ShaderDiagnosticSeverity::Information => lsp_types::DiagnosticSeverity::INFORMATION,
+            ShaderDiagnosticSeverity::Warning => lsp_types::DiagnosticSeverity::WARNING,
+            ShaderDiagnosticSeverity::Error => lsp_types::DiagnosticSeverity::ERROR,
+        }
+    }
     pub fn recolt_diagnostic(
         &mut self,
         uri: &Url,
@@ -67,16 +74,7 @@ impl ServerLanguage {
                 if diagnostic.severity.is_required(self.config.get_severity()) {
                     let diagnostic = Diagnostic {
                         range: shader_range_to_lsp_range(&diagnostic.range),
-                        severity: Some(match diagnostic.severity {
-                            ShaderDiagnosticSeverity::Hint => lsp_types::DiagnosticSeverity::HINT,
-                            ShaderDiagnosticSeverity::Information => {
-                                lsp_types::DiagnosticSeverity::INFORMATION
-                            }
-                            ShaderDiagnosticSeverity::Warning => {
-                                lsp_types::DiagnosticSeverity::WARNING
-                            }
-                            ShaderDiagnosticSeverity::Error => lsp_types::DiagnosticSeverity::ERROR,
-                        }),
+                        severity: Some(Self::get_lsp_severity(&diagnostic.severity)),
                         message: if diagnostic.error.is_empty() {
                             "No message.".into() // vscode extension send error when empty message.
                         } else {
@@ -112,8 +110,9 @@ impl ServerLanguage {
         } else {
             info!("Diagnostic disabled.");
         }
+
         // Add inactive regions to diag for open file.
-        let mut inactive_diagnostics = data
+        let inactive_diagnostics = data
             .symbol_cache
             .get_preprocessor()
             .regions
@@ -131,7 +130,22 @@ impl ServerLanguage {
             .collect();
         match diagnostics.get_mut(&uri) {
             Some(diagnostics) => {
-                diagnostics.append(&mut inactive_diagnostics);
+                if self.config.get_symbol_diagnostics() {
+                    diagnostics.extend(
+                        data.symbol_cache
+                            .get_preprocessor()
+                            .diagnostics
+                            .iter()
+                            .map(|d| Diagnostic {
+                                range: shader_range_to_lsp_range(&d.range),
+                                severity: Some(Self::get_lsp_severity(&d.severity)),
+                                message: d.error.clone(),
+                                source: Some("shader-validator".to_string()),
+                                ..Default::default()
+                            }),
+                    );
+                }
+                diagnostics.extend(inactive_diagnostics);
             }
             None => {
                 diagnostics.insert(uri.clone(), inactive_diagnostics);
