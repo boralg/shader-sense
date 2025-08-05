@@ -349,7 +349,7 @@ impl HlslIntrinsicParser {
                         },
                         range: None,
                     };
-                    match context {
+                    match variant {
                         "SampleBias" => method.signature.parameters.push(ShaderParameter {
                             ty: "float".into(),
                             label: "bias".into(),
