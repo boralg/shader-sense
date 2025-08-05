@@ -90,15 +90,30 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                                         cursor.goto_first_child();
                                         current_node = cursor.node();
                                     }
+                                    "identifier" => {
+                                        let identifier = cursor.node();
+                                        set_parent(
+                                            &mut word,
+                                            ShaderWordRange::new(
+                                                get_name(&symbol_tree.content, identifier).into(),
+                                                ShaderRange::from_range(
+                                                    identifier.range(),
+                                                    &symbol_tree.file_path,
+                                                ),
+                                                None,
+                                            ),
+                                        );
+                                        break;
+                                    }
                                     _ => {
                                         return Err(ShaderError::InternalErr(format!(
-                                            "Failed to get word from call {}",
+                                            "Failed to get word from call_expression {}",
                                             field.kind()
                                         )))
                                     }
                                 }
                             }
-                            _ => {
+                            "identifier" => {
                                 let identifier = current_node;
                                 set_parent(
                                     &mut word,
@@ -112,7 +127,13 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                                     ),
                                 );
                                 break;
-                            } // Should have already break here
+                            }
+                            _ => {
+                                return Err(ShaderError::InternalErr(format!(
+                                    "Failed to get word from cursor {}",
+                                    current_node.kind()
+                                )));
+                            }
                         }
                     }
                     return word.ok_or(ShaderError::NoSymbol);

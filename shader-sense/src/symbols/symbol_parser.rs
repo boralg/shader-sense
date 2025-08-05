@@ -179,6 +179,7 @@ impl ShaderWordRange {
                                     None => return vec![], // No matching function found
                                 }
                             }
+                            ShaderSymbolData::Functions { signatures: _ } => symbol,
                             ShaderSymbolData::Variables { ty: _, count: _ } => symbol,
                             _ => return vec![], // Symbol found is not a variable nor a function.
                         }
@@ -212,6 +213,7 @@ impl ShaderWordRange {
                             None => return vec![], // No matching function found
                         }
                     }
+                    ShaderSymbolData::Functions { signatures } => &signatures[0].returnType,
                     ShaderSymbolData::Variables { ty, count: _ } => &ty,
                     // Method & parameter will only be called after first iteration
                     ShaderSymbolData::Method {
