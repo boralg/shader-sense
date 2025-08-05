@@ -32,11 +32,10 @@ use lsp_types::notification::{
 use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, FoldingRangeRequest, Formatting,
     GotoDefinition, HoverRequest, InlayHintRequest, RangeFormatting, Request,
-    SemanticTokensFullRequest, SignatureHelpRequest, WorkspaceConfiguration,
-    WorkspaceSymbolRequest,
+    SemanticTokensFullRequest, SignatureHelpRequest, WorkspaceSymbolRequest,
 };
 use lsp_types::{
-    CompletionOptionsCompletionItem, CompletionParams, CompletionResponse, ConfigurationParams,
+    CompletionOptionsCompletionItem, CompletionParams, CompletionResponse,
     DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
     DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentDiagnosticReportResult,
@@ -54,7 +53,6 @@ use shader_sense::shader::ShadingLanguage;
 
 use lsp_server::{ErrorCode, Message};
 
-use serde_json::Value;
 use server_config::ServerConfig;
 use server_connection::ServerConnection;
 use server_file_cache::ServerLanguageFileCache;
@@ -179,14 +177,19 @@ impl ServerLanguage {
                         if self.connection.connection.handle_shutdown(&req)? {
                             return Ok(());
                         }
-                        self.on_request(req)?;
+                        match self.on_request(req) {
+                            Ok(_) => {}
+                            Err(err) => self.connection.send_notification_error(err.to_string()),
+                        }
                     }
-                    Message::Response(resp) => {
-                        self.on_response(resp)?;
-                    }
-                    Message::Notification(not) => {
-                        self.on_notification(not)?;
-                    }
+                    Message::Response(resp) => match self.on_response(resp) {
+                        Ok(_) => {}
+                        Err(err) => self.connection.send_notification_error(err.to_string()),
+                    },
+                    Message::Notification(not) => match self.on_notification(not) {
+                        Ok(_) => {}
+                        Err(err) => self.connection.send_notification_error(err.to_string()),
+                    },
                 },
                 Err(_) => {
                     // Recv error means disconnected.
@@ -946,66 +949,6 @@ impl ServerLanguage {
             ),
         }
         Ok(())
-    }
-    fn request_configuration(&mut self) {
-        let config = ConfigurationParams {
-            items: vec![lsp_types::ConfigurationItem {
-                scope_uri: None,
-                section: Some("shader-validator".to_owned()),
-            }],
-        };
-        self.connection.send_request::<WorkspaceConfiguration>(
-            config,
-            |server: &mut ServerLanguage, value: Value| {
-                // Sent 1 item, received 1 in an array
-                let mut parsed_config: Vec<Option<ServerConfig>> =
-                    serde_json::from_value(value).expect("Failed to parse received config");
-                let config = parsed_config.remove(0).unwrap_or_default();
-                profile_scope!("Updating server config: {:#?}", config);
-                server.config = config.clone();
-                // Republish all diagnostics
-                let mut file_to_republish = Vec::new();
-                let watched_urls: Vec<(Url, ShadingLanguage)> = server
-                    .watched_files
-                    .files
-                    .iter()
-                    .filter(|(_, file)| file.is_main_file())
-                    .map(|(url, file)| (url.clone(), file.shading_language))
-                    .collect();
-                for (url, shading_language) in watched_urls {
-                    profile_scope!("Updating server config for file: {}", url);
-                    // Clear diags
-                    server.clear_diagnostic(&server.connection, &url);
-                    let language_data = server.language_data.get_mut(&shading_language).unwrap();
-                    // Update symbols & republish diags.
-                    if server.watched_files.files.get(&url).unwrap().is_main_file() {
-                        // Cache once for main file all changes have been applied.
-                        match server.watched_files.cache_file_data(
-                            &url,
-                            language_data.validator.as_mut(),
-                            &mut language_data.language,
-                            &language_data.symbol_provider,
-                            &server.config,
-                            Some(&url.to_file_path().unwrap()),
-                        ) {
-                            Ok(updated_files) => {
-                                file_to_republish.push(url.clone());
-                                for updated_file in updated_files {
-                                    file_to_republish.push(updated_file);
-                                }
-                            }
-                            Err(err) => server
-                                .connection
-                                .send_notification_error(format!("{}", err)),
-                        }
-                    }
-                }
-                // Republish all diagnostics with new settings.
-                for url in &file_to_republish {
-                    server.publish_diagnostic(url, None);
-                }
-            },
-        );
     }
 }
 
