@@ -91,23 +91,24 @@ impl ServerLanguage {
                 // If we own a scope and have a range.
                 if let (Some(scope), Some(range)) = (&symbol.scope, &symbol.range) {
                     if range.start.file_path.as_os_str() == file_path.as_os_str() {
-                        // DIRTY_HACK: Start to range instead of scope to include parameters, because we dont have range stored for them.
-                        //let content_start = scope.start.to_byte_offset(&content).unwrap();
-                        let content_start = range.start.to_byte_offset(&content).unwrap();
+                        let content_start = scope.start.to_byte_offset(&content).unwrap();
                         let content_end = scope.end.to_byte_offset(&content).unwrap();
                         match &symbol.data {
                             ShaderSymbolData::Functions { signatures } => {
                                 assert!(signatures.len() == 1, "Should have only one signature");
                                 for parameter in &signatures[0].parameters {
-                                    // TODO: Push parameter, but need range stored. Could be used elsewhere aswell
-                                    /*tokens.push(SemanticToken {
-                                        delta_line: parameter.,
-                                        delta_start: (),
-                                        length: parameter.label.len() as u32,
-                                        token_type: 1, // SemanticTokenType::PARAMETERS, view registration
-                                        token_modifiers_bitset: 0
-                                    });*/
-                                    // Push occurence in scope
+                                    match &parameter.range {
+                                        Some(range) => tokens.push(SemanticToken {
+                                            delta_line: range.start.line,
+                                            delta_start: range.start.pos,
+                                            length: parameter.label.len() as u32,
+                                            token_type: 1, // SemanticTokenType::PARAMETERS, view registration
+                                            token_modifiers_bitset: 0,
+                                        }),
+                                        None => continue, // Should not happen for local symbol, but skip it to be sure...
+                                    }
+                                    // Push occurences in scope
+                                    // TODO: NOT dot at beginning of capture (as its a field.)
                                     let reg = regex::Regex::new(
                                         format!("\\b({})\\b", parameter.label).as_str(),
                                     )
