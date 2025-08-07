@@ -58,9 +58,16 @@ impl hassle_rs::wrapper::DxcIncludeHandler for DxcIncludeHandler<'_> {
         // https://github.com/microsoft/DirectXShaderCompiler/issues/6093
         // So includes can behave weirdly with dxc if too many subfolders.
         let path = Path::new(filename.as_str());
-        self.include_handler
+        match self
+            .include_handler
             .search_in_includes(&path, self.include_callback)
-            .map(|e| e.0)
+        {
+            Some((content, include)) => {
+                self.include_handler.push_directory_stack(&include);
+                Some(content)
+            }
+            None => None,
+        }
     }
 }
 

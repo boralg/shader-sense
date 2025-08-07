@@ -102,10 +102,13 @@ impl glslang::include::IncludeHandler for GlslangIncludeHandler<'_> {
                 .include_handler
                 .search_in_includes(Path::new(header_name), self.include_callback)
             {
-                Some(data) => Some(IncludeResult {
-                    name: String::from(header_name),
-                    data: data.0,
-                }),
+                Some((content, path)) => {
+                    self.include_handler.push_directory_stack(&path);
+                    Some(IncludeResult {
+                        name: String::from(header_name),
+                        data: content,
+                    })
+                }
                 None => None,
             }
         }
