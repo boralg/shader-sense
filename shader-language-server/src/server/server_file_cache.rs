@@ -225,7 +225,6 @@ impl ServerLanguageFileCache {
                                     );
                                 }
                                 // If include does not exist, add it to watched files.
-                                // Issue here: They will be considered as direct deps, while its not necessarly true, might break symbols.
                                 match self.watch_dependency(
                                     &deps_uri,
                                     shading_language,
@@ -438,8 +437,7 @@ impl ServerLanguageFileCache {
                         .visit_includes_mut(&mut |include| {
                             // We only need previously declared element. Stop once we reach it.
                             if !reached_include {
-                                reached_include =
-                                    include.get_absolute_path() == file_path;
+                                reached_include = include.get_absolute_path() == file_path;
                                 match variant_file.get_data().symbol_cache.find_include(
                                     &mut |variant_include| {
                                         include.get_absolute_path()

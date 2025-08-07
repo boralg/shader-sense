@@ -93,20 +93,19 @@ impl IncludeHandler {
             None => {
                 self.visited_dependencies.insert(canonical_path.into(), 1);
                 if let Some(parent) = canonical_path.parent() {
-                    self.directory_stack.push(parent.into());
+                    // Reduce amount of include in stack.
+                    if let Some(last) = self.directory_stack.last() {
+                        if last != parent {
+                            self.directory_stack.push(parent.into());
+                        }
+                    }
                 }
             }
         }
     }
     pub fn search_path_in_includes(&mut self, relative_path: &Path) -> Option<PathBuf> {
         self.search_path_in_includes_relative(relative_path)
-            .map(|e| {
-                // Canonicalize path.
-                let path = canonicalize(&e).unwrap();
-                // Add the parent to the stack
-                self.push_directory_stack(&path);
-                path
-            })
+            .map(|e| canonicalize(&e).unwrap())
     }
     fn search_path_in_includes_relative(&self, relative_path: &Path) -> Option<PathBuf> {
         // Checking for file existence is a bit costly.

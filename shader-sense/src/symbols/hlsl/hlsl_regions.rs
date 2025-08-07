@@ -390,6 +390,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     .collect::<Vec<&mut ShaderPreprocessorInclude>>();
                 for include_before in includes_before {
                     // Mark as processed before computing its child.
+                    context.push_directory_stack(&include_before.get_absolute_path());
                     context.append_defines(get_defined_macros_for_position(
                         last_processed_position,
                         &include_before.get_range().start,
@@ -654,6 +655,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             .filter(|include| include.get_range().start > last_processed_position)
             .collect::<Vec<&mut ShaderPreprocessorInclude>>();
         for include_left in include_lefts {
+            context.push_directory_stack(&include_left.get_absolute_path());
             context.append_defines(get_defined_macros_for_position(
                 &last_processed_position,
                 &include_left.get_range().start,
