@@ -178,30 +178,33 @@ impl SymbolProvider {
     ) -> Result<(), ShaderError> {
         if context.increase_depth() {
             // Get module handle using callback.
-            let result = match include_callback(&include)? {
-                Some(include_module_handle) => {
-                    // Include found, deal with it.
-                    let module = RefCell::borrow(&include_module_handle);
-                    match self.query_symbols_with_context(
-                        &module,
-                        context,
-                        include_callback,
-                        old_symbols,
-                    ) {
-                        Ok(cache) => {
-                            include.cache = Some(cache);
-                            Ok(())
+            let result = match include_callback(&include) {
+                Ok(include_module_handle) => match include_module_handle {
+                    Some(include_module_handle) => {
+                        // Include found, deal with it.
+                        let module = RefCell::borrow(&include_module_handle);
+                        match self.query_symbols_with_context(
+                            &module,
+                            context,
+                            include_callback,
+                            old_symbols,
+                        ) {
+                            Ok(cache) => {
+                                include.cache = Some(cache);
+                                Ok(())
+                            }
+                            Err(err) => Err(err),
                         }
-                        Err(err) => Err(err),
                     }
-                }
-                None => {
-                    // Include not found.
-                    Err(ShaderError::SymbolQueryError(
-                        format!("Failed to find include {}", include.get_relative_path()),
-                        include.get_range().clone(),
-                    ))
-                }
+                    None => {
+                        // Include not found.
+                        Err(ShaderError::SymbolQueryError(
+                            format!("Failed to find include {}", include.get_relative_path()),
+                            include.get_range().clone(),
+                        ))
+                    }
+                },
+                Err(err) => Err(err),
             };
             context.decrease_depth();
             assert!(
