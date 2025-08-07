@@ -57,6 +57,64 @@ impl Request for ShaderVariantRequest {
 }
 
 impl ServerLanguage {
+    pub fn parse_variant_params(
+        &self,
+        value: serde_json::Value,
+    ) -> Result<Option<ShaderVariant>, serde_json::Error> {
+        // Keep compatibility with old client.
+        #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct OldShaderVariant {
+            pub entry_point: String,
+            pub stage: Option<ShaderStage>,
+            pub defines: HashMap<String, String>,
+            pub includes: Vec<PathBuf>,
+        }
+        #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct OldDidChangeShaderVariantParams {
+            pub text_document: TextDocumentIdentifier,
+            pub shader_variant: Option<OldShaderVariant>,
+        }
+        match serde_json::from_value::<DidChangeShaderVariantParams>(value.clone()) {
+            Ok(variant) => Ok(variant.shader_variant),
+            Err(_) => match serde_json::from_value::<OldDidChangeShaderVariantParams>(value) {
+                Ok(new_variant) => {
+                    log::warn!("Client sending old variant version. Should use the new variant version instead. Only the latest enabled variant sent to server will be used.");
+                    match &self.watched_files.variant {
+                        Some(current_variant) => {
+                            if current_variant.url == new_variant.text_document.uri
+                                && new_variant.shader_variant.is_none()
+                            {
+                                // If same variant and we removed it, mark it gone.
+                                Ok(None)
+                            } else if new_variant.shader_variant.is_some() {
+                                // If we pass a variant with new URL, update (will pick the latest enabled.)
+                                Ok(new_variant.shader_variant.map(|v| ShaderVariant {
+                                    url: new_variant.text_document.uri,
+                                    entry_point: v.entry_point,
+                                    stage: v.stage,
+                                    defines: v.defines,
+                                    includes: v.includes,
+                                }))
+                            } else {
+                                Ok(None)
+                            }
+                        }
+                        // If no variant, set new one.
+                        None => Ok(new_variant.shader_variant.map(|v| ShaderVariant {
+                            url: new_variant.text_document.uri,
+                            entry_point: v.entry_point,
+                            stage: v.stage,
+                            defines: v.defines,
+                            includes: v.includes,
+                        })),
+                    }
+                }
+                Err(err) => Err(err),
+            },
+        }
+    }
     pub fn update_variant(
         &mut self,
         new_variant: Option<ShaderVariant>,

@@ -57,7 +57,7 @@ use server_config::ServerConfig;
 use server_connection::ServerConnection;
 use server_file_cache::ServerLanguageFileCache;
 use server_language_data::ServerLanguageData;
-use shader_variant::{DidChangeShaderVariant, DidChangeShaderVariantParams};
+use shader_variant::DidChangeShaderVariant;
 
 use crate::profile_scope;
 use crate::server::common::lsp_range_to_shader_range;
@@ -919,12 +919,12 @@ impl ServerLanguage {
                 self.request_configuration();
             }
             DidChangeShaderVariant::METHOD => {
-                let params: DidChangeShaderVariantParams =
-                    serde_json::from_value(notification.params)?;
-                let new_variant = params.shader_variant.map(|mut v| {
-                    v.url = clean_url(&v.url);
-                    v
-                });
+                let new_variant = self
+                    .parse_variant_params(notification.params)?
+                    .map(|mut v| {
+                        v.url = clean_url(&v.url);
+                        v
+                    });
                 profile_scope!(
                     "Received did change shader variant notification for file {}: {}",
                     new_variant
