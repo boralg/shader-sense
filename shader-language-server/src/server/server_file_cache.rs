@@ -193,7 +193,7 @@ impl ServerLanguageFileCache {
             (ShaderSymbols::default(), ShaderDiagnosticList::default())
         };
         // Get diagnostics
-        let mut diagnostics = if config.get_validate() {
+        let diagnostics = if config.get_validate() {
             profile_scope!("Validating file {}", uri);
             let shading_language = self.files.get(uri).unwrap().shading_language;
             let shader_module = Rc::clone(&self.files.get(uri).unwrap().shader_module);
@@ -431,22 +431,29 @@ impl ServerLanguageFileCache {
                     // which remove most of their symbols due to include guard.
                     // To workaround this, try to find their first occurence in variant and copy it.
                     let mut first_include: HashSet<PathBuf> = HashSet::new();
+                    let mut reached_include = false;
                     let variant_file = self.files.get(&variant.url).unwrap();
                     include_data
                         .symbol_cache
                         .visit_includes_mut(&mut |include| {
-                            match variant_file.get_data().symbol_cache.find_include(
-                                &mut |variant_include| {
-                                    include.get_absolute_path()
-                                        == variant_include.get_absolute_path()
-                                },
-                            ) {
-                                Some(variant_include) => {
-                                    if first_include.insert(include.get_absolute_path().into()) {
-                                        include.cache = variant_include.cache.clone();
+                            // We only need previously declared element. Stop once we reach it.
+                            if !reached_include {
+                                reached_include =
+                                    include.get_absolute_path() == file_path;
+                                match variant_file.get_data().symbol_cache.find_include(
+                                    &mut |variant_include| {
+                                        include.get_absolute_path()
+                                            == variant_include.get_absolute_path()
+                                    },
+                                ) {
+                                    Some(variant_include) => {
+                                        if first_include.insert(include.get_absolute_path().into())
+                                        {
+                                            include.cache = variant_include.cache.clone();
+                                        }
                                     }
+                                    None => {} // Not found
                                 }
-                                None => {} // Not found
                             }
                         });
                     self.files.get_mut(&include_url).unwrap().data = Some(include_data);
