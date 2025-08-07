@@ -64,12 +64,13 @@ mod tests {
     fn test_directory_stack() {
         let file_path = Path::new("./test/hlsl/include-level.hlsl");
         let mut include_handler = IncludeHandler::main(file_path, vec![], HashMap::new());
-        assert!(include_handler
-            .search_path_in_includes(Path::new("./inc0/level0.hlsl"))
-            .is_some());
-        assert!(include_handler
-            .search_path_in_includes(Path::new("./inc1/level1.hlsl"))
-            .is_some());
+        let absolute_level0 =
+            include_handler.search_path_in_includes(Path::new("./inc0/level0.hlsl"));
+        assert!(absolute_level0.is_some());
+        include_handler.push_directory_stack(&absolute_level0.unwrap());
+        let absolute_level1 =
+            include_handler.search_path_in_includes(Path::new("./inc1/level1.hlsl"));
+        assert!(absolute_level1.is_some());
     }
 
     #[test]
