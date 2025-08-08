@@ -19,8 +19,8 @@ mod tests {
     use crate::{
         include::IncludeHandler,
         shader::{
-            GlslShadingLanguageTag, HlslShadingLanguageTag, ShaderParams, ShadingLanguage,
-            ShadingLanguageTag, WgslShadingLanguageTag,
+            GlslShadingLanguageTag, HlslShadingLanguageTag, ShaderCompilationParams, ShaderParams,
+            ShadingLanguage, ShadingLanguageTag, WgslShadingLanguageTag,
         },
         shader_error::ShaderError,
         symbols::{
@@ -76,7 +76,9 @@ mod tests {
     ) -> Result<ShaderSymbolList, ShaderError> {
         let mut include_handler = IncludeHandler::main_without_config(&file_path);
         let deps = find_dependencies(&mut include_handler, &shader_content);
-        let mut all_symbols = language.get_intrinsics_symbol().clone();
+        let mut all_symbols = language
+            .get_intrinsics_symbol(&ShaderCompilationParams::default())
+            .to_owned();
         let symbol_tree = language.create_module(file_path, shader_content).unwrap();
         let symbols = symbol_provider
             .query_symbols(

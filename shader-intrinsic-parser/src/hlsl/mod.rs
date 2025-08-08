@@ -6,6 +6,7 @@ use shader_sense::symbols::symbols::ShaderSymbolList;
 use crate::common::{download_file, IntrinsicParser};
 
 mod functions;
+mod macros;
 mod semantics;
 mod types;
 
@@ -145,6 +146,7 @@ impl IntrinsicParser for HlslIntrinsicParser {
         // Doc is so bad its totally unscrappable. Do it manually.
         self.add_functions(&mut symbols);
         self.add_types(&mut symbols);
+        self.add_macros(&mut symbols);
         self.add_semantic(&mut symbols, cache_path);
 
         symbols

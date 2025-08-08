@@ -128,6 +128,7 @@ impl ShadingLanguageTag for WgslShadingLanguageTag {
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HlslShaderModel {
     ShaderModel1,
+    ShaderModel1_1,
     ShaderModel1_2,
     ShaderModel1_3,
     ShaderModel1_4,

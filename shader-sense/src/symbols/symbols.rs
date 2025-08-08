@@ -710,7 +710,6 @@ pub enum ShaderSymbolData {
     Link {
         target: ShaderPosition,
     },
-    #[serde(skip)] // This is runtime only. No serialization.
     Macro {
         value: String,
     },
@@ -721,7 +720,9 @@ pub enum ShaderSymbolData {
 pub struct HlslRequirementParameter {
     pub stages: Option<Vec<ShaderStage>>, // Stage required by this symbol.
     pub min_version: Option<HlslVersion>, // Minimum HLSL version for this symbol.
+    pub version: Option<HlslVersion>,     // Exact HLSL version for this symbol.
     pub min_shader_model: Option<HlslShaderModel>, // Minimum shader model for this symbol.
+    pub shader_model: Option<HlslShaderModel>, // Exact shader model for this symbol.
     pub spirv: Option<bool>,              // Requires SPIRV
     pub enable_16bit_types: Option<bool>, // Requires 16bit types.
 }
@@ -751,20 +752,29 @@ impl RequirementParameter {
         match self {
             RequirementParameter::None => true, // No requirement. All good.
             RequirementParameter::Hlsl(requirement) => {
+                // TODO: Should try to detect shader stage from file name at a higher level.
                 let is_stage_ok = match &requirement.stages {
                     Some(required_stages) => match shader_compilation_params.shader_stage {
-                        Some(param_stage) => {
-                            required_stages.contains(&param_stage) || required_stages.is_empty()
-                        }
-                        None => required_stages.is_empty(), // if no user stage but there is required stages, we have a problem.
+                        Some(param_stage) => required_stages.contains(&param_stage),
+                        None => true, // requirement, but no stage set. Pass them all
                     },
+                    None => true, // No requirements, dont care about stage set.
+                };
+                let is_version_ok = match &requirement.version {
+                    Some(version) => *version == shader_compilation_params.hlsl.version,
                     None => true,
                 };
-                let is_version_ok = match &requirement.min_version {
+                let is_min_version_ok = match &requirement.min_version {
                     Some(min_version) => *min_version <= shader_compilation_params.hlsl.version,
                     None => true,
                 };
-                let is_shader_model_ok = match &requirement.min_shader_model {
+                let is_shader_model_ok = match &requirement.shader_model {
+                    Some(shader_model) => {
+                        *shader_model == shader_compilation_params.hlsl.shader_model
+                    }
+                    None => true,
+                };
+                let is_min_shader_model_ok = match &requirement.min_shader_model {
                     Some(min_shader_model) => {
                         *min_shader_model <= shader_compilation_params.hlsl.shader_model
                     }
@@ -780,24 +790,28 @@ impl RequirementParameter {
                     }
                     None => true,
                 };
-                is_stage_ok && is_version_ok && is_shader_model_ok && is_spirv_ok && is_16bit_ok
+                is_stage_ok
+                    && is_min_version_ok
+                    && is_version_ok
+                    && is_min_shader_model_ok
+                    && is_shader_model_ok
+                    && is_spirv_ok
+                    && is_16bit_ok
             }
             RequirementParameter::Glsl(requirement) => {
                 let is_stage_ok = match &requirement.stages {
                     Some(required_stages) => match shader_compilation_params.shader_stage {
-                        Some(param_stage) => {
-                            required_stages.contains(&param_stage) || required_stages.is_empty()
-                        }
-                        None => required_stages.is_empty(), // if no user stage but there is required stages, we have a problem.
+                        Some(param_stage) => required_stages.contains(&param_stage),
+                        None => true, // requirement, but no stage set. Pass them all
                     },
-                    None => true,
+                    None => true, // No requirements, dont care about stage set.
                 };
                 let is_version_ok = match &requirement.min_version {
-                    Some(min_version) => true, // TODO: make this work.
+                    Some(_min_version) => true, // TODO: make this work.
                     None => true,
                 };
                 let is_extension_ok = match &requirement.extension {
-                    Some(extension) => true, // TODO: make this work.
+                    Some(_extension) => true, // TODO: make this work.
                     None => true,
                 };
                 is_stage_ok && is_version_ok && is_extension_ok
@@ -943,6 +957,18 @@ impl ShaderSymbolList {
     }
 }
 impl<'a> ShaderSymbolListRef<'a> {
+    pub fn to_owned(&self) -> ShaderSymbolList {
+        ShaderSymbolList {
+            types: self.types.iter().map(|s| (*s).clone()).collect(),
+            constants: self.constants.iter().map(|s| (*s).clone()).collect(),
+            variables: self.variables.iter().map(|s| (*s).clone()).collect(),
+            call_expression: self.call_expression.iter().map(|s| (*s).clone()).collect(),
+            functions: self.functions.iter().map(|s| (*s).clone()).collect(),
+            keywords: self.keywords.iter().map(|s| (*s).clone()).collect(),
+            macros: self.macros.iter().map(|s| (*s).clone()).collect(),
+            includes: self.includes.iter().map(|s| (*s).clone()).collect(),
+        }
+    }
     fn is_symbol_defined_at(
         shader_symbol: &ShaderSymbol,
         cursor_position: &ShaderPosition,
@@ -1078,23 +1104,6 @@ impl<'a> ShaderSymbolListRef<'a> {
                 .map(|s| *s)
                 .collect(),
         }
-    }
-    pub fn retain<P: Fn(ShaderSymbolType, &ShaderSymbol) -> bool>(&mut self, predicate: P) {
-        self.types.retain(|s| predicate(ShaderSymbolType::Types, s));
-        self.constants
-            .retain(|s| predicate(ShaderSymbolType::Constants, s));
-        self.functions
-            .retain(|s| predicate(ShaderSymbolType::Functions, s));
-        self.variables
-            .retain(|s| predicate(ShaderSymbolType::Variables, s));
-        self.call_expression
-            .retain(|s| predicate(ShaderSymbolType::CallExpression, s));
-        self.keywords
-            .retain(|s| predicate(ShaderSymbolType::Keyword, s));
-        self.macros
-            .retain(|s| predicate(ShaderSymbolType::Macros, s));
-        self.includes
-            .retain(|s| predicate(ShaderSymbolType::Include, s));
     }
     pub fn iter(&self) -> ShaderSymbolListIterator {
         ShaderSymbolListIterator::new(&self)

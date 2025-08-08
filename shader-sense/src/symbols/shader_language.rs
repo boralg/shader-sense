@@ -3,8 +3,9 @@ use std::path::Path;
 use tree_sitter::InputEdit;
 
 use crate::{
-    shader::ShadingLanguage,
+    shader::{ShaderCompilationParams, ShadingLanguage},
     shader_error::ShaderError,
+    symbols::symbols::ShaderSymbolListRef,
     validator::{create_validator, validator::Validator},
 };
 
@@ -71,8 +72,16 @@ impl ShaderLanguage {
     pub fn create_validator(&self) -> Box<dyn Validator> {
         create_validator(self.shading_language)
     }
-    pub fn get_intrinsics_symbol(&self) -> &ShaderSymbolList {
-        &self.shader_intrinsics
+    pub fn get_intrinsics_symbol(
+        &self,
+        shader_compilation_params: &ShaderCompilationParams,
+    ) -> ShaderSymbolListRef {
+        // Filter intrinsics with given params.
+        self.shader_intrinsics
+            .filter(|_ty, symbol| match &symbol.requirement {
+                Some(requirement) => requirement.is_met(shader_compilation_params),
+                None => true,
+            })
     }
     // Create shader module from file.
     pub fn create_module(

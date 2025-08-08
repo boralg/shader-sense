@@ -25,9 +25,7 @@ impl ServerLanguage {
             .get_mut(&cached_file.shading_language)
             .unwrap();
         let file_path = uri.to_file_path().unwrap();
-        let symbol_list = self
-            .watched_files
-            .get_all_symbols(uri, &language_data.language);
+        let symbol_list = self.watched_files.get_all_symbols(uri);
         let content = &RefCell::borrow(&cached_file.shader_module).content;
         let shader_position = {
             let position =

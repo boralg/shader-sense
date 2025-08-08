@@ -16,15 +16,8 @@ impl ServerLanguage {
         uri: &Url,
         lsp_range: &Range,
     ) -> Result<Vec<InlayHint>, ShaderError> {
-        let cached_file = self.watched_files.get_file(uri).unwrap();
-        let language_data = self
-            .language_data
-            .get_mut(&cached_file.shading_language)
-            .unwrap();
         // Get all symbols
-        let symbols = self
-            .watched_files
-            .get_all_symbols(uri, &language_data.language);
+        let symbols = self.watched_files.get_all_symbols(uri);
         let file_path = uri.to_file_path().unwrap();
         let valid_range = lsp_range_to_shader_range(lsp_range, &file_path);
         let inlay_hints = symbols

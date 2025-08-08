@@ -21,7 +21,7 @@ use shader_sense::{
         shader_language::ShaderLanguage,
         symbol_provider::SymbolProvider,
         symbol_tree::{ShaderModuleHandle, ShaderSymbols},
-        symbols::{ShaderPreprocessorContext, ShaderRange, ShaderSymbolListRef},
+        symbols::{ShaderPreprocessorContext, ShaderRange, ShaderSymbolList, ShaderSymbolListRef},
     },
     validator::validator::Validator,
 };
@@ -31,6 +31,7 @@ use super::{server_config::ServerConfig, shader_variant::ShaderVariant};
 #[derive(Debug, Clone, Default)]
 pub struct ServerFileCacheData {
     pub symbol_cache: ShaderSymbols, // Store symbols to avoid computing them at every change.
+    pub intrinsics: ShaderSymbolList, // Cached intrinsics to not recompute them everytime
     pub diagnostic_cache: ShaderDiagnosticList, // Cached diagnostic
 }
 
@@ -72,10 +73,12 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         symbol_cache: ShaderSymbols,
+        intrinsics: ShaderSymbolList,
         diagnostic_cache: ShaderDiagnosticList,
     ) {
         self.files.get_mut(uri).unwrap().data = Some(ServerFileCacheData {
             symbol_cache,
+            intrinsics,
             diagnostic_cache,
         })
     }
@@ -321,7 +324,10 @@ impl ServerLanguageFileCache {
             .get_preprocessor_mut()
             .diagnostics
             .extend(symbol_diagnostics.diagnostics);
-        self.create_data(uri, symbols, diagnostics);
+        let intrinsics = shader_language
+            .get_intrinsics_symbol(&shader_params.compilation)
+            .to_owned();
+        self.create_data(uri, symbols, intrinsics, diagnostics);
         Ok(())
     }
     pub fn cache_file_data(
@@ -411,10 +417,18 @@ impl ServerLanguageFileCache {
                                                 .cloned()
                                                 .collect(),
                                         };
+                                        let intrinsics = shader_language
+                                            .get_intrinsics_symbol(
+                                                &config
+                                                    .into_shader_params(Some(variant.clone()))
+                                                    .compilation,
+                                            )
+                                            .to_owned();
                                         file_to_cache.insert(
                                             include_url,
                                             ServerFileCacheData {
                                                 symbol_cache,
+                                                intrinsics,
                                                 diagnostic_cache,
                                             },
                                         );
@@ -730,11 +744,7 @@ impl ServerLanguageFileCache {
             },
         }
     }
-    pub fn get_all_symbols<'a>(
-        &'a self,
-        uri: &Url,
-        shader_language: &'a ShaderLanguage,
-    ) -> ShaderSymbolListRef<'a> {
+    pub fn get_all_symbols<'a>(&'a self, uri: &Url) -> ShaderSymbolListRef<'a> {
         let cached_file = self.files.get(uri).unwrap();
         assert!(cached_file.data.is_some(), "File {} do not have cache", uri);
         let data = &cached_file.get_data();
@@ -745,7 +755,7 @@ impl ServerLanguageFileCache {
             symbol_cache.macros.push(&symbol);
         }
         // Add intrinsics symbols
-        symbol_cache.append_as_reference(&shader_language.get_intrinsics_symbol());
+        symbol_cache.append_as_reference(&data.intrinsics);
         symbol_cache
     }
 }

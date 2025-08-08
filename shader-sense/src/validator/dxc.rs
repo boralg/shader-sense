@@ -72,6 +72,16 @@ impl hassle_rs::wrapper::DxcIncludeHandler for DxcIncludeHandler<'_> {
 }
 
 impl Dxc {
+    // This is the version bundled with DXC and which is expected.
+    // TODO: Find a way to get these values dynamically.
+    // Could preprocess them in small shader file and read them instead ?
+    pub const DXC_VERSION_MAJOR: u32 = 1;
+    pub const DXC_VERSION_MINOR: u32 = 8;
+    pub const DXC_VERSION_RELEASE: u32 = 2405;
+    pub const DXC_VERSION_COMMIT: u32 = 0;
+    pub const DXC_SPIRV_VERSION_MAJOR: u32 = 1;
+    pub const DXC_SPIRV_VERSION_MINOR: u32 = 6;
+
     pub fn new() -> Result<Self, hassle_rs::HassleError> {
         // Pick the bundled dxc dll if available.
         // Else it will ignore it and pick the globally available one.

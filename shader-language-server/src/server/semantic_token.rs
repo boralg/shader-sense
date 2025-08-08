@@ -161,11 +161,7 @@ impl ServerLanguage {
     ) -> Result<SemanticTokensResult, ShaderError> {
         let cached_file = self.watched_files.get_file(uri).unwrap();
         // For now, only handle macros as we cant resolve them with textmate.
-        let shading_language = cached_file.shading_language;
-        let symbols = self.watched_files.get_all_symbols(
-            &uri,
-            &self.language_data.get(&shading_language).unwrap().language,
-        );
+        let symbols = self.watched_files.get_all_symbols(&uri);
         // Find occurences of tokens to paint
         let mut tokens = Vec::new();
         tokens.extend(Self::find_macros(uri, cached_file, &symbols));

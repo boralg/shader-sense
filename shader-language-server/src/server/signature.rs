@@ -30,9 +30,7 @@ impl ServerLanguage {
             .language_data
             .get(&cached_file.shading_language)
             .unwrap();
-        let all_symbol_list = self
-            .watched_files
-            .get_all_symbols(uri, &language_data.language);
+        let all_symbol_list = self.watched_files.get_all_symbols(uri);
         let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);
         let content = &RefCell::borrow(&cached_file.shader_module).content;
         let function_parameter = get_function_parameter_at_position(content, position);

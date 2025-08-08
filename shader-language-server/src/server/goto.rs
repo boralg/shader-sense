@@ -26,9 +26,7 @@ impl ServerLanguage {
             line: position.line as u32,
             pos: position.character as u32,
         };
-        let symbol_list = self
-            .watched_files
-            .get_all_symbols(uri, &language_data.language);
+        let symbol_list = self.watched_files.get_all_symbols(uri);
         match language_data.symbol_provider.get_word_range_at_position(
             &RefCell::borrow(&cached_file.shader_module),
             &shader_position,

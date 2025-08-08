@@ -29,9 +29,7 @@ impl ServerLanguage {
         ) {
             // word_range should be the same as symbol range
             Ok(word) => {
-                let symbol_list = self
-                    .watched_files
-                    .get_all_symbols(uri, &language_data.language);
+                let symbol_list = self.watched_files.get_all_symbols(uri);
                 let matching_symbols = word.find_symbol_from_parent(&symbol_list);
                 if matching_symbols.len() == 0 {
                     Ok(None)
