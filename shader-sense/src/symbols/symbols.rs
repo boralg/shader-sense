@@ -8,7 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     include::IncludeHandler,
-    shader::{ShaderContextParams, ShaderStage},
+    shader::{
+        HlslShaderModel, HlslVersion, ShaderCompilationParams, ShaderContextParams, ShaderStage,
+    },
     shader_error::ShaderDiagnostic,
 };
 
@@ -335,8 +337,7 @@ impl ShaderPreprocessorContext {
                 .map(|(key, value)| ShaderSymbol {
                     label: key.clone(),
                     description: format!("Preprocessor macro. Expanding to \n```\n{}\n```", value),
-                    version: "".into(),
-                    stages: vec![],
+                    requirement: None,
                     link: None,
                     data: ShaderSymbolData::Macro {
                         value: value.clone(),
@@ -371,8 +372,7 @@ impl ShaderPreprocessorContext {
                 "Config preprocessor macro. Expanding to \n```\n{}\n```",
                 value
             ),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::Macro {
                 value: value.into(),
@@ -505,8 +505,7 @@ impl ShaderPreprocessorDefine {
                     }
                     None => format!("Preprocessor macro."),
                 },
-                version: "".into(),
-                stages: vec![],
+                requirement: None,
                 link: None,
                 data: ShaderSymbolData::Macro {
                     value: match &value {
@@ -540,8 +539,7 @@ impl ShaderPreprocessorInclude {
             symbol: ShaderSymbol {
                 label: relative_path,
                 description: format!("Including file {}", absolute_path.display()),
-                version: "".into(),
-                stages: vec![],
+                requirement: None,
                 link: None,
                 data: ShaderSymbolData::Link {
                     target: ShaderPosition::new(absolute_path, 0, 0),
@@ -636,8 +634,7 @@ impl ShaderMember {
         ShaderSymbol {
             label: self.parameters.label.clone(),
             description: self.parameters.description.clone(),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::Parameter {
                 context: self.context.clone(),
@@ -656,8 +653,7 @@ impl ShaderMethod {
         ShaderSymbol {
             label: self.label.clone(),
             description: self.signature.description.clone(),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::Method {
                 context: self.context.clone(),
@@ -721,14 +717,107 @@ pub enum ShaderSymbolData {
 }
 
 #[allow(non_snake_case)] // for JSON
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+pub struct HlslRequirementParameter {
+    pub stages: Option<Vec<ShaderStage>>, // Stage required by this symbol.
+    pub min_version: Option<HlslVersion>, // Minimum HLSL version for this symbol.
+    pub min_shader_model: Option<HlslShaderModel>, // Minimum shader model for this symbol.
+    pub spirv: Option<bool>,              // Requires SPIRV
+    pub enable_16bit_types: Option<bool>, // Requires 16bit types.
+}
+#[allow(non_snake_case)] // for JSON
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+pub struct GlslRequirementParameter {
+    pub stages: Option<Vec<ShaderStage>>,
+    pub min_version: Option<u32>,  // min glsl version
+    pub extension: Option<String>, // Extension required for this symbol.
+}
+#[allow(non_snake_case)] // for JSON
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+pub struct WgslRequirementParameter {}
+
+#[allow(non_snake_case)] // for JSON
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+pub enum RequirementParameter {
+    #[default]
+    None, // no filter parameters
+    Hlsl(HlslRequirementParameter),
+    Glsl(GlslRequirementParameter),
+    Wgsl(WgslRequirementParameter),
+}
+
+impl RequirementParameter {
+    pub fn is_met(&self, shader_compilation_params: &ShaderCompilationParams) -> bool {
+        match self {
+            RequirementParameter::None => true, // No requirement. All good.
+            RequirementParameter::Hlsl(requirement) => {
+                let is_stage_ok = match &requirement.stages {
+                    Some(required_stages) => match shader_compilation_params.shader_stage {
+                        Some(param_stage) => {
+                            required_stages.contains(&param_stage) || required_stages.is_empty()
+                        }
+                        None => required_stages.is_empty(), // if no user stage but there is required stages, we have a problem.
+                    },
+                    None => true,
+                };
+                let is_version_ok = match &requirement.min_version {
+                    Some(min_version) => *min_version <= shader_compilation_params.hlsl.version,
+                    None => true,
+                };
+                let is_shader_model_ok = match &requirement.min_shader_model {
+                    Some(min_shader_model) => {
+                        *min_shader_model <= shader_compilation_params.hlsl.shader_model
+                    }
+                    None => true,
+                };
+                let is_spirv_ok = match &requirement.spirv {
+                    Some(spirv) => *spirv == shader_compilation_params.hlsl.spirv,
+                    None => true,
+                };
+                let is_16bit_ok = match &requirement.enable_16bit_types {
+                    Some(enable_16bit_types) => {
+                        *enable_16bit_types == shader_compilation_params.hlsl.enable16bit_types
+                    }
+                    None => true,
+                };
+                is_stage_ok && is_version_ok && is_shader_model_ok && is_spirv_ok && is_16bit_ok
+            }
+            RequirementParameter::Glsl(requirement) => {
+                let is_stage_ok = match &requirement.stages {
+                    Some(required_stages) => match shader_compilation_params.shader_stage {
+                        Some(param_stage) => {
+                            required_stages.contains(&param_stage) || required_stages.is_empty()
+                        }
+                        None => required_stages.is_empty(), // if no user stage but there is required stages, we have a problem.
+                    },
+                    None => true,
+                };
+                let is_version_ok = match &requirement.min_version {
+                    Some(min_version) => true, // TODO: make this work.
+                    None => true,
+                };
+                let is_extension_ok = match &requirement.extension {
+                    Some(extension) => true, // TODO: make this work.
+                    None => true,
+                };
+                is_stage_ok && is_version_ok && is_extension_ok
+            }
+            RequirementParameter::Wgsl(_) => {
+                // Nothing yet here to filter.
+                true
+            }
+        }
+    }
+}
+
+#[allow(non_snake_case)] // for JSON
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShaderSymbol {
-    pub label: String,            // Label for the item
-    pub description: String,      // Description of the item
-    pub version: String,          // Minimum version required for the item.
-    pub stages: Vec<ShaderStage>, // Shader stages of the item
-    pub link: Option<String>,     // Link to some external documentation
-    pub data: ShaderSymbolData,   // Data for the variable
+    pub label: String,                             // Label for the item
+    pub description: String,                       // Description of the item
+    pub link: Option<String>,                      // Link to some external documentation
+    pub requirement: Option<RequirementParameter>, // Used for filtering symbols.
+    pub data: ShaderSymbolData,                    // Data for the variable
     // Runtime info. No serialization.
     #[serde(skip)]
     pub range: Option<ShaderRange>, // Range of symbol in shader

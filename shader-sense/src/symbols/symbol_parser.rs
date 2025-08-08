@@ -297,14 +297,6 @@ pub trait SymbolTreeParser {
             .collect::<Vec<ShaderScope>>()
     }
 }
-pub trait SymbolTreeFilter {
-    // Filter symbol, keep them on true, remove them on false
-    fn filter_symbol(
-        &self,
-        shader_symbol: &ShaderSymbol,
-        shader_params: &ShaderCompilationParams,
-    ) -> bool;
-}
 
 pub trait SymbolRegionFinder {
     fn query_regions_in_node<'a>(

@@ -2,7 +2,8 @@ use std::{borrow::Borrow, collections::HashMap};
 
 use regex::Regex;
 use shader_sense::symbols::symbols::{
-    ShaderParameter, ShaderSignature, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
+    GlslRequirementParameter, RequirementParameter, ShaderParameter, ShaderSignature, ShaderSymbol,
+    ShaderSymbolData, ShaderSymbolList,
 };
 use xmltree::Element;
 
@@ -92,8 +93,7 @@ impl GlslIntrinsicParser {
                     link_symbol.push(ShaderSymbol {
                         label: signature.0,
                         description: "".to_string(),
-                        version: "".to_string(),
-                        stages: Vec::new(),
+                        requirement: None,
                         link: Some(link.clone()),
                         data: ShaderSymbolData::Functions {
                             signatures: signature.1,
@@ -168,8 +168,7 @@ impl GlslIntrinsicParser {
                 link_symbol.push(ShaderSymbol {
                     label: var_name.trim().into(),
                     description: "".to_string(),
-                    version: "".to_string(),
-                    stages: Vec::new(),
+                    requirement: None,
                     link: Some(link.clone()),
                     data: ShaderSymbolData::Variables {
                         ty: ty.into(),
@@ -279,7 +278,22 @@ impl GlslIntrinsicParser {
                                         .replace("[4]", "");
                                     if compare_symbol == key {
                                         found = true;
-                                        symbol.version = glsl_version.to_string();
+                                        if let Some(requirement) = symbol.requirement.as_mut() {
+                                            if let RequirementParameter::Glsl(requirement) =
+                                                requirement
+                                            {
+                                                requirement.min_version = Some(glsl_version)
+                                            } else {
+                                                panic!("Requirement are not Glsl...");
+                                            }
+                                        } else {
+                                            symbol.requirement = Some(RequirementParameter::Glsl(
+                                                GlslRequirementParameter {
+                                                    min_version: Some(glsl_version),
+                                                    ..Default::default()
+                                                },
+                                            ));
+                                        }
                                     }
                                 }
                                 if !found {

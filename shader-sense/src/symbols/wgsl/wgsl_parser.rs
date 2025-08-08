@@ -42,8 +42,7 @@ impl SymbolTreeParser for WgslStructTreeParser {
         symbols.add_type(ShaderSymbol {
             label: struct_name.clone(),
             description: "".into(),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::Struct {
                 constructors: vec![], // Constructor in wgsl ?

@@ -352,6 +352,11 @@ impl Validator for Dxc {
                     HlslShaderModel::ShaderModel6_6 => "6_6",
                     HlslShaderModel::ShaderModel6_7 => "6_7",
                     HlslShaderModel::ShaderModel6_8 => "6_8",
+                    sm =>
+                        return Err(ShaderError::ValidationError(format!(
+                            "Shader model {:?} not supported by DXC.",
+                            sm
+                        ))),
                 }
             )
             .as_str(),

@@ -125,8 +125,18 @@ impl ShadingLanguageTag for WgslShadingLanguageTag {
 }
 
 // DXC only support shader model up to 6.0
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HlslShaderModel {
+    ShaderModel1,
+    ShaderModel1_2,
+    ShaderModel1_3,
+    ShaderModel1_4,
+    ShaderModel2,
+    ShaderModel3,
+    ShaderModel4,
+    ShaderModel4_1,
+    ShaderModel5,
+    ShaderModel5_1,
     ShaderModel6,
     ShaderModel6_1,
     ShaderModel6_2,
@@ -139,7 +149,16 @@ pub enum HlslShaderModel {
     ShaderModel6_8,
 }
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+impl HlslShaderModel {
+    pub fn earliest() -> HlslShaderModel {
+        HlslShaderModel::ShaderModel1
+    }
+    pub fn latest() -> HlslShaderModel {
+        HlslShaderModel::ShaderModel6_8
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HlslVersion {
     V2016,
     V2017,

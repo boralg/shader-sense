@@ -1,17 +1,20 @@
 use shader_sense::symbols::symbols::{
-    ShaderParameter, ShaderSignature, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
+    GlslRequirementParameter, RequirementParameter, ShaderParameter, ShaderSignature, ShaderSymbol,
+    ShaderSymbolData, ShaderSymbolList,
 };
 
 use super::GlslIntrinsicParser;
 
 impl GlslIntrinsicParser {
     pub fn add_types(&self, symbols: &mut ShaderSymbolList) {
-        pub fn new_glsl_type(label: &str, description: &str, version: &str) -> ShaderSymbol {
+        pub fn new_glsl_type(label: &str, description: &str, min_version: u32) -> ShaderSymbol {
             ShaderSymbol {
                 label: label.into(),
                 description: description.into(),
-                version: version.to_string(),
-                stages: vec![],
+                requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
+                    min_version: Some(min_version),
+                    ..Default::default()
+                })),
                 link: None,
                 data: ShaderSymbolData::Types {
                     constructors: vec![ShaderSignature {
@@ -46,15 +49,17 @@ impl GlslIntrinsicParser {
         pub fn new_glsl_vec_type(
             label: &str,
             description: &str,
-            version: &str,
             ty: &str,
+            min_version: u32,
             component_count: u32,
         ) -> ShaderSymbol {
             ShaderSymbol {
                 label: label.into(),
                 description: description.into(),
-                version: version.to_string(),
-                stages: vec![],
+                requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
+                    min_version: Some(min_version),
+                    ..Default::default()
+                })),
                 link: None,
                 data: ShaderSymbolData::Types {
                     constructors: vec![
@@ -92,16 +97,18 @@ impl GlslIntrinsicParser {
         pub fn new_glsl_mat_type(
             label: &str,
             description: &str,
-            version: &str,
             ty: &str,
+            min_version: u32,
             col_count: u32,
             row_count: u32,
         ) -> ShaderSymbol {
             ShaderSymbol {
                 label: label.into(),
                 description: description.into(),
-                version: version.to_string(),
-                stages: vec![],
+                requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
+                    min_version: Some(min_version),
+                    ..Default::default()
+                })),
                 link: None,
                 data: ShaderSymbolData::Types {
                     constructors: vec![
@@ -145,25 +152,25 @@ impl GlslIntrinsicParser {
         symbols.types.push(new_glsl_type(
             "bool",
             "conditional type, values may be either true or false",
-            "110",
+            110,
         ));
         symbols.types.push(new_glsl_type(
             "int",
             " a signed, two's complement, 32-bit integer",
-            "110",
+            110,
         ));
         symbols
             .types
-            .push(new_glsl_type("uint", " an unsigned 32-bit integer", "110"));
+            .push(new_glsl_type("uint", " an unsigned 32-bit integer", 110));
         symbols.types.push(new_glsl_type(
             "float",
             "an IEEE-754 single-precision floating point number",
-            "110",
+            110,
         ));
         symbols.types.push(new_glsl_type(
             "double",
             "an IEEE-754 double-precision floating-point number",
-            "110",
+            110,
         ));
         for component in 2..=4 {
             // Vectors
@@ -171,21 +178,21 @@ impl GlslIntrinsicParser {
                 format!("bvec{}", component).as_str(),
                 format!("Vector with {} components of booleans", component).as_str(),
                 "bool",
-                "110",
+                110,
                 component,
             ));
             symbols.types.push(new_glsl_vec_type(
                 format!("ivec{}", component).as_str(),
                 format!("Vector with {} components of signed integers", component).as_str(),
                 "int",
-                "110",
+                110,
                 component,
             ));
             symbols.types.push(new_glsl_vec_type(
                 format!("uvec{}", component).as_str(),
                 format!("Vector with {} components of unsigned integers", component).as_str(),
                 "uint",
-                "110",
+                110,
                 component,
             ));
             symbols.types.push(new_glsl_vec_type(
@@ -196,7 +203,7 @@ impl GlslIntrinsicParser {
                 )
                 .as_str(),
                 "float",
-                "110",
+                110,
                 component,
             ));
             symbols.types.push(new_glsl_vec_type(
@@ -207,7 +214,7 @@ impl GlslIntrinsicParser {
                 )
                 .as_str(),
                 "double",
-                "110",
+                110,
                 component,
             ));
             // Matrices
@@ -219,7 +226,7 @@ impl GlslIntrinsicParser {
                 )
                 .as_str(),
                 "float",
-                "110",
+                110,
                 component,
                 component,
             ));
@@ -231,7 +238,7 @@ impl GlslIntrinsicParser {
                 )
                 .as_str(),
                 "double",
-                "110",
+                110,
                 component,
                 component,
             ));
@@ -240,7 +247,7 @@ impl GlslIntrinsicParser {
                     format!("mat{}x{}", component, component_row).as_str(), 
                     format!("Matrice with {} columns and {} rows of single-precision floating-point numbers", component, component_row).as_str(),
                     "float",
-                    "110",
+                    110,
                     component,
                     component_row
                 ));
@@ -248,7 +255,7 @@ impl GlslIntrinsicParser {
                     format!("dmat{}x{}", component, component_row).as_str(), 
                     format!("Matrice with {} columns and {} rows of double-precision floating-point numbers", component, component_row).as_str(),
                     "double", 
-                    "110", 
+                    110,
                     component,
                     component_row
                 ));
@@ -272,17 +279,17 @@ impl GlslIntrinsicParser {
             symbols.types.push(new_glsl_type(
                 format!("sampler{}", sampler_type).as_str(),
                 format!("Floating-point sampler for Texture{}", sampler_type).as_str(),
-                "110",
+                110,
             ));
             symbols.types.push(new_glsl_type(
                 format!("isampler{}", sampler_type).as_str(),
                 format!("Signed integer sampler for Texture{}", sampler_type).as_str(),
-                "110",
+                110,
             ));
             symbols.types.push(new_glsl_type(
                 format!("usampler{}", sampler_type).as_str(),
                 format!("Unsigned integer sampler for Texture{}", sampler_type).as_str(),
-                "110",
+                110,
             ));
         }
         // Shadow Samplers
@@ -299,10 +306,10 @@ impl GlslIntrinsicParser {
             symbols.types.push(new_glsl_type(
                 format!("sampler{}Shadow", shadow_sampler_type).as_str(),
                 format!("Shadow sampler for Texture{}", shadow_sampler_type).as_str(),
-                "110",
+                110,
             ));
         }
         // Atomic counters
-        symbols.types.push(new_glsl_type("atomic_uint", "An Atomic Counter is a GLSL variable type whose storage comes from a Buffer Object. Atomic counters, as the name suggests, can have atomic memory operations performed on them. They can be thought of as a very limited form of buffer image variable.", "460"));
+        symbols.types.push(new_glsl_type("atomic_uint", "An Atomic Counter is a GLSL variable type whose storage comes from a Buffer Object. Atomic counters, as the name suggests, can have atomic memory operations performed on them. They can be thought of as a very limited form of buffer image variable.", 460));
     }
 }

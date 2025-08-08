@@ -1,7 +1,8 @@
 use shader_sense::{
-    shader::ShaderStage,
+    shader::{HlslShaderModel, ShaderStage},
     symbols::symbols::{
-        ShaderParameter, ShaderSignature, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
+        HlslRequirementParameter, RequirementParameter, ShaderParameter, ShaderSignature,
+        ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
     },
 };
 
@@ -12,8 +13,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "abort".into(),
             description: "Submits an error message to the information queue and terminates the current draw or dispatch call being executed.".into(),
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/abort".into()),
             data: ShaderSymbolData::Functions { signatures:vec![ShaderSignature {
                 returnType: "void".into(),
@@ -27,8 +30,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "abs".into(),
             description: "Returns the absolute value of the specified value.".into(),
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             link: Some(
                 "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-abs"
                     .into(),
@@ -56,8 +61,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "acos".into(),
             description: "Returns the arccosine of the specified value.".into(),
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-acos".into()),
             data: ShaderSymbolData::Functions { signatures: type_size_iter(&["float"], true, true, true).iter().map(|v| ShaderSignature {
                 returnType: v.format(),
@@ -77,8 +84,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "all".into(),
             description: "Determines if all components of the specified value are non-zero.".into(),
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-all".into()),
             data: ShaderSymbolData::Functions { signatures: type_size_iter(&["float", "int", "bool"], true, true, true).iter().map(|v| ShaderSignature {
                 returnType: "bool".into(),
@@ -98,8 +107,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "any".into(),
             description: "Determines if any components of the specified value are non-zero.".into(),
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-all".into()),
             data: ShaderSymbolData::Functions { signatures: type_size_iter(&["float", "int", "bool"], true, true, true).iter().map(|v| ShaderSignature {
                 returnType: "bool".into(),
@@ -119,8 +130,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "AllMemoryBarrier".into(),
             description: "Blocks execution of all threads in a group until all memory accesses have been completed.".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/allmemorybarrier".into()),
             data: ShaderSymbolData::Functions { signatures:vec![ShaderSignature {
                 returnType: "void".into(),
@@ -134,8 +147,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "AllMemoryBarrierWithGroupSync".into(),
             description: "Blocks execution of all threads in a group until all memory accesses have been completed and all threads in the group have reached this call.".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/allmemorybarrierwithgroupsync".into()),
             data: ShaderSymbolData::Functions { signatures:vec![ShaderSignature {
                 returnType: "void".into(),
@@ -149,8 +164,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "asdouble".into(),
             description: "Reinterprets a cast value (two 32-bit values) into a double.".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some(
                 "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/asdouble".into(),
             ),
@@ -183,8 +200,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "asfloat".into(),
             description: "Interprets the bit pattern of x as a floating-point number.".into(),
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-asfloat".into()),
             data: ShaderSymbolData::Functions { signatures: type_size_iter(&["int", "uint"], true, true, true).iter().map(|v| ShaderSignature {
                 returnType: v.format_with_type("float"),
@@ -204,8 +223,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "asint".into(),
             description: "Interprets the bit pattern of x as an integer.".into(),
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-asint".into()),
             data: ShaderSymbolData::Functions { signatures: type_size_iter(&["float", "uint"], true, true, true).iter().map(|v| ShaderSignature {
                 returnType: v.format_with_type("int"),
@@ -225,8 +246,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "asuint".into(),
             description: "Interprets the bit pattern of x as an unsigned integer.".into(),
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-asuint".into()),
             data: ShaderSymbolData::Functions { signatures:type_size_iter(&["float", "int"], true, true, true).iter().map(|v| ShaderSignature {
                 returnType: v.format_with_type("uint"),
@@ -246,8 +269,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "asin".into(),
             description: "Returns the arcsine of the specified value.".into(),
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-asin".into()),
             data: ShaderSymbolData::Functions { signatures: type_size_iter(&["float"], true, true, true).iter().map(|v| ShaderSignature {
                 returnType: v.format(),
@@ -267,8 +292,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "atan".into(),
             description: "Returns the arctangent of the specified value.".into(),
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-atan".into()),
             data: ShaderSymbolData::Functions { signatures: type_size_iter(&["float"], true, true, true).iter().map(|v| ShaderSignature {
                 returnType: v.format(),
@@ -288,8 +315,10 @@ impl HlslIntrinsicParser {
         symbols.functions.push(ShaderSymbol {
             label: "atan2".into(),
             description: "Returns the arctangent of two values (x,y).".into(),
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-atan2".into()),
             data: ShaderSymbolData::Functions { signatures: type_size_iter(&["float"], true, true, true).iter().map(|v| ShaderSignature {
                 returnType: v.format(),
@@ -328,8 +357,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -349,8 +380,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::Fragment, ShaderStage::Compute],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -384,8 +418,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -405,8 +441,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm1".into(),
-            stages: vec![ShaderStage::Fragment],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                stages: Some(vec![ShaderStage::Fragment]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -434,8 +473,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -463,8 +504,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -492,8 +535,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -520,8 +565,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -541,8 +588,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm2".into(),
-            stages: vec![ShaderStage::Fragment],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel2),
+                stages: Some(vec![ShaderStage::Fragment]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -562,8 +612,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::Fragment],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::Fragment]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -583,8 +636,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::Fragment],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::Fragment]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -604,8 +660,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm2".into(),
-            stages: vec![ShaderStage::Fragment],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel2),
+                stages: Some(vec![ShaderStage::Fragment]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -625,8 +684,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::Fragment],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::Fragment]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -646,8 +708,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::Fragment],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::Fragment]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -667,8 +732,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -688,8 +755,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -703,8 +772,10 @@ impl HlslIntrinsicParser {
                 description: "".into(),
                 parameters: vec![],
             }]},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -718,8 +789,10 @@ impl HlslIntrinsicParser {
                 description: "".into(),
                 parameters: vec![],
             }]},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -746,8 +819,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -785,8 +860,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -823,8 +900,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -857,8 +936,10 @@ impl HlslIntrinsicParser {
                     ],
                 }],
             },
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -878,8 +959,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::Fragment],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::Fragment]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -906,8 +990,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::Fragment],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::Fragment]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -934,8 +1021,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::Fragment],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::Fragment]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -963,8 +1053,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -984,8 +1076,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1013,8 +1107,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1041,8 +1137,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1074,8 +1172,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1095,8 +1195,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1116,8 +1218,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1137,8 +1241,10 @@ impl HlslIntrinsicParser {
                             range: None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1172,8 +1278,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1200,8 +1308,10 @@ impl HlslIntrinsicParser {
                             range: None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1221,8 +1331,10 @@ impl HlslIntrinsicParser {
                             range: None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1250,8 +1362,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1271,8 +1385,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm2".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel2),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1286,8 +1402,10 @@ impl HlslIntrinsicParser {
                 description: "The number of samples.".into(),
                 parameters: vec![],
             }]},
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1307,8 +1425,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1322,8 +1442,10 @@ impl HlslIntrinsicParser {
                 description: "".into(),
                 parameters: vec![],
             }]},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1337,8 +1459,10 @@ impl HlslIntrinsicParser {
                 description: "".into(),
                 parameters: vec![],
             }]},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1380,8 +1504,10 @@ impl HlslIntrinsicParser {
                     ],
                 }],
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1422,8 +1548,10 @@ impl HlslIntrinsicParser {
                     ],
                 }],
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1464,8 +1592,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1499,8 +1629,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1541,8 +1673,10 @@ impl HlslIntrinsicParser {
                     ],
                 }],
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1583,8 +1717,10 @@ impl HlslIntrinsicParser {
                     ],
                 }],
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1625,8 +1761,10 @@ impl HlslIntrinsicParser {
                     ],
                 }],
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1666,8 +1804,10 @@ impl HlslIntrinsicParser {
                     ],
                 }],
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1708,8 +1848,10 @@ impl HlslIntrinsicParser {
                     ],
                 }],
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1729,8 +1871,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1750,8 +1894,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1771,8 +1917,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1799,8 +1947,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1820,8 +1970,10 @@ impl HlslIntrinsicParser {
                             range: None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1855,8 +2007,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1890,8 +2044,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1911,8 +2067,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1932,8 +2090,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1953,8 +2113,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -1995,8 +2157,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2033,8 +2197,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2072,8 +2238,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2100,8 +2268,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2135,8 +2305,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2164,8 +2336,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2185,8 +2359,10 @@ impl HlslIntrinsicParser {
                             range: None,
                 }],
             }).collect()},
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2206,8 +2382,10 @@ impl HlslIntrinsicParser {
                             range: None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2245,8 +2423,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2279,8 +2459,10 @@ impl HlslIntrinsicParser {
                     ],
                 }],
             },
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2328,8 +2510,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2377,8 +2562,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2426,8 +2614,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2468,8 +2659,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2517,8 +2711,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2566,8 +2763,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2615,8 +2815,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2664,8 +2867,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2713,8 +2919,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2762,8 +2971,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2783,8 +2995,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2809,8 +3023,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2837,8 +3053,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2872,8 +3090,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2900,8 +3120,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2921,8 +3143,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2942,8 +3166,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2963,8 +3189,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -2984,8 +3212,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3013,8 +3243,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3048,8 +3280,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3069,8 +3303,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3104,8 +3340,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3125,8 +3363,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3153,8 +3393,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3182,8 +3424,10 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3203,8 +3447,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3238,8 +3484,11 @@ impl HlslIntrinsicParser {
                     range:None,
                     }],
                 }]},
-                version: "sm1".into(),
-                stages: vec![ShaderStage::Fragment],
+                requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                    min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                    stages: Some(vec![ShaderStage::Fragment]),
+                    ..Default::default()
+                })),
                 scope_stack: None,
                 range: None,
                 scope: None,
@@ -3280,8 +3529,11 @@ impl HlslIntrinsicParser {
                     range:None,
                     }],
                 }]},
-                version: "sm2".into(),
-                stages: vec![ShaderStage::Fragment],
+                requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                    min_shader_model: Some(HlslShaderModel::ShaderModel2),
+                    stages: Some(vec![ShaderStage::Fragment]),
+                    ..Default::default()
+                })),
                 scope_stack: None,
                 range: None,
                 scope: None,
@@ -3308,8 +3560,11 @@ impl HlslIntrinsicParser {
                     range:None,
                     }],
                 }]},
-                version: "sm2".into(),
-                stages: vec![ShaderStage::Fragment],
+                requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                    min_shader_model: Some(HlslShaderModel::ShaderModel2),
+                    stages: Some(vec![ShaderStage::Fragment]),
+                    ..Default::default()
+                })),
                 scope_stack: None,
                 range: None,
                 scope: None,
@@ -3350,8 +3605,11 @@ impl HlslIntrinsicParser {
                     range:None,
                     }],
                 }]},
-                version: "sm2".into(),
-                stages: vec![ShaderStage::Fragment],
+                requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                    min_shader_model: Some(HlslShaderModel::ShaderModel2),
+                    stages: Some(vec![ShaderStage::Fragment]),
+                    ..Default::default()
+                })),
                 scope_stack: None,
                 range: None,
                 scope: None,
@@ -3378,8 +3636,11 @@ impl HlslIntrinsicParser {
                     range:None,
                     }],
                 }]},
-                version: "sm3".into(),
-                stages: vec![ShaderStage::Fragment],
+                requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                    min_shader_model: Some(HlslShaderModel::ShaderModel3),
+                    stages: Some(vec![ShaderStage::Fragment]),
+                    ..Default::default()
+                })),
                 scope_stack: None,
                 range: None,
                 scope: None,
@@ -3406,8 +3667,11 @@ impl HlslIntrinsicParser {
                     range:None,
                     }],
                 }]},
-                version: "sm2".into(),
-                stages: vec![ShaderStage::Fragment],
+                requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                    min_shader_model: Some(HlslShaderModel::ShaderModel2),
+                    stages: Some(vec![ShaderStage::Fragment]),
+                    ..Default::default()
+                })),
                 scope_stack: None,
                 range: None,
                 scope: None,
@@ -3428,8 +3692,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3449,8 +3715,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel1),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3471,8 +3739,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![ShaderStage::Fragment, ShaderStage::Compute],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3498,8 +3769,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![ShaderStage::Fragment, ShaderStage::Compute],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3519,8 +3793,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![ShaderStage::Fragment, ShaderStage::Compute],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3540,8 +3817,11 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![ShaderStage::Fragment, ShaderStage::Compute],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3561,8 +3841,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3582,8 +3864,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3603,8 +3887,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3624,8 +3910,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3645,8 +3933,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3666,8 +3956,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3687,8 +3979,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3708,8 +4002,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3729,8 +4025,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3756,8 +4054,10 @@ impl HlslIntrinsicParser {
                     }],
                 }],
             },
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3777,8 +4077,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3798,8 +4100,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3813,8 +4117,10 @@ impl HlslIntrinsicParser {
                 description: "The result will be between 4 and 128, and includes all waves: active, inactive, and/or helper lanes. The result returned from this function may vary significantly depending on the driver implementation.".into(),
                 parameters: vec![],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3828,8 +4134,10 @@ impl HlslIntrinsicParser {
                 description: "The current lane index. The result will be between 0 and the result returned from WaveGetLaneCount.".into(),
                 parameters: vec![],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3852,8 +4160,10 @@ impl HlslIntrinsicParser {
                     parameters: vec![],
                 }],
             },
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3873,8 +4183,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3894,8 +4206,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3915,8 +4229,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3936,8 +4252,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,
@@ -3964,8 +4282,10 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }]},
-            version: "sm6".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel6),
+                ..Default::default()
+            })),
             scope_stack: None,
             range: None,
             scope: None,

@@ -11,7 +11,7 @@ use crate::{
 use super::{
     shader_language::ShaderLanguage,
     symbol_parser::{
-        ShaderSymbolListBuilder, SymbolRegionFinder, SymbolTreeFilter, SymbolTreeParser,
+        ShaderSymbolListBuilder, SymbolRegionFinder, SymbolTreeParser,
         SymbolTreePreprocessorParser, SymbolWordProvider,
     },
     symbol_tree::{ShaderModule, ShaderModuleHandle, ShaderSymbols, SymbolTree},
@@ -23,7 +23,6 @@ use super::{
 
 pub struct SymbolProvider {
     symbol_parsers: Vec<(Box<dyn SymbolTreeParser>, tree_sitter::Query)>,
-    symbol_filters: Vec<Box<dyn SymbolTreeFilter>>,
     scope_query: Query,
     error_query: Query,
 
@@ -52,7 +51,6 @@ impl SymbolProvider {
     pub fn new(
         language: tree_sitter::Language,
         parsers: Vec<Box<dyn SymbolTreeParser>>,
-        filters: Vec<Box<dyn SymbolTreeFilter>>,
         preprocessor_parsers: Vec<Box<dyn SymbolTreePreprocessorParser>>,
         region_finder: Box<dyn SymbolRegionFinder>,
         word_provider: Box<dyn SymbolWordProvider>,
@@ -71,7 +69,6 @@ impl SymbolProvider {
                     (e, query)
                 })
                 .collect(),
-            symbol_filters: filters,
             scope_query: tree_sitter::Query::new(language.clone(), scope_query).unwrap(),
             error_query: tree_sitter::Query::new(language.clone(), error_query).unwrap(),
             preprocessor_parsers: preprocessor_parsers
@@ -361,15 +358,14 @@ impl SymbolProvider {
     fn query_file_symbols(
         &self,
         symbol_tree: &SymbolTree,
-        shader_params: &ShaderCompilationParams,
+        shader_compilation_params: &ShaderCompilationParams,
     ) -> Result<ShaderSymbolList, ShaderError> {
         let filter_symbol = |symbol: &ShaderSymbol| -> bool {
             // Dont filter inactive regions here on parsing, to avoid recomputing all symbols on regions update.
-            let mut is_retained = true;
-            for filter in &self.symbol_filters {
-                is_retained = is_retained & filter.filter_symbol(symbol, shader_params);
+            match &symbol.requirement {
+                Some(requirement) => requirement.is_met(shader_compilation_params),
+                None => true, // Not filtered
             }
-            is_retained
         };
         let mut symbol_list_builder = ShaderSymbolListBuilder::new(&filter_symbol);
         let scopes = self.query_file_scopes(symbol_tree);

@@ -81,8 +81,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
                 symbols.add_variable(ShaderSymbol {
                     label: label.clone(),
                     description: "".into(),
-                    version: "".into(),
-                    stages: vec![],
+                    requirement: None,
                     link: None,
                     data: ShaderSymbolData::Variables {
                         ty: ty.clone(),
@@ -104,8 +103,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
         symbols.add_function(ShaderSymbol {
             label: get_name(shader_content, matches.captures[1].node).into(),
             description: "".into(),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::Functions {
                 signatures: vec![ShaderSignature {
@@ -246,8 +244,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
         symbols.add_type(ShaderSymbol {
             label: struct_name,
             description: "".into(),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::Struct {
                 constructors: vec![], // No constructor in HLSL
@@ -313,8 +310,7 @@ impl SymbolTreeParser for HlslVariableTreeParser {
         symbol_builder.add_variable(ShaderSymbol {
             label: get_name(shader_content, label_node).into(),
             description: "".into(),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::Variables {
                 ty: get_name(shader_content, type_node).into(),
@@ -369,8 +365,7 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
         symbol_builder.add_call_expression(ShaderSymbol {
             label: label,
             description: "".into(),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::CallExpression {
                 label: get_name(shader_content, label_node).into(),
@@ -534,8 +529,7 @@ mod hlsl_parser_tests {
             &ShaderSymbol {
                 label: "TestStruct".into(),
                 description: "".into(),
-                version: "".into(),
-                stages: vec![],
+                requirement: None,
                 link: None,
                 data: ShaderSymbolData::Struct {
                     constructors: vec![],
@@ -601,8 +595,7 @@ mod hlsl_parser_tests {
             &ShaderSymbol {
                 label: "function".into(),
                 description: "".into(),
-                version: "".into(),
-                stages: vec![],
+                requirement: None,
                 link: None,
                 data: ShaderSymbolData::Functions {
                     signatures: vec![ShaderSignature {

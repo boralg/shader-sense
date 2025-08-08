@@ -66,8 +66,7 @@ impl SymbolTreeParser for GlslFunctionTreeParser {
         symbols.add_function(ShaderSymbol {
             label: get_name(shader_content, matches.captures[1].node).into(),
             description: "".into(),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::Functions {
                 signatures: vec![ShaderSignature {
@@ -126,8 +125,7 @@ impl SymbolTreeParser for GlslUniformBlock {
             symbols.add_type(ShaderSymbol {
                 label: uniform_block_name.clone(),
                 description: "".into(),
-                version: "".into(),
-                stages: vec![],
+                requirement: None,
                 link: None,
                 data: ShaderSymbolData::Struct {
                     constructors: vec![], // No constructor for uniform.
@@ -156,8 +154,7 @@ impl SymbolTreeParser for GlslUniformBlock {
             symbols.add_variable(ShaderSymbol {
                 label: get_name(shader_content, variable_node).into(),
                 description: "".into(),
-                version: "".into(),
-                stages: vec![],
+                requirement: None,
                 link: None,
                 data: ShaderSymbolData::Variables {
                     ty: get_name(shader_content, identifier_node).into(),
@@ -176,8 +173,7 @@ impl SymbolTreeParser for GlslUniformBlock {
                 symbols.add_variable(ShaderSymbol {
                     label: get_name(shader_content, uniform_value[1].node).into(),
                     description: "".into(),
-                    version: "".into(),
-                    stages: vec![],
+                    requirement: None,
                     link: None,
                     data: ShaderSymbolData::Variables {
                         ty: get_name(shader_content, uniform_value[0].node).into(),
@@ -232,8 +228,7 @@ impl SymbolTreeParser for GlslStructTreeParser {
         symbols.add_type(ShaderSymbol {
             label: label.clone(),
             description: "".into(),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::Struct {
                 // In Glsl, constructor are auto built from all their members.
@@ -293,8 +288,7 @@ impl SymbolTreeParser for GlslVariableTreeParser {
         symbols.add_variable(ShaderSymbol {
             label: get_name(shader_content, matches.captures[1].node).into(),
             description: "".into(),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::Variables {
                 ty: get_name(shader_content, matches.captures[0].node).into(),
@@ -344,8 +338,7 @@ impl SymbolTreeParser for GlslCallExpressionTreeParser {
         symbol_builder.add_call_expression(ShaderSymbol {
             label: label,
             description: "".into(),
-            version: "".into(),
-            stages: vec![],
+            requirement: None,
             link: None,
             data: ShaderSymbolData::CallExpression {
                 label: get_name(shader_content, label_node).into(),

@@ -43,8 +43,7 @@ impl HlslIntrinsicParser {
                     symbols.constants.push(ShaderSymbol {
                         label: label.into(),
                         description: description.into(),
-                        version: "".into(),
-                        stages: vec![],
+                        requirement: None,
                         link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-semantics".into()),
                         data: ShaderSymbolData::Variables { ty, count: None },
                         range: None,

@@ -1,19 +1,25 @@
 use shader_sense::{
-    shader::ShaderStage,
+    shader::{HlslShaderModel, ShaderStage},
     symbols::symbols::{
-        ShaderMethod, ShaderParameter, ShaderSignature, ShaderSymbol, ShaderSymbolData,
-        ShaderSymbolList,
+        HlslRequirementParameter, RequirementParameter, ShaderMethod, ShaderParameter,
+        ShaderSignature, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
     },
 };
 
 use super::HlslIntrinsicParser;
 
-pub fn new_hlsl_scalar(label: &str, description: &str, version: &str) -> ShaderSymbol {
+pub fn new_hlsl_scalar(
+    label: &str,
+    description: &str,
+    min_shader_model: HlslShaderModel,
+) -> ShaderSymbol {
     ShaderSymbol {
         label: label.into(),
         description: description.into(),
-        version: version.to_string(),
-        stages: vec![],
+        requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+            min_shader_model: Some(min_shader_model),
+            ..Default::default()
+        })),
         link: Some(
             "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-scalar"
                 .into(),
@@ -424,8 +430,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "Buffer".into(),
             description: "".into(),
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-buffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -472,8 +480,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "Texture1D".into(),
             description: "".into(),
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             link: Some(
                 "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1d"
                     .into(),
@@ -490,8 +500,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "Texture1DArray".into(),
             description: "".into(),
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1darray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -505,8 +517,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "Texture2D".into(),
             description: "".into(),
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             link: Some(
                 "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2d"
                     .into(),
@@ -523,8 +537,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "Texture2DArray".into(),
             description: "".into(),
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2darray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -538,8 +554,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "Texture3D".into(),
             description: "".into(),
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             link: Some(
                 "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture3d"
                     .into(),
@@ -556,8 +574,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "TextureCube".into(),
             description: "".into(),
-            version: "sm4".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texturecube".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -571,8 +591,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "TextureCubeArray".into(),
             description: "".into(),
-            version: "sm4.1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4_1),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texturecubearray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -586,8 +608,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "Texture2DMS".into(),
             description: "".into(),
-            version: "sm4.1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4_1),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2dms".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -601,8 +625,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "Texture2DMSArray".into(),
             description: "".into(),
-            version: "sm4.1".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel4_1),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-Texture2DMSArray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -618,8 +644,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "AppendStructuredBuffer".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-AppendStructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -672,8 +700,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "ByteAddressBuffer".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-ByteAddressBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -768,8 +798,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "ConsumeStructuredBuffer".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-ConsumeStructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -816,8 +848,11 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "InputPatch".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-InputPatch".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -831,8 +866,11 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "OutputPatch".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![ShaderStage::TesselationControl],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                stages: Some(vec![ShaderStage::TesselationControl]),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-OutputPatch".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -846,8 +884,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "RWBuffer".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some(
                 "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWBuffer"
                     .into(),
@@ -897,8 +937,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "RWByteAddressBuffer".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWByteAddressBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -1361,8 +1403,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "RWStructuredBuffer".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWStructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -1435,8 +1479,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "RWTexture1D".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture1D".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -1482,8 +1528,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "RWTexture1DArray".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture1DArray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -1536,8 +1584,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "RWTexture2D".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture2D".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -1590,8 +1640,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "RWTexture2DArray".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture2DArray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -1649,8 +1701,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "RWTexture3D".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture3D".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -1710,8 +1764,10 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "StructuredBuffer".into(),
             description: "".into(),
-            version: "sm5".into(),
-            stages: vec![],
+            requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
+                min_shader_model: Some(HlslShaderModel::ShaderModel5),
+                ..Default::default()
+            })),
             link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-StructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
@@ -1872,53 +1928,73 @@ impl HlslIntrinsicParser {
         scalar_types.push(new_hlsl_scalar(
             "bool",
             "conditional type, values may be either true or false",
-            "",
+            HlslShaderModel::earliest(),
         ));
-        scalar_types.push(new_hlsl_scalar("int", "32-bit signed integer", ""));
-        scalar_types.push(new_hlsl_scalar("uint", "32-bit unsigned integer", ""));
-        scalar_types.push(new_hlsl_scalar("dword", "32-bit unsigned integer", ""));
-        scalar_types.push(new_hlsl_scalar("half", "16-bit floating point value", ""));
-        scalar_types.push(new_hlsl_scalar("float", "32-bit floating point value", ""));
+        scalar_types.push(new_hlsl_scalar(
+            "int",
+            "32-bit signed integer",
+            HlslShaderModel::earliest(),
+        ));
+        scalar_types.push(new_hlsl_scalar(
+            "uint",
+            "32-bit unsigned integer",
+            HlslShaderModel::earliest(),
+        ));
+        scalar_types.push(new_hlsl_scalar(
+            "dword",
+            "32-bit unsigned integer",
+            HlslShaderModel::earliest(),
+        ));
+        scalar_types.push(new_hlsl_scalar(
+            "half",
+            "16-bit floating point value",
+            HlslShaderModel::earliest(),
+        ));
+        scalar_types.push(new_hlsl_scalar(
+            "float",
+            "32-bit floating point value",
+            HlslShaderModel::earliest(),
+        ));
         scalar_types.push(new_hlsl_scalar(
             "double",
             "64-bit floating point value.",
-            "",
+            HlslShaderModel::earliest(),
         ));
         // Minimum are only supported with windows 8+
         scalar_types.push(new_hlsl_scalar(
             "min16float",
             "minimum 16-bit floating point value. Only supported on Windows 8+ only.",
-            "",
+            HlslShaderModel::earliest(),
         ));
         scalar_types.push(new_hlsl_scalar(
             "min10float",
             "minimum 10-bit floating point value. Only supported on Windows 8+ only.",
-            "",
+            HlslShaderModel::earliest(),
         ));
         scalar_types.push(new_hlsl_scalar(
             "min16int",
             "minimum 16-bit signed integer. Only supported on Windows 8+ only.",
-            "",
+            HlslShaderModel::earliest(),
         ));
         scalar_types.push(new_hlsl_scalar(
             "min12int",
             "minimum 12-bit signed integer. Only supported on Windows 8+ only.",
-            "",
+            HlslShaderModel::earliest(),
         ));
         scalar_types.push(new_hlsl_scalar(
             "min16uint",
             "minimum 16-bit unsigned integer. Only supported on Windows 8+ only.",
-            "",
+            HlslShaderModel::earliest(),
         ));
         scalar_types.push(new_hlsl_scalar(
             "uint64_t",
             "A 64-bit unsigned integer.",
-            "sm6",
+            HlslShaderModel::ShaderModel6,
         ));
         scalar_types.push(new_hlsl_scalar(
             "int64_t",
             "A 64-bit signed integer.",
-            "sm6",
+            HlslShaderModel::ShaderModel6,
         ));
         // TODO: -enable16bnit float16_t + uint16_t
         fn get_vector_component_label(index: u32) -> String {
@@ -1965,8 +2041,7 @@ impl HlslIntrinsicParser {
                             }).collect(),
                         }
                     ]},
-                    version: "".into(),
-                    stages: vec![],
+                    requirement: None,
                     range: None,
                     scope: None,
                     scope_stack:None,
@@ -2011,8 +2086,7 @@ impl HlslIntrinsicParser {
                                 ).collect::<Vec<Vec<ShaderParameter>>>().concat(),
                             }
                         ] },
-                        version: "".into(),
-                        stages: vec![],
+                        requirement: None,
                         range: None,
                         scope: None,
                         scope_stack:None,

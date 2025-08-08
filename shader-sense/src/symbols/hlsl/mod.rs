@@ -1,10 +1,8 @@
-mod hlsl_filter;
 mod hlsl_parser;
 mod hlsl_preprocessor;
 mod hlsl_regions;
 mod hlsl_word;
 
-use hlsl_filter::get_hlsl_filters;
 use hlsl_parser::get_hlsl_parsers;
 use hlsl_preprocessor::get_hlsl_preprocessor_parser;
 
@@ -17,7 +15,6 @@ pub fn create_hlsl_symbol_provider(tree_sitter_language: tree_sitter::Language) 
     SymbolProvider::new(
         tree_sitter_language.clone(),
         get_hlsl_parsers(),
-        get_hlsl_filters(),
         get_hlsl_preprocessor_parser(),
         Box::new(HlslSymbolRegionFinder::new(tree_sitter_language.clone())),
         Box::new(hlsl_word::HlslSymbolWordProvider {}),

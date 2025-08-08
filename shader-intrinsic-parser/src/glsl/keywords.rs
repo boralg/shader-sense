@@ -8,8 +8,7 @@ impl GlslIntrinsicParser {
             ShaderSymbol {
                 label: label.into(),
                 description: description.into(),
-                version: "".into(),
-                stages: vec![],
+                requirement: None,
                 link: Some("https://www.khronos.org/opengl/wiki/Type_Qualifier_(GLSL)".into()),
                 data: ShaderSymbolData::Keyword {},
                 range: None,
