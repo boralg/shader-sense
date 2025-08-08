@@ -1,4 +1,5 @@
 use crate::{
+    shader::ShaderCompilationParams,
     shader_error::ShaderError,
     symbols::{
         symbol_parser::SymbolRegionFinder,
@@ -15,6 +16,7 @@ impl SymbolRegionFinder for WgslRegionFinder {
         &self,
         _symbol_tree: &SymbolTree,
         _symbol_provider: &SymbolProvider,
+        _shader_params: &ShaderCompilationParams,
         _node: tree_sitter::Node,
         _preprocessor: &mut ShaderPreprocessor,
         _context: &'a mut ShaderPreprocessorContext,

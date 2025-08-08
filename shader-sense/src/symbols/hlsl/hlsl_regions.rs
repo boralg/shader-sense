@@ -3,6 +3,7 @@ use std::num::ParseIntError;
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
+    shader::ShaderCompilationParams,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
         symbol_parser::{get_name, SymbolRegionFinder},
@@ -333,6 +334,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         &self,
         symbol_tree: &SymbolTree,
         symbol_provider: &SymbolProvider,
+        shader_params: &ShaderCompilationParams,
         node: tree_sitter::Node,
         preprocessor: &mut ShaderPreprocessor,
         context: &'a mut ShaderPreprocessorContext,
@@ -364,6 +366,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             fn parse_region<'a>(
                 symbol_tree: &SymbolTree,
                 symbol_provider: &SymbolProvider,
+                shader_params: &ShaderCompilationParams,
                 preprocessor: &mut ShaderPreprocessor,
                 cursor: &mut tree_sitter::TreeCursor,
                 found_active_region: bool,
@@ -411,6 +414,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     match symbol_provider.process_include(
                         context,
                         include_before,
+                        shader_params,
                         include_callback,
                         include_old_symbol,
                     ) {
@@ -573,6 +577,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                 let mut next_region = parse_region(
                                     symbol_tree,
                                     symbol_provider,
+                                    shader_params,
                                     preprocessor,
                                     cursor,
                                     (is_active_region != 0) || found_active_region,
@@ -639,6 +644,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             regions.append(&mut parse_region(
                 symbol_tree,
                 symbol_provider,
+                shader_params,
                 preprocessor,
                 &mut cursor,
                 false,
@@ -679,6 +685,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             match symbol_provider.process_include(
                 context,
                 include_left,
+                shader_params,
                 include_callback,
                 include_old_symbol,
             ) {

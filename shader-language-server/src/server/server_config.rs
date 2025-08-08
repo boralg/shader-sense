@@ -5,10 +5,12 @@ use serde::{Deserialize, Serialize};
 
 use serde_json::Value;
 use shader_sense::{
-    shader::{GlslSpirvVersion, GlslTargetClient, HlslShaderModel, HlslVersion, ShadingLanguage},
+    shader::{
+        GlslCompilationParams, GlslSpirvVersion, GlslTargetClient, HlslCompilationParams,
+        HlslShaderModel, HlslVersion, ShaderCompilationParams, ShaderContextParams, ShaderParams,
+        ShadingLanguage, WgslCompilationParams,
+    },
     shader_error::ShaderDiagnosticSeverity,
-    symbols::symbol_provider::ShaderSymbolParams,
-    validator::validator::ValidationParams,
 };
 
 use crate::{profile_scope, server::ServerLanguage};
@@ -77,7 +79,7 @@ impl ServerConfig {
         server: ServerTraceLevel::Off,
     };
 
-    pub fn into_validation_params(&self, variant: Option<ShaderVariant>) -> ValidationParams {
+    pub fn into_shader_params(&self, variant: Option<ShaderVariant>) -> ShaderParams {
         let (mut defines, mut includes, entry_point, shader_stage) = match variant {
             Some(variant) => (
                 variant.defines.clone(),
@@ -95,50 +97,33 @@ impl ServerConfig {
         includes.extend(self.includes.clone().unwrap_or_default());
         let hlsl = self.hlsl.clone().unwrap_or_default();
         let glsl = self.glsl.clone().unwrap_or_default();
-        ValidationParams {
-            entry_point: entry_point,
-            shader_stage: shader_stage,
-            defines: defines,
-            includes: includes,
-            path_remapping: self
-                .path_remapping
-                .clone()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(vp, p)| (vp.into(), p.into()))
-                .collect(),
-            hlsl_shader_model: hlsl.shader_model.unwrap_or_default(),
-            hlsl_version: hlsl.version.unwrap_or_default(),
-            hlsl_enable16bit_types: hlsl.enable16bit_types.unwrap_or_default(),
-            hlsl_spirv: hlsl.spirv.unwrap_or_default(),
-            glsl_client: glsl.target_client.unwrap_or_default(),
-            glsl_spirv: glsl.spirv_version.unwrap_or_default(),
-        }
-    }
-    pub fn into_symbol_params(&self, variant: Option<ShaderVariant>) -> ShaderSymbolParams {
-        let (mut defines, mut includes) = match variant {
-            Some(variant) => (
-                variant.defines.clone(),
-                variant
-                    .includes
+        ShaderParams {
+            context: ShaderContextParams {
+                defines,
+                includes,
+                path_remapping: self
+                    .path_remapping
+                    .clone()
+                    .unwrap_or_default()
                     .into_iter()
-                    .map(|e| e.into_os_string().into_string().unwrap())
-                    .collect::<Vec<String>>(),
-            ),
-            None => (HashMap::new(), Vec::new()),
-        };
-        defines.extend(self.defines.clone().unwrap_or_default());
-        includes.extend(self.includes.clone().unwrap_or_default());
-        ShaderSymbolParams {
-            defines: defines,
-            includes: includes,
-            path_remapping: self
-                .path_remapping
-                .clone()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(vp, p)| (vp.into(), p.into()))
-                .collect(),
+                    .map(|(vp, p)| (vp.into(), p.into()))
+                    .collect(),
+            },
+            compilation: ShaderCompilationParams {
+                entry_point,
+                shader_stage,
+                hlsl: HlslCompilationParams {
+                    shader_model: hlsl.shader_model.unwrap_or_default(),
+                    version: hlsl.version.unwrap_or_default(),
+                    enable16bit_types: hlsl.enable16bit_types.unwrap_or_default(),
+                    spirv: hlsl.spirv.unwrap_or_default(),
+                },
+                glsl: GlslCompilationParams {
+                    client: glsl.target_client.unwrap_or_default(),
+                    spirv: glsl.spirv_version.unwrap_or_default(),
+                },
+                wgsl: WgslCompilationParams {},
+            },
         }
     }
     pub fn get_symbols(&self) -> bool {

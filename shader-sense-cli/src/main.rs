@@ -8,16 +8,14 @@ use std::{
 use colored::Colorize;
 use shader_sense::{
     shader::{
-        GlslShadingLanguageTag, GlslSpirvVersion, GlslTargetClient, HlslShaderModel,
-        HlslShadingLanguageTag, HlslVersion, ShaderStage, ShadingLanguage, ShadingLanguageTag,
-        WgslShadingLanguageTag,
+        GlslCompilationParams, GlslShadingLanguageTag, GlslSpirvVersion, GlslTargetClient,
+        HlslCompilationParams, HlslShaderModel, HlslShadingLanguageTag, HlslVersion,
+        ShaderCompilationParams, ShaderContextParams, ShaderParams, ShaderStage, ShadingLanguage,
+        ShadingLanguageTag, WgslCompilationParams, WgslShadingLanguageTag,
     },
     shader_error::ShaderDiagnosticSeverity,
-    symbols::{
-        shader_language::ShaderLanguage, symbol_provider::ShaderSymbolParams,
-        symbols::ShaderSymbolType,
-    },
-    validator::{create_validator, validator::ValidationParams},
+    symbols::{shader_language::ShaderLanguage, symbols::ShaderSymbolType},
+    validator::create_validator,
 };
 
 fn get_version() -> &'static str {
@@ -160,6 +158,28 @@ pub fn main() {
     }
     match file_name {
         Some(file_name) => {
+            let shader_params = ShaderParams {
+                context: ShaderContextParams {
+                    includes: includes,
+                    defines: defines.into_iter().map(|d| (d, "1".to_owned())).collect(),
+                    path_remapping: HashMap::new(),
+                },
+                compilation: ShaderCompilationParams {
+                    entry_point: entry_point,
+                    shader_stage: shader_stage,
+                    hlsl: HlslCompilationParams {
+                        shader_model: HlslShaderModel::ShaderModel6_8,
+                        version: HlslVersion::V2018,
+                        enable16bit_types: false,
+                        spirv: false,
+                    },
+                    glsl: GlslCompilationParams {
+                        client: GlslTargetClient::Vulkan1_3,
+                        spirv: GlslSpirvVersion::SPIRV1_6,
+                    },
+                    wgsl: WgslCompilationParams {},
+                },
+            };
             let shader_path = Path::new(&file_name);
             let shader_content = std::fs::read_to_string(shader_path).unwrap();
             // By default validate (if we dont parse symbols)
@@ -169,19 +189,7 @@ pub fn main() {
                 match validator.validate_shader(
                     &shader_content,
                     shader_path,
-                    &ValidationParams {
-                        entry_point: entry_point,
-                        shader_stage: shader_stage,
-                        includes: includes,
-                        defines: defines.into_iter().map(|d| (d, "1".to_owned())).collect(),
-                        path_remapping: HashMap::new(),
-                        hlsl_shader_model: HlslShaderModel::ShaderModel6_8,
-                        hlsl_version: HlslVersion::V2018,
-                        hlsl_enable16bit_types: false,
-                        hlsl_spirv: false,
-                        glsl_client: GlslTargetClient::Vulkan1_3,
-                        glsl_spirv: GlslSpirvVersion::SPIRV1_6,
-                    },
+                    &shader_params,
                     &mut |path: &Path| Some(std::fs::read_to_string(path).unwrap()),
                 ) {
                     Ok(diagnostic_list) => {
@@ -237,7 +245,7 @@ pub fn main() {
                         let symbols = symbol_provider
                             .query_symbols(
                                 &shader_module,
-                                ShaderSymbolParams::default(),
+                                shader_params,
                                 &mut |include| {
                                     let include_module = language.create_module(
                                         &include.get_absolute_path(),

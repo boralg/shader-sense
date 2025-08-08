@@ -150,8 +150,10 @@ impl ServerLanguageFileCache {
         let old_data = self.files.get_mut(&uri).unwrap().data.take();
         self.files.get_mut(&uri).unwrap().data = Some(ServerFileCacheData::default());
 
+        // Compute params
+        let shader_params = config.into_shader_params(variant.clone());
         let mut context =
-            ShaderPreprocessorContext::main(&file_path, config.into_symbol_params(variant.clone()));
+            ShaderPreprocessorContext::main(&file_path, shader_params.context.clone());
         if let Some(dirty_deps) = dirty_deps {
             context.mark_dirty(dirty_deps);
         }
@@ -164,6 +166,7 @@ impl ServerLanguageFileCache {
             match symbol_provider.query_symbols_with_context(
                 &shader_module,
                 &mut context,
+                &shader_params.compilation,
                 &mut |include| {
                     let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
                     let included_file =
@@ -177,10 +180,7 @@ impl ServerLanguageFileCache {
                     // Return this error & store it to display it as a diagnostic & dont prevent linting.
                     match error.into_diagnostic(ShaderDiagnosticSeverity::Warning) {
                         Some(diagnostic) => (
-                            ShaderSymbols::new(
-                                &file_path,
-                                config.into_symbol_params(variant.clone()),
-                            ),
+                            ShaderSymbols::new(&file_path, shader_params.context.clone()),
                             ShaderDiagnosticList {
                                 diagnostics: vec![diagnostic],
                             },
@@ -201,7 +201,6 @@ impl ServerLanguageFileCache {
             let mut diagnostic_list = {
                 // TODO: should print warning if validation is too long.
                 profile_scope!("Raw validation");
-                let validation_params = config.into_validation_params(variant.clone());
                 let variant_shader_module = match &variant {
                     Some(variant) => {
                         Rc::clone(&self.files.get(&variant.url).unwrap().shader_module)
@@ -211,7 +210,7 @@ impl ServerLanguageFileCache {
                 let diagnostics = match validator.validate_shader(
                     &RefCell::borrow(&variant_shader_module).content,
                     RefCell::borrow(&variant_shader_module).file_path.as_path(),
-                    &validation_params,
+                    &shader_params,
                     &mut |deps_path: &Path| -> Option<String> {
                         let deps_uri = Url::from_file_path(deps_path).unwrap();
                         let deps_file = match self.get_file(&deps_uri) {

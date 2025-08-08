@@ -3,6 +3,7 @@ use std::path::Path;
 use tree_sitter::{Node, QueryMatch};
 
 use crate::{
+    shader::ShaderCompilationParams,
     shader_error::ShaderError,
     symbols::symbols::{
         ShaderPosition, ShaderRange, ShaderSymbolData, ShaderSymbolList, ShaderSymbolListRef,
@@ -298,7 +299,11 @@ pub trait SymbolTreeParser {
 }
 pub trait SymbolTreeFilter {
     // Filter symbol, keep them on true, remove them on false
-    fn filter_symbol(&self, shader_symbol: &ShaderSymbol, file_name: &String) -> bool;
+    fn filter_symbol(
+        &self,
+        shader_symbol: &ShaderSymbol,
+        shader_params: &ShaderCompilationParams,
+    ) -> bool;
 }
 
 pub trait SymbolRegionFinder {
@@ -306,6 +311,7 @@ pub trait SymbolRegionFinder {
         &self,
         symbol_tree: &SymbolTree,
         symbol_provider: &SymbolProvider,
+        shader_params: &ShaderCompilationParams,
         node: tree_sitter::Node,
         preprocessor: &mut ShaderPreprocessor,
         context: &'a mut ShaderPreprocessorContext,

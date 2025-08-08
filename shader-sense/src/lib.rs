@@ -15,9 +15,8 @@ mod tests {
 
     use crate::{
         include::{canonicalize, IncludeHandler},
-        shader::ShadingLanguage,
-        symbols::{shader_language::ShaderLanguage, symbol_provider::ShaderSymbolParams},
-        validator::validator::ValidationParams,
+        shader::{ShaderParams, ShadingLanguage},
+        symbols::shader_language::ShaderLanguage,
     };
 
     fn validate_include(path: &Path) -> bool {
@@ -86,7 +85,7 @@ mod tests {
         let mut depth = 0;
         let _symbols = symbol_provider.query_symbols(
             &shader_module,
-            ShaderSymbolParams::default(),
+            ShaderParams::default(),
             &mut |include| {
                 depth += 1;
                 println!(
@@ -110,7 +109,7 @@ mod tests {
         let _symbols = validator.validate_shader(
             &shader_module.content,
             file_path,
-            &ValidationParams::default(),
+            &ShaderParams::default(),
             &mut |path| Some(std::fs::read_to_string(path).unwrap()),
         );
     }

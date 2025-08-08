@@ -1,12 +1,8 @@
 use std::path::Path;
 
 use shader_sense::{
-    shader::{GlslShadingLanguageTag, ShadingLanguageTag},
-    symbols::{
-        shader_language::ShaderLanguage,
-        symbol_provider::{default_include_callback, ShaderSymbolParams},
-    },
-    validator::validator::ValidationParams,
+    shader::{GlslShadingLanguageTag, ShaderParams, ShadingLanguageTag},
+    symbols::{shader_language::ShaderLanguage, symbol_provider::default_include_callback},
 };
 
 fn validate_file<T: ShadingLanguageTag>(shader_path: &Path, shader_content: &str) {
@@ -16,7 +12,7 @@ fn validate_file<T: ShadingLanguageTag>(shader_path: &Path, shader_content: &str
     match validator.validate_shader(
         shader_content,
         shader_path,
-        &ValidationParams::default(),
+        &ShaderParams::default(),
         &mut |path: &Path| Some(std::fs::read_to_string(path).unwrap()),
     ) {
         Ok(diagnostic_list) => println!(
@@ -36,7 +32,7 @@ fn query_all_symbol<T: ShadingLanguageTag>(shader_path: &Path, shader_content: &
             let symbols = symbol_provider
                 .query_symbols(
                     &shader_module,
-                    ShaderSymbolParams::default(),
+                    ShaderParams::default(),
                     &mut default_include_callback::<T>,
                     None,
                 )

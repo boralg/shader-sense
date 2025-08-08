@@ -1,4 +1,4 @@
-use crate::shader::ShaderStage;
+use crate::shader::ShaderCompilationParams;
 
 use crate::symbols::symbol_parser::SymbolTreeFilter;
 use crate::symbols::symbols::ShaderSymbol;
@@ -10,8 +10,12 @@ pub fn get_hlsl_filters() -> Vec<Box<dyn SymbolTreeFilter>> {
 struct HlslStageFilter {}
 
 impl SymbolTreeFilter for HlslStageFilter {
-    fn filter_symbol(&self, shader_symbol: &ShaderSymbol, file_name: &String) -> bool {
-        match ShaderStage::from_file_name(file_name) {
+    fn filter_symbol(
+        &self,
+        shader_symbol: &ShaderSymbol,
+        shader_compilation_params: &ShaderCompilationParams,
+    ) -> bool {
+        match shader_compilation_params.shader_stage {
             Some(shader_stage) => {
                 shader_symbol.stages.contains(&shader_stage) || shader_symbol.stages.is_empty()
             }

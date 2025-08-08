@@ -1,7 +1,7 @@
-use super::validator::{ValidationParams, Validator};
+use super::validator::Validator;
 use crate::{
     include::IncludeHandler,
-    shader::{GlslSpirvVersion, GlslTargetClient, ShaderStage},
+    shader::{GlslSpirvVersion, GlslTargetClient, ShaderParams, ShaderStage},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::symbols::{ShaderPosition, ShaderRange},
 };
@@ -120,7 +120,7 @@ impl Glslang {
         &self,
         errors: &String,
         file_path: &Path,
-        params: &ValidationParams,
+        params: &ShaderParams,
         offset_first_line: bool,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         let mut shader_error_list = ShaderDiagnosticList::empty();
@@ -134,8 +134,8 @@ impl Glslang {
         starts.push(errors.len());
         let mut include_handler = IncludeHandler::main(
             file_path,
-            params.includes.clone(),
-            params.path_remapping.clone(),
+            params.context.includes.clone(),
+            params.context.path_remapping.clone(),
         );
         // Cache includes as its a heavy operation.
         let mut include_cache: HashMap<String, PathBuf> = HashMap::new();
@@ -210,7 +210,7 @@ impl Glslang {
         &self,
         err: GlslangError,
         file_path: &Path,
-        params: &ValidationParams,
+        params: &ShaderParams,
         offset_first_line: bool,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         match err {
@@ -248,13 +248,13 @@ impl Validator for Glslang {
         &mut self,
         content: &str,
         file_path: &Path,
-        params: &ValidationParams,
+        params: &ShaderParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         let file_name = self.get_file_name(file_path);
 
         let (shader_stage, shader_source, offset_first_line) =
-            if let Some(variant_stage) = params.shader_stage {
+            if let Some(variant_stage) = params.compilation.shader_stage {
                 (variant_stage, content.into(), false)
             } else if let Some(shader_stage) = ShaderStage::from_file_name(&file_name) {
                 (shader_stage, content.into(), false)
@@ -282,19 +282,19 @@ impl Validator for Glslang {
 
         let source = ShaderSource::try_from(shader_source).expect("Failed to read from source");
 
-        let defines_copy = params.defines.clone();
+        let defines_copy = params.context.defines.clone();
         let defines: Vec<(&str, Option<&str>)> = defines_copy
             .iter()
             .map(|v| (&v.0 as &str, Some(&v.1 as &str)))
             .collect();
         let mut include_handler = GlslangIncludeHandler::new(
             file_path,
-            params.includes.clone(),
-            params.path_remapping.clone(),
+            params.context.includes.clone(),
+            params.context.path_remapping.clone(),
             include_callback,
         );
 
-        let lang_version = match params.glsl_spirv {
+        let lang_version = match params.compilation.glsl.spirv {
             GlslSpirvVersion::SPIRV1_0 => glslang::SpirvVersion::SPIRV1_0,
             GlslSpirvVersion::SPIRV1_1 => glslang::SpirvVersion::SPIRV1_1,
             GlslSpirvVersion::SPIRV1_2 => glslang::SpirvVersion::SPIRV1_2,
@@ -316,13 +316,13 @@ impl Validator for Glslang {
                 target: if self.hlsl {
                     glslang::Target::None(Some(lang_version))
                 } else {
-                    if params.glsl_client.is_opengl() {
+                    if params.compilation.glsl.client.is_opengl() {
                         glslang::Target::OpenGL {
                             version: glslang::OpenGlVersion::OpenGL4_5,
                             spirv_version: None, // TODO ?
                         }
                     } else {
-                        let client_version = match params.glsl_client {
+                        let client_version = match params.compilation.glsl.client {
                             GlslTargetClient::Vulkan1_0 => glslang::VulkanVersion::Vulkan1_0,
                             GlslTargetClient::Vulkan1_1 => glslang::VulkanVersion::Vulkan1_1,
                             GlslTargetClient::Vulkan1_2 => glslang::VulkanVersion::Vulkan1_2,
@@ -338,7 +338,7 @@ impl Validator for Glslang {
                 messages: glslang::ShaderMessage::CASCADING_ERRORS
                     | glslang::ShaderMessage::DEBUG_INFO
                     | glslang::ShaderMessage::DISPLAY_ERROR_COLUMN
-                    | if self.hlsl && params.hlsl_enable16bit_types {
+                    | if self.hlsl && params.compilation.hlsl.enable16bit_types {
                         glslang::ShaderMessage::HLSL_ENABLE_16BIT_TYPES
                     } else {
                         glslang::ShaderMessage::DEFAULT

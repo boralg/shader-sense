@@ -26,7 +26,7 @@ pub fn create_validator(shading_language: ShadingLanguage) -> Box<dyn Validator>
 mod tests {
     use std::{collections::HashMap, path::Path};
 
-    use crate::shader::ShaderStage;
+    use crate::shader::{ShaderCompilationParams, ShaderContextParams, ShaderParams, ShaderStage};
 
     use super::validator::*;
     use super::*;
@@ -50,7 +50,7 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams::default(),
+            &ShaderParams::default(),
             &mut default_include_callback,
         ) {
             Ok(result) => {
@@ -69,8 +69,11 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams {
-                includes: vec!["./test/glsl/inc0/".into()],
+            &ShaderParams {
+                context: ShaderContextParams {
+                    includes: vec!["./test/glsl/inc0/".into()],
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             &mut default_include_callback,
@@ -91,8 +94,11 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams {
-                includes: vec!["./test/glsl/inc0/".into()],
+            &ShaderParams {
+                context: ShaderContextParams {
+                    includes: vec!["./test/glsl/inc0/".into()],
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             &mut default_include_callback,
@@ -113,8 +119,11 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams {
-                includes: vec!["./test/glsl/inc0/".into()],
+            &ShaderParams {
+                context: ShaderContextParams {
+                    includes: vec!["./test/glsl/inc0/".into()],
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             &mut default_include_callback,
@@ -135,8 +144,11 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams {
-                defines: HashMap::from([("CUSTOM_MACRO".into(), "42".into())]),
+            &ShaderParams {
+                context: ShaderContextParams {
+                    defines: HashMap::from([("CUSTOM_MACRO".into(), "42".into())]),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             &mut default_include_callback,
@@ -157,7 +169,7 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams::default(),
+            &ShaderParams::default(),
             &mut default_include_callback,
         ) {
             Ok(result) => {
@@ -178,7 +190,7 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams::default(),
+            &ShaderParams::default(),
             &mut default_include_callback,
         ) {
             Ok(result) => {
@@ -197,8 +209,11 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams {
-                includes: vec!["./test/hlsl/inc0/".into()],
+            &ShaderParams {
+                context: ShaderContextParams {
+                    includes: vec!["./test/hlsl/inc0/".into()],
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             &mut default_include_callback,
@@ -219,8 +234,11 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams {
-                includes: vec!["./test/hlsl/".into()],
+            &ShaderParams {
+                context: ShaderContextParams {
+                    includes: vec!["./test/hlsl/".into()],
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             &mut default_include_callback,
@@ -241,10 +259,16 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams {
-                includes: vec!["./test/hlsl/inc0/".into()],
-                entry_point: Some("compute".into()),
-                shader_stage: Some(ShaderStage::Compute),
+            &ShaderParams {
+                context: ShaderContextParams {
+                    includes: vec!["./test/hlsl/inc0/".into()],
+                    ..Default::default()
+                },
+                compilation: ShaderCompilationParams {
+                    entry_point: Some("compute".into()),
+                    shader_stage: Some(ShaderStage::Compute),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             &mut default_include_callback,
@@ -265,8 +289,11 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams {
-                defines: HashMap::from([("CUSTOM_MACRO".into(), "42".into())]),
+            &ShaderParams {
+                context: ShaderContextParams {
+                    defines: HashMap::from([("CUSTOM_MACRO".into(), "42".into())]),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             &mut default_include_callback,
@@ -282,14 +309,22 @@ mod tests {
     #[test]
     #[cfg(not(target_os = "wasi"))] // Somehow glslang fail to enable 16bit types... Disabled for now.
     fn hlsl_16bits_types_ok() {
+        use crate::shader::HlslCompilationParams;
+
         let mut validator = create_validator(ShadingLanguage::Hlsl);
         let file_path = Path::new("./test/hlsl/16bit-types.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams {
-                hlsl_enable16bit_types: true,
+            &ShaderParams {
+                compilation: ShaderCompilationParams {
+                    hlsl: HlslCompilationParams {
+                        enable16bit_types: true,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             &mut default_include_callback,
@@ -305,6 +340,8 @@ mod tests {
     #[test]
     #[cfg(not(target_os = "wasi"))] // Default behaviour of glslang, so ignore
     fn hlsl_spirv_ok() {
+        use crate::shader::HlslCompilationParams;
+
         let mut validator = create_validator(ShadingLanguage::Hlsl);
         let file_path = Path::new("./test/hlsl/spirv-shader.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
@@ -312,8 +349,14 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams {
-                hlsl_spirv: false,
+            &ShaderParams {
+                compilation: ShaderCompilationParams {
+                    hlsl: HlslCompilationParams {
+                        spirv: false,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             &mut default_include_callback,
@@ -328,8 +371,14 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams {
-                hlsl_spirv: true,
+            &ShaderParams {
+                compilation: ShaderCompilationParams {
+                    hlsl: HlslCompilationParams {
+                        spirv: true,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             &mut default_include_callback,
@@ -350,7 +399,7 @@ mod tests {
         match validator.validate_shader(
             &shader_content,
             file_path,
-            &ValidationParams::default(),
+            &ShaderParams::default(),
             &mut default_include_callback,
         ) {
             Ok(result) => {

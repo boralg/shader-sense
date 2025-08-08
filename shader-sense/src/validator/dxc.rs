@@ -6,12 +6,12 @@ use std::{
 
 use crate::{
     include::IncludeHandler,
-    shader::{HlslShaderModel, HlslVersion, ShaderStage},
+    shader::{HlslShaderModel, HlslVersion, ShaderParams, ShaderStage},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::symbols::{ShaderPosition, ShaderRange},
 };
 
-use super::validator::{ValidationParams, Validator};
+use super::validator::Validator;
 
 pub struct Dxc {
     compiler: hassle_rs::DxcCompiler,
@@ -128,7 +128,7 @@ impl Dxc {
         &self,
         errors: &String,
         file_path: &Path,
-        params: &ValidationParams,
+        params: &ShaderParams,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         // Check empty string.
         if errors.len() == 0 {
@@ -144,8 +144,8 @@ impl Dxc {
         starts.push(errors.len()); // Push the end.
         let mut include_handler = IncludeHandler::main(
             file_path,
-            params.includes.clone(),
-            params.path_remapping.clone(),
+            params.context.includes.clone(),
+            params.context.path_remapping.clone(),
         );
         // Cache includes as its a heavy operation.
         let mut include_cache: HashMap<String, PathBuf> = HashMap::new();
@@ -219,7 +219,7 @@ impl Dxc {
         &self,
         error: HassleError,
         file_path: &Path,
-        params: &ValidationParams,
+        params: &ShaderParams,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         match error {
             HassleError::CompileError(err) => self.parse_dxc_errors(&err, file_path, &params),
@@ -282,7 +282,7 @@ impl Validator for Dxc {
         &mut self,
         shader_source: &str,
         file_path: &Path,
-        params: &ValidationParams,
+        params: &ShaderParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         let file_name = self.get_file_name(file_path);
@@ -298,22 +298,22 @@ impl Validator for Dxc {
             },
         };
 
-        let defines_copy = params.defines.clone();
+        let defines_copy = params.context.defines.clone();
         let defines: Vec<(&str, Option<&str>)> = defines_copy
             .iter()
             .map(|v| (&v.0 as &str, Some(&v.1 as &str)))
             .collect();
         let mut include_handler = DxcIncludeHandler::new(
             file_path,
-            params.includes.clone(),
-            params.path_remapping.clone(),
+            params.context.includes.clone(),
+            params.context.path_remapping.clone(),
             include_callback,
         );
         let dxc_options = {
             let mut options = Vec::new();
             options.push(format!(
                 "-HV {}",
-                match params.hlsl_version {
+                match params.compilation.hlsl.version {
                     HlslVersion::V2016 => "2016",
                     HlslVersion::V2017 => "2017",
                     HlslVersion::V2018 => "2018",
@@ -321,10 +321,10 @@ impl Validator for Dxc {
                 }
             ));
 
-            if params.hlsl_enable16bit_types {
+            if params.compilation.hlsl.enable16bit_types {
                 options.push("-enable-16bit-types".into());
             }
-            if params.hlsl_spirv {
+            if params.compilation.hlsl.spirv {
                 options.push("-spirv".into());
                 // Default target does not support lib profile, so this is required.
                 options.push("-fspv-target-env=vulkan1.3".into());
@@ -335,14 +335,14 @@ impl Validator for Dxc {
         let result = self.compiler.compile(
             &blob,
             file_name.as_str(),
-            match &params.entry_point {
+            match &params.compilation.entry_point {
                 Some(entry_point) => entry_point.as_str(),
                 None => "",
             },
             format!(
                 "{}_{}",
-                get_profile(params.shader_stage),
-                match params.hlsl_shader_model {
+                get_profile(params.compilation.shader_stage),
+                match params.compilation.hlsl.shader_model {
                     HlslShaderModel::ShaderModel6 => "6_0",
                     HlslShaderModel::ShaderModel6_1 => "6_1",
                     HlslShaderModel::ShaderModel6_2 => "6_2",
@@ -396,7 +396,7 @@ impl Validator for Dxc {
                     },
                 };
                 // Dxil validation not supported for spirv.
-                if !params.hlsl_spirv {
+                if !params.compilation.hlsl.spirv {
                     // Skip validation if dxil.dll does not exist.
                     if let (Some(_dxil), Some(validator)) = (&self.dxil, &self.validator) {
                         let data = result_blob.to_vec();

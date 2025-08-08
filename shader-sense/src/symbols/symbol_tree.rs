@@ -6,11 +6,10 @@ use std::{
 
 use tree_sitter::{Tree, TreeCursor};
 
-use crate::symbols::symbols::ShaderSymbolListRef;
+use crate::{shader::ShaderContextParams, symbols::symbols::ShaderSymbolListRef};
 
 use super::{
     shader_language::ShaderLanguage,
-    symbol_provider::ShaderSymbolParams,
     symbols::{
         ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude, ShaderSymbolList,
     },
@@ -32,11 +31,11 @@ pub struct ShaderSymbols {
     pub(super) symbol_list: ShaderSymbolList,
 }
 impl ShaderSymbols {
-    pub fn new(file_path: &Path, symbol_params: ShaderSymbolParams) -> Self {
+    pub fn new(file_path: &Path, shader_params: ShaderContextParams) -> Self {
         Self {
             preprocessor: ShaderPreprocessor::new(ShaderPreprocessorContext::main(
                 file_path,
-                symbol_params,
+                shader_params,
             )),
             symbol_list: ShaderSymbolList::default(),
         }
@@ -145,7 +144,7 @@ impl ShaderSymbols {
             if is_last { "└─" } else { "├─" },
             include.get_absolute_path().display(),
             match &include.cache {
-                Some(cache) => format!("{:?}", cache.preprocessor.mode),
+                Some(cache) => format!("Mode: {:?}", cache.preprocessor.mode),
                 None => "Missing cache".into(),
             }
         );

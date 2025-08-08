@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
@@ -12,12 +12,12 @@ pub enum ShadingLanguage {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ShaderStage {
     Vertex,
-    Fragment,
+    Fragment, // aka pixel shader
     Compute,
-    TesselationControl,
-    TesselationEvaluation,
+    TesselationControl,    // aka hull shader
+    TesselationEvaluation, // aka domain shader
     Mesh,
-    Task,
+    Task, // aka amplification shader
     Geometry,
     RayGeneration,
     ClosestHit,
@@ -148,6 +148,14 @@ pub enum HlslVersion {
     V2021,
 }
 
+#[derive(Default, Debug, Clone)]
+pub struct HlslCompilationParams {
+    pub shader_model: HlslShaderModel,
+    pub version: HlslVersion,
+    pub enable16bit_types: bool,
+    pub spirv: bool,
+}
+
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub enum GlslTargetClient {
     Vulkan1_0,
@@ -177,4 +185,34 @@ pub enum GlslSpirvVersion {
     SPIRV1_5,
     #[default]
     SPIRV1_6,
+}
+#[derive(Default, Debug, Clone)]
+pub struct GlslCompilationParams {
+    pub client: GlslTargetClient,
+    pub spirv: GlslSpirvVersion,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct WgslCompilationParams {}
+
+#[derive(Default, Debug, Clone)]
+pub struct ShaderContextParams {
+    pub defines: HashMap<String, String>,
+    pub includes: Vec<String>,
+    pub path_remapping: HashMap<PathBuf, PathBuf>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct ShaderCompilationParams {
+    pub entry_point: Option<String>,
+    pub shader_stage: Option<ShaderStage>,
+    pub hlsl: HlslCompilationParams,
+    pub glsl: GlslCompilationParams,
+    pub wgsl: WgslCompilationParams,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct ShaderParams {
+    pub context: ShaderContextParams,
+    pub compilation: ShaderCompilationParams,
 }

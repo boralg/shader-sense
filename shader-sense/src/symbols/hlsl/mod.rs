@@ -30,11 +30,12 @@ mod tests {
 
     use crate::{
         shader::{
-            GlslShadingLanguageTag, HlslShadingLanguageTag, ShadingLanguage, ShadingLanguageTag,
+            GlslShadingLanguageTag, HlslShadingLanguageTag, ShaderParams, ShadingLanguage,
+            ShadingLanguageTag,
         },
         symbols::{
             shader_language::ShaderLanguage,
-            symbol_provider::{default_include_callback, ShaderSymbolParams, SymbolProvider},
+            symbol_provider::{default_include_callback, SymbolProvider},
             symbols::{ShaderPosition, ShaderRange, ShaderRegion},
         },
     };
@@ -62,7 +63,7 @@ mod tests {
         let symbols = symbol_provider
             .query_symbols(
                 &symbol_tree,
-                ShaderSymbolParams::default(),
+                ShaderParams::default(),
                 &mut default_include_callback::<T>,
                 None,
             )

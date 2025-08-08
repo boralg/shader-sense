@@ -1,4 +1,5 @@
 use crate::{
+    shader::ShaderCompilationParams,
     shader_error::ShaderError,
     symbols::{
         hlsl::HlslSymbolRegionFinder,
@@ -26,6 +27,7 @@ impl SymbolRegionFinder for GlslRegionFinder {
         &self,
         symbol_tree: &SymbolTree,
         symbol_provider: &SymbolProvider,
+        shader_params: &ShaderCompilationParams,
         node: tree_sitter::Node,
         preprocessor: &mut ShaderPreprocessor,
         context: &'a mut ShaderPreprocessorContext,
@@ -35,6 +37,7 @@ impl SymbolRegionFinder for GlslRegionFinder {
         self.region_finder.query_regions_in_node(
             symbol_tree,
             symbol_provider,
+            shader_params,
             node,
             preprocessor,
             context,

@@ -5,11 +5,12 @@ use naga::{
 use std::path::Path;
 
 use crate::{
+    shader::ShaderParams,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::symbols::{ShaderPosition, ShaderRange},
 };
 
-use super::validator::{ValidationParams, Validator};
+use super::validator::Validator;
 
 pub struct Naga {
     validator: naga::valid::Validator,
@@ -50,7 +51,7 @@ impl Validator for Naga {
         &mut self,
         shader_content: &str,
         file_path: &Path,
-        _params: &ValidationParams,
+        _params: &ShaderParams,
         _include_callback: &mut dyn FnMut(&Path) -> Option<String>,
     ) -> Result<ShaderDiagnosticList, ShaderError> {
         let module = match wgsl::parse_str(shader_content)

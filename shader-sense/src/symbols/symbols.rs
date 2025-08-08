@@ -6,9 +6,13 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::{include::IncludeHandler, shader::ShaderStage, shader_error::ShaderDiagnostic};
+use crate::{
+    include::IncludeHandler,
+    shader::{ShaderContextParams, ShaderStage},
+    shader_error::ShaderDiagnostic,
+};
 
-use super::{symbol_provider::ShaderSymbolParams, symbol_tree::ShaderSymbols};
+use super::symbol_tree::ShaderSymbols;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderParameter {
@@ -323,9 +327,9 @@ pub struct ShaderPreprocessorContext {
 }
 
 impl ShaderPreprocessorContext {
-    pub fn main(file_path: &Path, symbol_params: ShaderSymbolParams) -> Self {
+    pub fn main(file_path: &Path, shader_params: ShaderContextParams) -> Self {
         Self {
-            defines: symbol_params
+            defines: shader_params
                 .defines
                 .iter()
                 .map(|(key, value)| ShaderSymbol {
@@ -344,8 +348,8 @@ impl ShaderPreprocessorContext {
                 .collect(),
             include_handler: IncludeHandler::main(
                 &file_path,
-                symbol_params.includes,
-                symbol_params.path_remapping,
+                shader_params.includes,
+                shader_params.path_remapping,
             ),
             dirty_files: HashSet::new(),
             depth: 0,

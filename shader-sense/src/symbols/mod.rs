@@ -19,13 +19,12 @@ mod tests {
     use crate::{
         include::IncludeHandler,
         shader::{
-            GlslShadingLanguageTag, HlslShadingLanguageTag, ShadingLanguage, ShadingLanguageTag,
-            WgslShadingLanguageTag,
+            GlslShadingLanguageTag, HlslShadingLanguageTag, ShaderParams, ShadingLanguage,
+            ShadingLanguageTag, WgslShadingLanguageTag,
         },
         shader_error::ShaderError,
         symbols::{
             shader_language::ShaderLanguage,
-            symbol_provider::ShaderSymbolParams,
             symbols::{ShaderPosition, ShaderRange, ShaderSymbolData},
         },
     };
@@ -82,7 +81,7 @@ mod tests {
         let symbols = symbol_provider
             .query_symbols(
                 &symbol_tree,
-                ShaderSymbolParams::default(),
+                ShaderParams::default(),
                 &mut default_include_callback::<T>,
                 None,
             )
@@ -94,7 +93,7 @@ mod tests {
             let symbols = symbol_provider
                 .query_symbols(
                     &symbol_tree,
-                    ShaderSymbolParams::default(),
+                    ShaderParams::default(),
                     &mut default_include_callback::<T>,
                     None,
                 )
@@ -137,7 +136,7 @@ mod tests {
         let symbols = symbol_provider
             .query_symbols(
                 &symbol_tree,
-                ShaderSymbolParams::default(),
+                ShaderParams::default(),
                 &mut default_include_callback::<GlslShadingLanguageTag>,
                 None,
             )
@@ -156,7 +155,7 @@ mod tests {
         let symbols = symbol_provider
             .query_symbols(
                 &symbol_tree,
-                ShaderSymbolParams::default(),
+                ShaderParams::default(),
                 &mut default_include_callback::<HlslShadingLanguageTag>,
                 None,
             )
@@ -175,7 +174,7 @@ mod tests {
         let symbols = symbol_provider
             .query_symbols(
                 &symbol_tree,
-                ShaderSymbolParams::default(),
+                ShaderParams::default(),
                 &mut default_include_callback::<WgslShadingLanguageTag>,
                 None,
             )
@@ -242,7 +241,7 @@ mod tests {
         let symbols = symbol_provider
             .query_symbols(
                 &symbol_tree,
-                ShaderSymbolParams::default(),
+                ShaderParams::default(),
                 &mut default_include_callback::<GlslShadingLanguageTag>,
                 None,
             )
