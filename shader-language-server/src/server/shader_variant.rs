@@ -128,9 +128,13 @@ impl ServerLanguage {
 
             // Get old relying files before update.
             let mut old_relying_files = if let Some(old_variant) = &old_variant {
-                self.watched_files.get_relying_files(&old_variant.url)
+                if self.watched_files.files.get(&old_variant.url).is_some() {
+                    self.watched_files.get_relying_main_files(&old_variant.url)
+                } else {
+                    vec![] // File not watched.
+                }
             } else {
-                vec![]
+                vec![] // No old variant.
             };
 
             // Cache new variant
@@ -164,9 +168,13 @@ impl ServerLanguage {
 
             // Get new relying files after update.
             let new_relying_files = if let Some(new_variant) = &self.watched_files.variant {
-                self.watched_files.get_relying_files(&new_variant.url)
+                if self.watched_files.files.get(&new_variant.url).is_some() {
+                    self.watched_files.get_relying_main_files(&new_variant.url)
+                } else {
+                    vec![] // File not watched.
+                }
             } else {
-                vec![]
+                vec![] // No new variant.
             };
 
             // Check if we need to update old variant or its already done.
