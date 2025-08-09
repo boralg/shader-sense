@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use log::info;
 use lsp_types::{notification::Notification, request::Request, TextDocumentIdentifier, Url};
@@ -131,10 +134,10 @@ impl ServerLanguage {
                 if self.watched_files.files.get(&old_variant.url).is_some() {
                     self.watched_files.get_relying_main_files(&old_variant.url)
                 } else {
-                    vec![] // File not watched.
+                    HashSet::new() // File not watched.
                 }
             } else {
-                vec![] // No old variant.
+                HashSet::new() // No old variant.
             };
 
             // Cache new variant
@@ -171,10 +174,10 @@ impl ServerLanguage {
                 if self.watched_files.files.get(&new_variant.url).is_some() {
                     self.watched_files.get_relying_main_files(&new_variant.url)
                 } else {
-                    vec![] // File not watched.
+                    HashSet::new() // File not watched.
                 }
             } else {
-                vec![] // No new variant.
+                HashSet::new() // No new variant.
             };
 
             // Check if we need to update old variant or its already done.

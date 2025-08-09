@@ -83,7 +83,7 @@ mod tests {
             .unwrap();
         println!("Testing symbol overflow");
         let mut depth = 0;
-        let _symbols = symbol_provider.query_symbols(
+        match symbol_provider.query_symbols(
             &shader_module,
             ShaderParams::default(),
             &mut |include| {
@@ -103,15 +103,24 @@ mod tests {
                 ))))
             },
             None,
-        );
+        ) {
+            Ok(_) => {}
+            Err(err) => panic!("Failed to query symbols: {}", err),
+        }
         println!("Testing validation overflow");
         let mut validator = language.create_validator();
-        let _symbols = validator.validate_shader(
+        match validator.validate_shader(
             &shader_module.content,
             file_path,
             &ShaderParams::default(),
             &mut |path| Some(std::fs::read_to_string(path).unwrap()),
-        );
+        ) {
+            Ok(diagnostics) => assert!(
+                !diagnostics.is_empty(),
+                "Diagnostics are empty but should not be."
+            ),
+            Err(err) => panic!("Failed to validate shader: {}", err),
+        }
     }
     #[test]
     fn test_canonicalize_parent() {

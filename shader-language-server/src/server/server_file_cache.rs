@@ -83,7 +83,7 @@ impl ServerLanguageFileCache {
         })
     }
     // Get all main dependent files using the given file.
-    pub fn get_dependent_main_files(&self, dependent_url: &Url) -> Vec<Url> {
+    pub fn get_dependent_main_files(&self, dependent_url: &Url) -> HashSet<Url> {
         let dependant_file_path = dependent_url.to_file_path().unwrap();
         self.files
             .iter()
@@ -99,10 +99,10 @@ impl ServerLanguageFileCache {
             .collect()
     }
     // Get all main files relying on the given file.
-    pub fn get_relying_main_files(&self, url: &Url) -> Vec<Url> {
+    pub fn get_relying_main_files(&self, url: &Url) -> HashSet<Url> {
         match self.files.get(url) {
             Some(file) => {
-                let mut relying_on_files = Vec::new();
+                let mut relying_on_files = HashSet::new();
                 file.get_data().symbol_cache.visit_includes(&mut |include| {
                     let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
                     let is_relying_on = match self.files.get(&include_uri) {
@@ -110,7 +110,7 @@ impl ServerLanguageFileCache {
                         None => false,
                     };
                     if is_relying_on {
-                        relying_on_files.push(include_uri);
+                        relying_on_files.insert(include_uri);
                     }
                 });
                 relying_on_files
@@ -121,19 +121,21 @@ impl ServerLanguageFileCache {
                     "Trying to get relying main files for file {} that is not watched",
                     url
                 );
-                Vec::new()
+                HashSet::new()
             }
         }
     }
     // Get all files relying on the given file.
-    pub fn get_all_relying_files(&self, url: &Url) -> Vec<Url> {
+    pub fn get_all_relying_files(&self, url: &Url) -> HashSet<Url> {
         match self.files.get(url) {
             Some(file) => {
-                let mut relying_on_files = Vec::new();
+                let mut relying_on_files = HashSet::new();
                 file.get_data().symbol_cache.visit_includes(&mut |include| {
                     let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
                     match self.files.get(&include_uri) {
-                        Some(_) => relying_on_files.push(include_uri),
+                        Some(_) => {
+                            relying_on_files.insert(include_uri);
+                        }
                         None => {}
                     };
                 });
@@ -145,7 +147,7 @@ impl ServerLanguageFileCache {
                     "Trying to get all relying files for file {} that is not watched",
                     url
                 );
-                Vec::new()
+                HashSet::new()
             }
         }
     }
@@ -407,7 +409,7 @@ impl ServerLanguageFileCache {
             let mut old_relying_files = if self.files.get(&uri).unwrap().data.is_some() {
                 self.get_all_relying_files(uri)
             } else {
-                vec![] // No old relying files as no cache
+                HashSet::new() // No old relying files as no cache
             };
             self.__cache_file_data(
                 uri,
@@ -510,11 +512,15 @@ impl ServerLanguageFileCache {
             // Get dangling dependencies that need to be removed.
             let new_relying_files = self.get_all_relying_files(uri);
             old_relying_files.retain(|f| {
-                // Check if file was removed from include tree.
-                if new_relying_files.iter().find(|n| *n == f).is_none() {
-                    self.is_dangling_file(f)
+                if f != uri {
+                    // Check if file was removed from include tree.
+                    if new_relying_files.iter().find(|n| *n == f).is_none() {
+                        self.is_dangling_file(f)
+                    } else {
+                        false // Keep it by removing it from update.
+                    }
                 } else {
-                    false // Keep it by removing it from update.
+                    false // Avoid removing main file twice.
                 }
             });
             // Remove these deps from cache.
@@ -756,7 +762,13 @@ impl ServerLanguageFileCache {
                         self.files.len()
                     );
                     // Get dangling dependencies that need to be removed.
-                    dangling_files.retain(|f| self.is_dangling_file(f));
+                    dangling_files.retain(|f| {
+                        if uri != f {
+                            self.is_dangling_file(f)
+                        } else {
+                            false // Avoid removing main file twice.
+                        }
+                    });
                     // Remove these deps from cache.
                     for dangling_file in &dangling_files {
                         self.files.remove(dangling_file);
@@ -767,7 +779,7 @@ impl ServerLanguageFileCache {
                             self.files.len()
                         );
                     }
-                    Ok(vec![vec![uri.clone()], dangling_files].concat())
+                    Ok(vec![vec![uri.clone()], dangling_files.into_iter().collect()].concat())
                 }
                 None => Err(ShaderError::InternalErr(format!(
                     "Trying to remove main file {} that is not watched",
@@ -781,7 +793,13 @@ impl ServerLanguageFileCache {
                         cached_file.data.is_some(),
                         "Removing main file without data"
                     );
-                    dangling_files.retain(|f| self.is_dangling_file(f));
+                    dangling_files.retain(|f| {
+                        if uri != f {
+                            self.is_dangling_file(f)
+                        } else {
+                            false // Avoid removing main file twice.
+                        }
+                    });
                     // Remove main file before deps & drop cache for ref.
                     let data = cached_file.data.unwrap();
                     drop(data);
@@ -802,7 +820,7 @@ impl ServerLanguageFileCache {
                             self.files.len()
                         );
                     }
-                    Ok(vec![vec![uri.clone()], dangling_files].concat())
+                    Ok(vec![vec![uri.clone()], dangling_files.into_iter().collect()].concat())
                 }
                 None => Err(ShaderError::InternalErr(format!(
                     "Trying to remove main file {} that is not watched",
