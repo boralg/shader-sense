@@ -4,7 +4,7 @@ members = [
     "shader-sense",
     "shader-language-server",
     "shader-sense-cli",
-    "shader-intrinsic-parser"
+    #"shader-intrinsic-parser" # Skip it as its only a tool on windows.
 ]
 resolver = "2"
 

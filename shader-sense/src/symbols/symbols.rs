@@ -1030,24 +1030,24 @@ impl<'a> ShaderSymbolListRef<'a> {
             !symbol_type.is_transient() && Self::is_symbol_defined_at(symbol, cursor_position)
         })
     }
-    pub fn find_symbols(&'a self, label: &String) -> Vec<&'a ShaderSymbol> {
+    pub fn find_symbols(&'a self, label: &str) -> Vec<&'a ShaderSymbol> {
         self.iter()
             .filter(|s| s.label == *label && !s.is_transient())
             .collect::<Vec<&ShaderSymbol>>()
     }
-    pub fn find_symbol(&'a self, label: &String) -> Option<&'a ShaderSymbol> {
+    pub fn find_symbol(&'a self, label: &str) -> Option<&'a ShaderSymbol> {
         match self.iter().find(|e| e.label == *label) {
             Some(symbol) => return Some(symbol),
             None => None,
         }
     }
-    pub fn find_function_symbol(&'a self, label: &String) -> Option<&'a ShaderSymbol> {
+    pub fn find_function_symbol(&'a self, label: &str) -> Option<&'a ShaderSymbol> {
         self.functions
             .iter()
             .find(|s| s.label == *label)
             .map(|s| *s)
     }
-    pub fn find_type_symbol(&'a self, label: &String) -> Option<&'a ShaderSymbol> {
+    pub fn find_type_symbol(&'a self, label: &str) -> Option<&'a ShaderSymbol> {
         self.types.iter().find(|s| s.label == *label).map(|s| *s)
     }
     pub fn filter<P: Fn(ShaderSymbolType, &ShaderSymbol) -> bool>(

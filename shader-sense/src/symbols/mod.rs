@@ -20,7 +20,7 @@ mod tests {
         include::IncludeHandler,
         shader::{
             GlslShadingLanguageTag, HlslShadingLanguageTag, ShaderCompilationParams, ShaderParams,
-            ShadingLanguage, ShadingLanguageTag, WgslShadingLanguageTag,
+            ShaderStage, ShadingLanguage, ShadingLanguageTag, WgslShadingLanguageTag,
         },
         shader_error::ShaderError,
         symbols::{
@@ -357,5 +357,33 @@ mod tests {
         println!("File range: {:#?}", range);
         let end_byte_offset = range.end.to_byte_offset(&shader_content).unwrap();
         assert!(end_byte_offset == shader_content.len());
+    }
+    #[test]
+    fn test_intrinsic_filtering() {
+        let language = ShaderLanguage::new(ShadingLanguage::Hlsl);
+        // Check with frag stage set
+        let intrinsics_frag = language.get_intrinsics_symbol(&ShaderCompilationParams {
+            shader_stage: Some(ShaderStage::Fragment),
+            ..Default::default()
+        });
+        assert!(
+            intrinsics_frag.find_symbol("clip").is_some(),
+            "clip() should be available from fragment shader."
+        );
+        // Check without stage set
+        let intrinsics_common = language.get_intrinsics_symbol(&ShaderCompilationParams::default());
+        assert!(
+            intrinsics_common.find_symbol("clip").is_some(),
+            "clip() should be available if no shader given."
+        );
+        // Check with vert stage set
+        let intrinsics_vert = language.get_intrinsics_symbol(&ShaderCompilationParams {
+            shader_stage: Some(ShaderStage::Vertex),
+            ..Default::default()
+        });
+        assert!(
+            intrinsics_vert.find_symbol("clip").is_none(),
+            "clip() should not be available from vertex shader."
+        );
     }
 }
