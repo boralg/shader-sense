@@ -225,7 +225,7 @@ impl ServerLanguage {
                                 &mut language_data.language,
                                 &language_data.symbol_provider,
                                 &self.config,
-                                None,
+                                Some(&file_to_update.to_file_path().unwrap()),
                             )?;
                             all_updated_files.push(file_to_update);
                             all_updated_files.extend(updated_files)

@@ -184,17 +184,35 @@ impl ServerLanguageFileCache {
         // Get variant if its our URL.
         let variant = self.variant.clone().filter(|v| v.url == *uri);
 
-        // Get old data and replace it by dummy to avoid empty data on early exit.
-        let old_data = self.files.get_mut(&uri).unwrap().data.take();
-        self.files.get_mut(&uri).unwrap().data = Some(ServerFileCacheData::default());
-
         // Compute params
         let shader_params = config.into_shader_params(variant.clone());
         let mut context =
             ShaderPreprocessorContext::main(&file_path, shader_params.context.clone());
+
+        // Do not recache & revalidate if not dirty.
+        match &self.files.get(&uri).unwrap().data {
+            Some(data) => {
+                let is_dirty = data
+                    .symbol_cache
+                    .get_preprocessor()
+                    .context
+                    .is_dirty(&file_path, &context);
+                let has_cache = self.files.get_mut(&uri).unwrap().data.is_some();
+                let has_dirty = dirty_deps.is_some();
+                if !is_dirty && !has_dirty && has_cache {
+                    return Ok(());
+                }
+            }
+            None => {}
+        };
         if let Some(dirty_deps) = dirty_deps {
             context.mark_dirty(dirty_deps);
         }
+
+        // Get old data and replace it by dummy to avoid empty data on early exit.
+        let old_data = self.files.get_mut(&uri).unwrap().data.take();
+        self.files.get_mut(&uri).unwrap().data = Some(ServerFileCacheData::default());
+
         // Get symbols for main file.
         let (mut symbols, symbol_diagnostics) = if config.get_symbols() {
             profile_scope!("Querying symbols for file {}", uri);
@@ -383,16 +401,35 @@ impl ServerLanguageFileCache {
 
         // Get variant if its our URL.
         let variant = self.variant.clone().filter(|v| v.url == *uri);
-        let is_dirty = dirty_deps
-            .iter()
-            .find(|dirty_deps| **dirty_deps == file_path)
-            .is_some();
 
         let relying_variant_uri = if variant.is_some() {
             None // Not relying as its a variant.
         } else {
             self.get_relying_variant(uri)
         };
+
+        // Update dependent files before so that currently cached file diag are overriding them.
+        if dirty_deps.is_some() {
+            let dependent_files = self.get_dependent_main_files(uri);
+            let mut unique_dependent_files: HashSet<_> = dependent_files.iter().cloned().collect();
+            // Remove variant and its dependent file as its already updated later.
+            if let Some(relying_variant_uri) = &relying_variant_uri {
+                unique_dependent_files.remove(&relying_variant_uri);
+                for variant_dependent in self.get_dependent_main_files(relying_variant_uri) {
+                    unique_dependent_files.remove(&variant_dependent);
+                }
+            }
+            for dependent_file in unique_dependent_files {
+                self.__cache_file_data(
+                    &dependent_file,
+                    validator,
+                    shader_language,
+                    symbol_provider,
+                    config,
+                    Some(&file_path),
+                )?;
+            }
+        }
         let updated_files = if let Some(relying_variant_uri) = &relying_variant_uri {
             info!("Caching file {} from variant {}", uri, relying_variant_uri);
             // Caching here will take care of propagating to its relying files.
@@ -533,24 +570,6 @@ impl ServerLanguageFileCache {
             updated_files
         };
 
-        // Now, we need to update dependent files if dirty
-        if is_dirty {
-            let dependent_files = self.get_dependent_main_files(uri);
-            let mut unique_dependent_files: HashSet<_> = dependent_files.iter().cloned().collect();
-            if let Some(relying_variant_uri) = &relying_variant_uri {
-                unique_dependent_files.remove(&relying_variant_uri);
-            }
-            for dependent_file in unique_dependent_files {
-                self.__cache_file_data(
-                    &dependent_file,
-                    validator,
-                    shader_language,
-                    symbol_provider,
-                    config,
-                    Some(&file_path),
-                )?;
-            }
-        }
         debug_assert!(
             self.get_file(uri).unwrap().data.is_some(),
             "Failed to cache data for file {}",
