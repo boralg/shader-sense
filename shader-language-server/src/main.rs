@@ -1,4 +1,4 @@
-use log::{error, info};
+use log::{error, info, warn};
 use shader_language_server::server::{self, server_config::ServerConfig, Transport};
 
 fn get_version() -> &'static str {
@@ -11,7 +11,6 @@ fn print_version() {
 }
 
 fn run_server(config: ServerConfig, transport: Transport) {
-    env_logger::init();
     info!(
         "shader-language-server v{} ({})",
         get_version(),
@@ -30,6 +29,7 @@ fn usage() {
     println!();
     println!("Options:");
     println!("  --config                  Pass a custom config as a JSON string for server.");
+    println!("  --config-file             Pass a custom config as a file for server.");
     println!("  --stdio                   Use the stdio transport. Default transport.");
     println!("  --tcp                     Use tcp transport. Not implemented yet.");
     println!("  --memory                  Use memory transport. Not implemented yet.");
@@ -38,6 +38,7 @@ fn usage() {
 }
 
 pub fn main() {
+    env_logger::init();
     let mut args = std::env::args().into_iter();
     let _exe = args.next().unwrap();
     let mut transport = Transport::default();
@@ -52,7 +53,29 @@ pub fn main() {
                 if let Some(config_str) = args.next() {
                     match serde_json::from_str::<ServerConfig>(&config_str) {
                         Ok(config_parsed) => config = config_parsed,
-                        Err(err) => error!("Failed to parse config {}: {}", config_str, err),
+                        Err(err) => {
+                            error!("Failed to parse config {}: {}", config_str, err);
+                            return usage();
+                        }
+                    }
+                } else {
+                    return usage();
+                }
+            }
+            "--config-file" => {
+                if let Some(config_file) = args.next() {
+                    match std::fs::read_to_string(&config_file) {
+                        Ok(config_str) => match serde_json::from_str::<ServerConfig>(&config_str) {
+                            Ok(config_parsed) => config = config_parsed,
+                            Err(err) => {
+                                error!("Failed to parse config file {}: {}", config_str, err);
+                                return usage();
+                            }
+                        },
+                        Err(err) => {
+                            error!("Failed to open config file {}: {}", config_file, err);
+                            return usage();
+                        }
                     }
                 } else {
                     return usage();
@@ -62,7 +85,7 @@ pub fn main() {
             "--tcp" => transport = Transport::Tcp,
             "--memory" => transport = Transport::Memory,
             arg => {
-                info!("Argument {} unknown", arg);
+                warn!("Argument {} unknown", arg);
             }
         }
     }
