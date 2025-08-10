@@ -59,6 +59,7 @@ pub fn main() {
                         }
                     }
                 } else {
+                    error!("Missing JSON for argument --config");
                     return usage();
                 }
             }
@@ -66,7 +67,10 @@ pub fn main() {
                 if let Some(config_file) = args.next() {
                     match std::fs::read_to_string(&config_file) {
                         Ok(config_str) => match serde_json::from_str::<ServerConfig>(&config_str) {
-                            Ok(config_parsed) => config = config_parsed,
+                            Ok(config_parsed) => {
+                                info!("Parsed config {:?}", config_parsed);
+                                config = config_parsed;
+                            }
                             Err(err) => {
                                 error!("Failed to parse config file {}: {}", config_str, err);
                                 return usage();
@@ -78,6 +82,7 @@ pub fn main() {
                         }
                     }
                 } else {
+                    error!("Missing file path for argument --config-file");
                     return usage();
                 }
             }

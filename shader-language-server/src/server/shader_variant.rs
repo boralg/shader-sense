@@ -17,6 +17,7 @@ use crate::server::{clean_url, ServerLanguage};
 #[serde(rename_all = "camelCase")]
 pub struct ShaderVariant {
     pub url: Url,
+    pub language: ShadingLanguage,
     pub entry_point: String,
     pub stage: Option<ShaderStage>,
     pub defines: HashMap<String, String>,
@@ -87,41 +88,55 @@ impl ServerLanguage {
                 v.url = clean_url(&v.url);
                 v
             })),
-            Err(_) => match serde_json::from_value::<OldDidChangeShaderVariantParams>(value) {
-                Ok(new_variant) => {
-                    log::warn!("Client sending old variant version. Should use the new variant version instead. Only the latest enabled variant sent to server will be used.");
-                    match &self.watched_files.variant {
-                        Some(current_variant) => {
-                            if current_variant.url == new_variant.text_document.uri
-                                && new_variant.shader_variant.is_none()
-                            {
-                                // If same variant and we removed it, mark it gone.
-                                Ok(None)
-                            } else if new_variant.shader_variant.is_some() {
-                                // If we pass a variant with new URL, update (will pick the latest enabled.)
+            Err(new_err) => {
+                match serde_json::from_value::<OldDidChangeShaderVariantParams>(value) {
+                    Ok(new_variant) => {
+                        log::warn!("Client sending old variant version. Should use the new variant version instead. Only the latest enabled variant sent to server will be used.");
+                        match &self.watched_files.variant {
+                            Some(current_variant) => {
+                                if current_variant.url == new_variant.text_document.uri
+                                    && new_variant.shader_variant.is_none()
+                                {
+                                    // If same variant and we removed it, mark it gone.
+                                    Ok(None)
+                                } else if new_variant.shader_variant.is_some() {
+                                    // If we pass a variant with new URL, update (will pick the latest enabled.)
+                                    let url = clean_url(&new_variant.text_document.uri);
+                                    Ok(new_variant.shader_variant.map(|v| ShaderVariant {
+                                        language: match self.watched_files.files.get(&url) {
+                                            Some(file) => file.shading_language,
+                                            None => ShadingLanguage::Hlsl, // Default to HLSL as we have no way to guess it.
+                                        },
+                                        url: url,
+                                        entry_point: v.entry_point,
+                                        stage: v.stage,
+                                        defines: v.defines,
+                                        includes: v.includes,
+                                    }))
+                                } else {
+                                    Ok(None)
+                                }
+                            }
+                            // If no variant, set new one.
+                            None => {
+                                let url = clean_url(&new_variant.text_document.uri);
                                 Ok(new_variant.shader_variant.map(|v| ShaderVariant {
-                                    url: clean_url(&new_variant.text_document.uri),
+                                    language: match self.watched_files.files.get(&url) {
+                                        Some(file) => file.shading_language,
+                                        None => ShadingLanguage::Hlsl, // Default to HLSL as we have no way to guess it.
+                                    },
+                                    url: url,
                                     entry_point: v.entry_point,
                                     stage: v.stage,
                                     defines: v.defines,
                                     includes: v.includes,
                                 }))
-                            } else {
-                                Ok(None)
                             }
                         }
-                        // If no variant, set new one.
-                        None => Ok(new_variant.shader_variant.map(|v| ShaderVariant {
-                            url: clean_url(&new_variant.text_document.uri),
-                            entry_point: v.entry_point,
-                            stage: v.stage,
-                            defines: v.defines,
-                            includes: v.includes,
-                        })),
                     }
+                    Err(_err) => Err(new_err),
                 }
-                Err(err) => Err(err),
-            },
+            }
         }
     }
     pub fn update_variant(
@@ -151,10 +166,10 @@ impl ServerLanguage {
             };
 
             // Cache new variant
-            let lang = ShadingLanguage::Hlsl; // TODO: Missing lang for variant...
-            let language_data = self.language_data.get_mut(&lang).unwrap();
             let mut all_removed_files = match &self.watched_files.variant {
                 Some(new_variant) => {
+                    let lang = new_variant.language;
+                    let language_data = self.language_data.get_mut(&lang).unwrap();
                     let new_variant_url = new_variant.url.clone();
                     self.watched_files.watch_variant_file(
                         &new_variant_url,

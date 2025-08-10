@@ -618,7 +618,7 @@ impl ServerLanguageFileCache {
                 let none = self.files.insert(uri.clone(), cached_file);
                 assert!(none.is_none());
                 info!(
-                    "Starting watching {:#?} main file at {}. {} files in cache.",
+                    "Starting watching {:#?} variant file at {}. {} files in cache.",
                     lang,
                     file_path.display(),
                     self.files.len(),
