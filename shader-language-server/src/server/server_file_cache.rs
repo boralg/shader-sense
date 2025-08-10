@@ -317,50 +317,51 @@ impl ServerLanguageFileCache {
             }
             {
                 // If includes have issues, diagnose them.
-                let mut ascended_diagnostics: Vec<ShaderDiagnostic> = symbols
-                    .get_preprocessor()
-                    .includes
-                    .iter()
-                    .filter_map(|include| {
-                        for diagnostic in &diagnostic_list.diagnostics {
-                            if diagnostic.severity != ShaderDiagnosticSeverity::Error {
-                                continue;
-                            }
-                            let diagnostic_path = &diagnostic.range.start.file_path;
-                            if *diagnostic_path == file_path {
-                                continue; // Main file diagnostics
-                            }
-                            if *diagnostic_path == include.get_absolute_path() {
-                                return Some(ShaderDiagnostic {
-                                    severity: ShaderDiagnosticSeverity::Error,
-                                    error: format!(
-                                        "File {} has issues:\n{}", // TODO: add command to file
-                                        include.get_relative_path(),
-                                        diagnostic.error
-                                    ),
-                                    range: include.get_range().clone(),
-                                });
-                            }
-                            match symbols
-                                .find_include(&mut |i| i.get_absolute_path() == *diagnostic_path)
-                            {
-                                Some(includer) => {
+                let mut ascended_diagnostics: Vec<ShaderDiagnostic> =
+                    symbols
+                        .get_preprocessor()
+                        .includes
+                        .iter()
+                        .filter_map(|include| {
+                            for diagnostic in &diagnostic_list.diagnostics {
+                                if diagnostic.severity != ShaderDiagnosticSeverity::Error {
+                                    continue;
+                                }
+                                let diagnostic_path = &diagnostic.range.start.file_path;
+                                if *diagnostic_path == file_path {
+                                    continue; // Main file diagnostics
+                                }
+                                if *diagnostic_path == include.get_absolute_path() {
                                     return Some(ShaderDiagnostic {
                                         severity: ShaderDiagnosticSeverity::Error,
                                         error: format!(
-                                            "File {} has issues:\n{}",
-                                            includer.get_relative_path(),
+                                            "File {} has issues:\n{}", // TODO: add command to file
+                                            include.get_relative_path(),
                                             diagnostic.error
                                         ),
                                         range: include.get_range().clone(),
-                                    })
+                                    });
                                 }
-                                None => {}
+                                match include.cache.as_ref().unwrap().find_include(&mut |i| {
+                                    i.get_absolute_path() == *diagnostic_path
+                                }) {
+                                    Some(includer) => {
+                                        return Some(ShaderDiagnostic {
+                                            severity: ShaderDiagnosticSeverity::Error,
+                                            error: format!(
+                                                "File {} has issues:\n{}",
+                                                includer.get_relative_path(),
+                                                diagnostic.error
+                                            ),
+                                            range: include.get_range().clone(),
+                                        })
+                                    }
+                                    None => {}
+                                }
                             }
-                        }
-                        None
-                    })
-                    .collect();
+                            None
+                        })
+                        .collect();
                 diagnostic_list
                     .diagnostics
                     .append(&mut ascended_diagnostics);
@@ -483,10 +484,10 @@ impl ServerLanguageFileCache {
                                                 .diagnostics
                                                 .iter()
                                                 .filter(|d| {
-                                                    let diag_file_path = &d.range.start.file_path;
-                                                    *diag_file_path == include.get_absolute_path()
+                                                    let deps_file_path = &d.range.start.file_path;
+                                                    *deps_file_path == include.get_absolute_path()
                                                         || symbol_cache
-                                                            .has_dependency(diag_file_path)
+                                                            .has_dependency(deps_file_path)
                                                 })
                                                 .cloned()
                                                 .collect(),
