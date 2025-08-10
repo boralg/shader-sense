@@ -7,7 +7,7 @@ use shader_sense::shader_error::{ShaderDiagnosticSeverity, ShaderError};
 
 use crate::server::common::shader_range_to_lsp_range;
 
-use super::{ServerConnection, ServerLanguage};
+use super::ServerLanguage;
 
 impl ServerLanguage {
     pub fn publish_diagnostic(&mut self, uri: &Url, version: Option<i32>) {
@@ -38,7 +38,7 @@ impl ServerLanguage {
         }
     }
 
-    pub fn clear_diagnostic(&self, connection: &ServerConnection, uri: &Url) {
+    pub fn clear_diagnostic(&self, uri: &Url) {
         // TODO: check it exist ?
         info!("Clearing diagnostic for file {}", uri);
         let publish_diagnostics_params = PublishDiagnosticsParams {
@@ -46,9 +46,10 @@ impl ServerLanguage {
             diagnostics: Vec::new(),
             version: None,
         };
-        connection.send_notification::<lsp_types::notification::PublishDiagnostics>(
-            publish_diagnostics_params,
-        );
+        self.connection
+            .send_notification::<lsp_types::notification::PublishDiagnostics>(
+                publish_diagnostics_params,
+            );
     }
     fn get_lsp_severity(severity: &ShaderDiagnosticSeverity) -> lsp_types::DiagnosticSeverity {
         match severity {

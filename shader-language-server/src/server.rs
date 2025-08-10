@@ -812,11 +812,11 @@ impl ServerLanguage {
                                             &self.config,
                                             Some(&uri.to_file_path().unwrap()), // Force update
                                         ) {
-                                            Ok(updated_files) => {
-                                                self.publish_diagnostic(&uri, None);
-                                                for updated_file in updated_files {
-                                                    self.publish_diagnostic(&updated_file, None);
+                                            Ok(removed_files) => {
+                                                for removed_file in removed_files {
+                                                    self.clear_diagnostic(&removed_file);
                                                 }
+                                                self.publish_diagnostic(&uri, None);
                                             }
                                             Err(err) => self
                                                 .connection
@@ -849,7 +849,7 @@ impl ServerLanguage {
                 match self.watched_files.remove_file(&uri) {
                     Ok(removed_urls) => {
                         for removed_url in removed_urls {
-                            self.clear_diagnostic(&self.connection, &removed_url);
+                            self.clear_diagnostic(&removed_url);
                         }
                     }
                     Err(err) => self.connection.send_notification_error(format!("{}", err)),
@@ -892,11 +892,11 @@ impl ServerLanguage {
                             &self.config,
                             Some(&uri.to_file_path().unwrap()),
                         ) {
-                            Ok(updated_files) => {
-                                self.publish_diagnostic(&uri, Some(params.text_document.version));
-                                for updated_file in updated_files {
-                                    self.publish_diagnostic(&updated_file, None);
+                            Ok(removed_files) => {
+                                for removed_file in removed_files {
+                                    self.clear_diagnostic(&removed_file);
                                 }
+                                self.publish_diagnostic(&uri, Some(params.text_document.version));
                             }
                             Err(err) => self.connection.send_notification_error(format!("{}", err)),
                         }

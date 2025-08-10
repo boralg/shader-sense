@@ -147,7 +147,7 @@ impl ServerLanguage {
             };
 
             // Cache new variant
-            let mut all_updated_files = match &self.watched_files.variant {
+            let mut all_removed_files = match &self.watched_files.variant {
                 Some(new_variant) => match self.watched_files.get_file(&new_variant.url) {
                     Some(new_variant_file) => {
                         if new_variant_file.is_main_file() {
@@ -156,7 +156,7 @@ impl ServerLanguage {
                             info!("Updating new variant {}", new_variant.url);
                             let language_data =
                                 self.language_data.get_mut(&shading_language).unwrap();
-                            let mut updated_files = self.watched_files.cache_file_data(
+                            let removed_files = self.watched_files.cache_file_data(
                                 &new_variant_url,
                                 language_data.validator.as_mut(),
                                 &mut language_data.language,
@@ -164,8 +164,7 @@ impl ServerLanguage {
                                 &self.config,
                                 None,
                             )?;
-                            updated_files.insert(new_variant_url);
-                            updated_files
+                            removed_files
                         } else {
                             HashSet::new() // TODO: Not a main file. ignore for now.
                         }
@@ -225,7 +224,7 @@ impl ServerLanguage {
                             info!("Updating old relying file {}", file_to_update);
                             let language_data =
                                 self.language_data.get_mut(&shading_language).unwrap();
-                            let updated_files = self.watched_files.cache_file_data(
+                            let removed_files = self.watched_files.cache_file_data(
                                 &file_to_update,
                                 language_data.validator.as_mut(),
                                 &mut language_data.language,
@@ -233,14 +232,13 @@ impl ServerLanguage {
                                 &self.config,
                                 Some(&file_to_update.to_file_path().unwrap()),
                             )?;
-                            all_updated_files.insert(file_to_update);
-                            all_updated_files.extend(updated_files)
+                            all_removed_files.extend(removed_files)
                         } // TODO: Not a main file. ignore for now.
                     }
                     None => {} // Not a watched file. ignore for now.
                 };
             }
-            Ok(all_updated_files)
+            Ok(all_removed_files)
         } else {
             info!("Variant unchanged.");
             Ok(HashSet::new()) // Nothing changed

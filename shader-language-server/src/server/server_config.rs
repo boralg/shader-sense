@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use lsp_types::{request::WorkspaceConfiguration, ConfigurationParams, Url};
 use serde::{Deserialize, Serialize};
@@ -193,7 +193,8 @@ impl ServerLanguage {
                 profile_scope!("Updating server config: {:#?}", config);
                 server.config = config.clone();
                 // Republish all diagnostics
-                let mut file_to_republish = Vec::new();
+                let mut files_to_republish = HashSet::new();
+                let mut files_to_clear = HashSet::new();
                 let watched_urls: Vec<(Url, ShadingLanguage)> = server
                     .watched_files
                     .files
@@ -204,7 +205,7 @@ impl ServerLanguage {
                 for (url, shading_language) in watched_urls {
                     profile_scope!("Updating server config for file: {}", url);
                     // Clear diags
-                    server.clear_diagnostic(&server.connection, &url);
+                    server.clear_diagnostic(&url);
                     let language_data = server.language_data.get_mut(&shading_language).unwrap();
                     // Update symbols & republish diags.
                     if server.watched_files.files.get(&url).unwrap().is_main_file() {
@@ -217,11 +218,9 @@ impl ServerLanguage {
                             &server.config,
                             Some(&url.to_file_path().unwrap()),
                         ) {
-                            Ok(updated_files) => {
-                                file_to_republish.push(url.clone());
-                                for updated_file in updated_files {
-                                    file_to_republish.push(updated_file);
-                                }
+                            Ok(removed_files) => {
+                                files_to_republish.insert(url.clone());
+                                files_to_clear.extend(removed_files);
                             }
                             Err(err) => server
                                 .connection
@@ -230,7 +229,10 @@ impl ServerLanguage {
                     }
                 }
                 // Republish all diagnostics with new settings.
-                for url in &file_to_republish {
+                for url in &files_to_clear {
+                    server.clear_diagnostic(url);
+                }
+                for url in &files_to_republish {
                     server.publish_diagnostic(url, None);
                 }
             },

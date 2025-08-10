@@ -431,7 +431,7 @@ impl ServerLanguageFileCache {
                 )?;
             }
         }
-        let updated_files = if let Some(relying_variant_uri) = &relying_variant_uri {
+        let removed_files = if let Some(relying_variant_uri) = &relying_variant_uri {
             info!("Caching file {} from variant {}", uri, relying_variant_uri);
             // Caching here will take care of propagating to its relying files.
             self.cache_file_data(
@@ -457,8 +457,6 @@ impl ServerLanguageFileCache {
                 config,
                 dirty_deps,
             )?;
-
-            let mut updated_files = HashSet::from([uri.clone()]);
 
             // Copy variant deps data to all its relying data.
             if let Some(variant) = &variant {
@@ -544,7 +542,6 @@ impl ServerLanguageFileCache {
                         });
                     self.files.get_mut(&include_url).unwrap().data = Some(include_data);
                     // Mark them for publishing diagnostics.
-                    updated_files.insert(include_url);
                 }
             }
             // Get dangling dependencies that need to be removed.
@@ -567,8 +564,7 @@ impl ServerLanguageFileCache {
                 self.files.remove(old_relying_file);
             }
             // For clearing diagnostics.
-            updated_files.extend(old_relying_files);
-            updated_files
+            old_relying_files
         };
 
         debug_assert!(
@@ -576,7 +572,7 @@ impl ServerLanguageFileCache {
             "Failed to cache data for file {}",
             uri
         );
-        Ok(updated_files)
+        Ok(removed_files)
     }
     pub fn watch_file(
         &mut self,
@@ -634,8 +630,8 @@ impl ServerLanguageFileCache {
             }
         };
         // Cache file data from new context.
-        // We dont update content here, so we can ignore updated_files.
-        let _updated_files = self.cache_file_data(
+        // We dont update content here, so we can ignore removed_files.
+        let _removed_files = self.cache_file_data(
             uri,
             validator,
             shader_language,
@@ -781,25 +777,7 @@ impl ServerLanguageFileCache {
                         uri,
                         self.files.len()
                     );
-                    // Get dangling dependencies that need to be removed.
-                    dangling_files.retain(|f| {
-                        if uri != f {
-                            self.is_dangling_file(f)
-                        } else {
-                            false // Avoid removing main file twice.
-                        }
-                    });
-                    // Remove these deps from cache.
-                    for dangling_file in &dangling_files {
-                        self.files.remove(dangling_file);
-                        info!(
-                            "Removed {:#?} dangling deps {}. {} files in cache.",
-                            shading_language,
-                            dangling_file,
-                            self.files.len()
-                        );
-                    }
-                    Ok(vec![vec![uri.clone()], dangling_files.into_iter().collect()].concat())
+                    Ok(vec![])
                 }
                 None => Err(ShaderError::InternalErr(format!(
                     "Trying to remove main file {} that is not watched",
@@ -813,6 +791,7 @@ impl ServerLanguageFileCache {
                         cached_file.data.is_some(),
                         "Removing main file without data"
                     );
+                    // Get dangling dependencies that need to be removed.
                     dangling_files.retain(|f| {
                         if uri != f {
                             self.is_dangling_file(f)
