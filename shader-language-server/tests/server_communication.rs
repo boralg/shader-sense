@@ -6,7 +6,7 @@ use core::panic;
 use std::collections::HashMap;
 use std::path::Path;
 
-use lsp_types::request::DocumentDiagnosticRequest;
+use lsp_types::request::{DocumentDiagnosticRequest, WorkspaceSymbolRequest};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
     request::DocumentSymbolRequest,
@@ -16,17 +16,18 @@ use lsp_types::{
 };
 use lsp_types::{
     DiagnosticSeverity, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticReportResult, RelatedFullDocumentDiagnosticReport,
+    DocumentDiagnosticReportResult, RelatedFullDocumentDiagnosticReport, WorkspaceSymbolParams,
+    WorkspaceSymbolResponse,
 };
 use shader_language_server::server::shader_variant::{
     DidChangeShaderVariant, DidChangeShaderVariantParams, ShaderVariant,
 };
-use shader_sense::shader::ShadingLanguage;
+use shader_sense::shader::{ShaderStage, ShadingLanguage};
 use test_server::{TestFile, TestServer};
 
 mod test_server;
 
-fn has_symbol(response: Option<DocumentSymbolResponse>, symbol: &str) -> bool {
+fn has_document_symbol(response: Option<DocumentSymbolResponse>, symbol: &str) -> bool {
     let symbols = response.unwrap();
     match symbols {
         DocumentSymbolResponse::Nested(document_symbol) => {
@@ -35,9 +36,25 @@ fn has_symbol(response: Option<DocumentSymbolResponse>, symbol: &str) -> bool {
         _ => panic!("Should not be reached."),
     }
 }
+fn has_workspace_symbol(response: Option<WorkspaceSymbolResponse>, symbol: &str) -> bool {
+    let symbols = response.unwrap();
+    match symbols {
+        WorkspaceSymbolResponse::Flat(workspace_symbol) => {
+            workspace_symbol.iter().find(|e| e.name == symbol).is_some()
+        }
+        _ => panic!("Should not be reached."),
+    }
+}
 fn get_document_symbol_params(file: &TestFile) -> DocumentSymbolParams {
     DocumentSymbolParams {
         text_document: file.identifier(),
+        work_done_progress_params: WorkDoneProgressParams::default(),
+        partial_result_params: PartialResultParams::default(),
+    }
+}
+fn get_workspace_symbol_params() -> WorkspaceSymbolParams {
+    WorkspaceSymbolParams {
+        query: "".into(),
         work_done_progress_params: WorkDoneProgressParams::default(),
         partial_result_params: PartialResultParams::default(),
     }
@@ -87,13 +104,14 @@ fn test_variant() {
     });
     server.send_request::<DocumentSymbolRequest>(&document_symbol_params, |response| {
         assert!(
-            has_symbol(response, "mainError"),
+            has_document_symbol(response, "mainError"),
             "Missing symbol mainError for variant"
         );
     });
     server.send_notification::<DidChangeShaderVariant>(&DidChangeShaderVariantParams {
         shader_variant: Some(ShaderVariant {
             url: file.url.clone(),
+            language: ShadingLanguage::Hlsl,
             entry_point: "".into(),
             stage: None,
             defines: HashMap::from([("VARIANT_DEFINE".into(), "1".into())]),
@@ -102,7 +120,7 @@ fn test_variant() {
     });
     server.send_request::<DocumentSymbolRequest>(&document_symbol_params, |response| {
         assert!(
-            has_symbol(response, "mainOk"),
+            has_document_symbol(response, "mainOk"),
             "Missing symbol mainOk for variant"
         );
     });
@@ -165,6 +183,7 @@ fn test_variant_dependency() {
     server.send_notification::<DidChangeShaderVariant>(&DidChangeShaderVariantParams {
         shader_variant: Some(ShaderVariant {
             url: file_variant.url.clone(),
+            language: ShadingLanguage::Hlsl,
             entry_point: "".into(),
             stage: None,
             defines: HashMap::new(),
@@ -296,5 +315,50 @@ fn test_server_stack_overflow() {
     });
     server.send_notification::<DidCloseTextDocument>(&DidCloseTextDocumentParams {
         text_document: file.identifier(),
+    });
+}
+
+#[test]
+fn test_dependency_include_guard() {
+    // Test for variant dependency to have access to symbols protected by include guard
+    let mut server = TestServer::desktop().unwrap();
+
+    let variant = TestFile::new(
+        Path::new("../shader-sense/test/hlsl/include-level.hlsl"),
+        ShadingLanguage::Hlsl,
+    );
+    let deps = TestFile::new(
+        Path::new("../shader-sense/test/hlsl/inc0/level0.hlsl"),
+        ShadingLanguage::Hlsl,
+    );
+    let workspace_symbol_params = get_workspace_symbol_params();
+
+    server.send_notification::<DidOpenTextDocument>(&DidOpenTextDocumentParams {
+        text_document: variant.item(),
+    });
+    server.send_notification::<DidOpenTextDocument>(&DidOpenTextDocumentParams {
+        text_document: deps.item(),
+    });
+    server.send_notification::<DidChangeShaderVariant>(&DidChangeShaderVariantParams {
+        shader_variant: Some(ShaderVariant {
+            url: variant.url.clone(),
+            language: ShadingLanguage::Hlsl,
+            entry_point: "".into(),
+            stage: Some(ShaderStage::Compute),
+            defines: HashMap::new(),
+            includes: Vec::new(),
+        }),
+    });
+    server.send_request::<WorkspaceSymbolRequest>(&workspace_symbol_params, |response| {
+        assert!(
+            has_workspace_symbol(response, "methodLevel1"),
+            "Missing symbol methodLevel1 for variant deps"
+        );
+    });
+    server.send_notification::<DidCloseTextDocument>(&DidCloseTextDocumentParams {
+        text_document: variant.identifier(),
+    });
+    server.send_notification::<DidCloseTextDocument>(&DidCloseTextDocumentParams {
+        text_document: deps.identifier(),
     });
 }
