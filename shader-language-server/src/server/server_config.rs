@@ -199,7 +199,7 @@ impl ServerLanguage {
                     .watched_files
                     .files
                     .iter()
-                    .filter(|(_, file)| file.is_main_file())
+                    .filter(|(_, file)| file.is_cachable_file())
                     .map(|(url, file)| (url.clone(), file.shading_language))
                     .collect();
                 for (url, shading_language) in watched_urls {
@@ -208,28 +208,25 @@ impl ServerLanguage {
                     server.clear_diagnostic(&url);
                     let language_data = server.language_data.get_mut(&shading_language).unwrap();
                     // Update symbols & republish diags.
-                    if server.watched_files.files.get(&url).unwrap().is_main_file() {
-                        // Cache once for main file all changes have been applied.
-                        match server.watched_files.cache_file_data(
-                            &url,
-                            language_data.validator.as_mut(),
-                            &mut language_data.language,
-                            &language_data.symbol_provider,
-                            &server.config,
-                            Some(&url.to_file_path().unwrap()),
-                        ) {
-                            Ok(removed_files) => {
-                                let url_to_republish = server
-                                    .watched_files
-                                    .get_relying_variant(&url)
-                                    .unwrap_or(url.clone());
-                                files_to_republish.insert(url_to_republish);
-                                files_to_clear.extend(removed_files);
-                            }
-                            Err(err) => server
-                                .connection
-                                .send_notification_error(format!("{}", err)),
+                    match server.watched_files.cache_file_data(
+                        &url,
+                        language_data.validator.as_mut(),
+                        &mut language_data.language,
+                        &language_data.symbol_provider,
+                        &server.config,
+                        Some(&url.to_file_path().unwrap()),
+                    ) {
+                        Ok(removed_files) => {
+                            let url_to_republish = server
+                                .watched_files
+                                .get_relying_variant(&url)
+                                .unwrap_or(url.clone());
+                            files_to_republish.insert(url_to_republish);
+                            files_to_clear.extend(removed_files);
                         }
+                        Err(err) => server
+                            .connection
+                            .send_notification_error(format!("{}", err)),
                     }
                 }
                 // Republish all diagnostics with new settings.

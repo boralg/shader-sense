@@ -40,12 +40,17 @@ pub struct ServerFileCache {
     pub shading_language: ShadingLanguage,
     pub shader_module: ShaderModuleHandle, // Store content on change as its not on disk.
     pub data: Option<ServerFileCacheData>, // Data for file opened and edited.
-    is_main_file: bool,
+    // A file can be dependency, main, dependent variant or main variant.
+    is_main_file: bool,    // main file are opened file in editor.
+    is_variant_file: bool, // variant are set through variant window.
 }
 
 impl ServerFileCache {
     pub fn is_main_file(&self) -> bool {
         self.is_main_file
+    }
+    pub fn is_cachable_file(&self) -> bool {
+        self.is_main_file || self.is_variant_file
     }
     pub fn get_data(&self) -> &ServerFileCacheData {
         assert!(
@@ -156,13 +161,10 @@ impl ServerLanguageFileCache {
         match &self.variant {
             Some(variant) => {
                 let is_relying_on = match self.files.get(&variant.url) {
-                    Some(cached_file) => {
-                        cached_file.is_main_file()
-                            && cached_file
-                                .get_data()
-                                .symbol_cache
-                                .has_dependency(&file_path)
-                    }
+                    Some(variant_cached_file) => variant_cached_file
+                        .get_data()
+                        .symbol_cache
+                        .has_dependency(&file_path),
                     None => false,
                 };
                 is_relying_on.then_some(variant.url.clone())
@@ -392,7 +394,7 @@ impl ServerLanguageFileCache {
     ) -> Result<HashSet<Url>, ShaderError> {
         profile_scope!("Caching file data for file {}", uri);
         assert!(
-            self.files.get(&uri).unwrap().is_main_file(),
+            self.files.get(&uri).unwrap().is_cachable_file(),
             "Trying to cache data of dependency {}...",
             uri
         );
@@ -574,11 +576,72 @@ impl ServerLanguageFileCache {
         );
         Ok(removed_files)
     }
-    pub fn watch_file(
+    pub fn watch_variant_file(
         &mut self,
         uri: &Url,
         lang: ShadingLanguage,
-        text: &String,
+        shader_language: &mut ShaderLanguage,
+        symbol_provider: &SymbolProvider,
+        validator: &mut dyn Validator,
+        config: &ServerConfig,
+    ) -> Result<HashSet<Url>, ShaderError> {
+        assert!(*uri == clean_url(&uri));
+        let file_path = uri.to_file_path().unwrap();
+        // Check if watched file already watched as deps or variant.
+        match self.files.get_mut(&uri) {
+            Some(cached_file) => {
+                assert!(
+                    !cached_file.is_variant_file,
+                    "File {} already watched as variant.",
+                    uri
+                );
+                cached_file.is_variant_file = true;
+                info!(
+                    "Starting watching {:#?} file as variant file at {}. {} files in cache.",
+                    lang,
+                    file_path.display(),
+                    self.files.len(),
+                );
+            }
+            None => {
+                let text = read_string_lossy(&file_path).unwrap();
+                let shader_module = Rc::new(RefCell::new(
+                    shader_language.create_module(&file_path, &text)?,
+                ));
+                let cached_file = ServerFileCache {
+                    shading_language: lang,
+                    shader_module: shader_module,
+                    data: None,
+                    is_main_file: false,
+                    is_variant_file: true,
+                };
+                let none = self.files.insert(uri.clone(), cached_file);
+                assert!(none.is_none());
+                info!(
+                    "Starting watching {:#?} main file at {}. {} files in cache.",
+                    lang,
+                    file_path.display(),
+                    self.files.len(),
+                );
+            }
+        };
+        // Cache file data from new context.
+        // We dont update content here, so we can ignore removed_files.
+        let removed_files = self.cache_file_data(
+            uri,
+            validator,
+            shader_language,
+            symbol_provider,
+            config,
+            None, // We simply open the file. No change detected.
+        )?;
+        Ok(removed_files)
+    }
+    pub fn watch_main_file(
+        &mut self,
+        uri: &Url,
+        lang: ShadingLanguage,
+        text: &str,
         shader_language: &mut ShaderLanguage,
         symbol_provider: &SymbolProvider,
         validator: &mut dyn Validator,
@@ -601,7 +664,7 @@ impl ServerLanguageFileCache {
                     RefCell::borrow_mut(&cached_file.shader_module).content == *text,
                     "Server deps content different from client provided one."
                 );
-                RefCell::borrow_mut(&cached_file.shader_module).content = text.clone();
+                RefCell::borrow_mut(&cached_file.shader_module).content = text.into();
                 info!(
                     "Starting watching {:#?} dependency file as main file at {}. {} files in cache.",
                     lang,
@@ -613,14 +676,16 @@ impl ServerLanguageFileCache {
                 let shader_module = Rc::new(RefCell::new(
                     shader_language.create_module(&file_path, &text)?,
                 ));
+                debug_assert!(self.variant.as_ref().map(|v| v.url != *uri).unwrap_or(true));
                 let cached_file = ServerFileCache {
                     shading_language: lang,
                     shader_module: shader_module,
                     data: None,
                     is_main_file: true,
+                    is_variant_file: false, // Cannot be a variant if its not watched.
                 };
                 let none = self.files.insert(uri.clone(), cached_file);
-                assert!(none.is_none());
+                debug_assert!(none.is_none());
                 info!(
                     "Starting watching {:#?} main file at {}. {} files in cache.",
                     lang,
@@ -659,6 +724,13 @@ impl ServerLanguageFileCache {
                         file_path.display(),
                         self.files.len(),
                     );
+                } else if file.is_variant_file {
+                    debug!(
+                        "Already watched {:#?} deps file as variant at {}. {} files in cache.",
+                        lang,
+                        file_path.display(),
+                        self.files.len(),
+                    );
                 } else {
                     debug!(
                         "Already watched {:#?} deps file at {}. {} files in cache.",
@@ -678,6 +750,11 @@ impl ServerLanguageFileCache {
                     shader_module: shader_module,
                     data: None,
                     is_main_file: false,
+                    is_variant_file: self
+                        .variant
+                        .as_ref()
+                        .map(|v| v.url == *uri)
+                        .unwrap_or(false),
                 };
                 let none = self.files.insert(uri.clone(), cached_file);
                 assert!(none.is_none());
@@ -736,7 +813,7 @@ impl ServerLanguageFileCache {
         let file_path = uri.to_file_path().unwrap();
         self.files.iter().find(|(file_url, file_cache)| {
             if *file_url != uri {
-                file_cache.is_main_file()
+                file_cache.is_cachable_file()
                     && file_cache
                         .get_data()
                         .symbol_cache
@@ -749,7 +826,7 @@ impl ServerLanguageFileCache {
     fn is_dangling_file(&self, uri: &Url) -> bool {
         match self.files.get(uri) {
             Some(cached_file) => {
-                !cached_file.is_main_file() && self.is_used_as_dependency(uri).is_none()
+                !cached_file.is_cachable_file() && self.is_used_as_dependency(uri).is_none()
             }
             None => {
                 debug_assert!(
@@ -761,71 +838,163 @@ impl ServerLanguageFileCache {
             }
         }
     }
-    pub fn remove_file(&mut self, uri: &Url) -> Result<Vec<Url>, ShaderError> {
-        let used_as_deps = self.is_used_as_dependency(uri);
+    // Dependency removal are handled by remove_variant & remove_file.
+    pub fn remove_variant_file(&mut self, uri: &Url) -> Result<Vec<Url>, ShaderError> {
+        let used_as_deps = self.is_used_as_dependency(uri).is_some();
         let mut dangling_files = self.get_all_relying_files(uri);
-        match used_as_deps {
-            Some(_) => match self.files.get_mut(&uri) {
-                Some(cached_file) => {
+        match self.files.get_mut(&uri) {
+            Some(cached_file) => {
+                if used_as_deps || cached_file.is_main_file() {
                     let shading_language = cached_file.shading_language;
-                    // Used as deps. Reset cache only.
-                    cached_file.data = None;
-                    cached_file.is_main_file = false;
+                    // Used as deps. Reset cache only if not main.
+                    if !cached_file.is_main_file {
+                        cached_file.data = None;
+                    }
+                    debug_assert!(cached_file.is_variant_file);
+                    cached_file.is_variant_file = false;
                     info!(
-                        "Converted {:#?} main file to deps at {}. {} files in cache.",
+                        "Converted {:#?} variant file to {} at {}. {} files in cache.",
                         shading_language,
+                        if cached_file.is_main_file {
+                            "main file"
+                        } else {
+                            "deps file"
+                        },
                         uri,
                         self.files.len()
                     );
                     Ok(vec![])
-                }
-                None => Err(ShaderError::InternalErr(format!(
-                    "Trying to remove main file {} that is not watched",
-                    uri.path()
-                ))),
-            },
-            None => match self.files.remove(uri) {
-                Some(mut cached_file) => {
-                    let shading_language = cached_file.shading_language;
-                    assert!(
-                        cached_file.data.is_some(),
-                        "Removing main file without data"
-                    );
-                    // Get dangling dependencies that need to be removed.
-                    dangling_files.retain(|f| {
-                        if uri != f {
-                            self.is_dangling_file(f)
-                        } else {
-                            false // Avoid removing main file twice.
+                } else {
+                    match self.files.remove(uri) {
+                        Some(mut cached_file) => {
+                            let shading_language = cached_file.shading_language;
+                            assert!(
+                                cached_file.data.is_some(),
+                                "Removing variant file without data"
+                            );
+                            // Get dangling dependencies that need to be removed.
+                            dangling_files.retain(|f| {
+                                if uri != f {
+                                    self.is_dangling_file(f)
+                                } else {
+                                    false // Avoid removing main file twice.
+                                }
+                            });
+                            // Remove main file before deps & drop cache for ref.
+                            let data = cached_file.data.unwrap();
+                            drop(data);
+                            cached_file.is_variant_file = false; // Just to be sure.
+                            info!(
+                                "Removed {:#?} main file at {}. {} files in cache.",
+                                cached_file.shading_language,
+                                uri,
+                                self.files.len()
+                            );
+                            // Remove these deps from cache.
+                            for dangling_file in &dangling_files {
+                                self.files.remove(dangling_file);
+                                info!(
+                                    "Removed {:#?} dangling deps {}. {} files in cache.",
+                                    shading_language,
+                                    dangling_file,
+                                    self.files.len()
+                                );
+                            }
+                            Ok(
+                                vec![vec![uri.clone()], dangling_files.into_iter().collect()]
+                                    .concat(),
+                            )
                         }
-                    });
-                    // Remove main file before deps & drop cache for ref.
-                    let data = cached_file.data.unwrap();
-                    drop(data);
-                    cached_file.is_main_file = false; // Just to be sure.
+                        None => Err(ShaderError::InternalErr(format!(
+                            "Trying to remove variant file {} that is not watched",
+                            uri.path()
+                        ))),
+                    }
+                }
+            }
+            None => Err(ShaderError::InternalErr(format!(
+                "Trying to remove variant file {} that is not watched",
+                uri.path()
+            ))),
+        }
+    }
+    pub fn remove_main_file(&mut self, uri: &Url) -> Result<Vec<Url>, ShaderError> {
+        let used_as_deps = self.is_used_as_dependency(uri).is_some();
+        let mut dangling_files = self.get_all_relying_files(uri);
+        match self.files.get_mut(&uri) {
+            Some(cached_file) => {
+                if used_as_deps || cached_file.is_variant_file {
+                    let shading_language = cached_file.shading_language;
+                    // Used as deps. Reset cache only if not main.
+                    if !cached_file.is_variant_file {
+                        cached_file.data = None;
+                    }
+                    debug_assert!(cached_file.is_main_file);
+                    cached_file.is_main_file = false;
                     info!(
-                        "Removed {:#?} main file at {}. {} files in cache.",
-                        cached_file.shading_language,
+                        "Converted {:#?} main file to {} at {}. {} files in cache.",
+                        shading_language,
+                        if cached_file.is_main_file {
+                            "variant file"
+                        } else {
+                            "deps file"
+                        },
                         uri,
                         self.files.len()
                     );
-                    // Remove these deps from cache.
-                    for dangling_file in &dangling_files {
-                        self.files.remove(dangling_file);
-                        info!(
-                            "Removed {:#?} dangling deps {}. {} files in cache.",
-                            shading_language,
-                            dangling_file,
-                            self.files.len()
-                        );
+                    Ok(vec![])
+                } else {
+                    match self.files.remove(uri) {
+                        Some(mut cached_file) => {
+                            let shading_language = cached_file.shading_language;
+                            assert!(
+                                cached_file.data.is_some(),
+                                "Removing main file without data"
+                            );
+                            // Get dangling dependencies that need to be removed.
+                            dangling_files.retain(|f| {
+                                if uri != f {
+                                    self.is_dangling_file(f)
+                                } else {
+                                    false // Avoid removing main file twice.
+                                }
+                            });
+                            // Remove main file before deps & drop cache for ref.
+                            let data = cached_file.data.unwrap();
+                            drop(data);
+                            cached_file.is_main_file = false; // Just to be sure.
+                            info!(
+                                "Removed {:#?} main file at {}. {} files in cache.",
+                                cached_file.shading_language,
+                                uri,
+                                self.files.len()
+                            );
+                            // Remove these deps from cache.
+                            for dangling_file in &dangling_files {
+                                self.files.remove(dangling_file);
+                                info!(
+                                    "Removed {:#?} dangling deps {}. {} files in cache.",
+                                    shading_language,
+                                    dangling_file,
+                                    self.files.len()
+                                );
+                            }
+                            Ok(
+                                vec![vec![uri.clone()], dangling_files.into_iter().collect()]
+                                    .concat(),
+                            )
+                        }
+                        None => Err(ShaderError::InternalErr(format!(
+                            "Trying to remove main file {} that is not watched",
+                            uri.path()
+                        ))),
                     }
-                    Ok(vec![vec![uri.clone()], dangling_files.into_iter().collect()].concat())
                 }
-                None => Err(ShaderError::InternalErr(format!(
-                    "Trying to remove main file {} that is not watched",
-                    uri.path()
-                ))),
-            },
+            }
+            None => Err(ShaderError::InternalErr(format!(
+                "Trying to remove main file {} that is not watched",
+                uri.path()
+            ))),
         }
     }
     pub fn get_all_symbols<'a>(&'a self, uri: &Url) -> ShaderSymbolListRef<'a> {

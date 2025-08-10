@@ -6,7 +6,10 @@ use std::{
 use log::info;
 use lsp_types::{notification::Notification, request::Request, TextDocumentIdentifier, Url};
 use serde::{Deserialize, Serialize};
-use shader_sense::{shader::ShaderStage, shader_error::ShaderError};
+use shader_sense::{
+    shader::{ShaderStage, ShadingLanguage},
+    shader_error::ShaderError,
+};
 
 use crate::server::{clean_url, ServerLanguage};
 
@@ -137,40 +140,31 @@ impl ServerLanguage {
 
             // Get old relying files before update.
             let mut old_relying_files = if let Some(old_variant) = &old_variant {
-                if self.watched_files.files.get(&old_variant.url).is_some() {
-                    self.watched_files.get_relying_main_files(&old_variant.url)
-                } else {
-                    HashSet::new() // File not watched.
+                let old_relying_files = self.watched_files.get_relying_main_files(&old_variant.url);
+                let removed_urls = self.watched_files.remove_variant_file(&old_variant.url)?;
+                for removed_url in removed_urls {
+                    self.clear_diagnostic(&removed_url);
                 }
+                old_relying_files
             } else {
                 HashSet::new() // No old variant.
             };
 
             // Cache new variant
+            let lang = ShadingLanguage::Hlsl; // TODO: Missing lang for variant...
+            let language_data = self.language_data.get_mut(&lang).unwrap();
             let mut all_removed_files = match &self.watched_files.variant {
-                Some(new_variant) => match self.watched_files.get_file(&new_variant.url) {
-                    Some(new_variant_file) => {
-                        if new_variant_file.is_main_file() {
-                            let new_variant_url = new_variant.url.clone();
-                            let shading_language = new_variant_file.shading_language;
-                            info!("Updating new variant {}", new_variant.url);
-                            let language_data =
-                                self.language_data.get_mut(&shading_language).unwrap();
-                            let removed_files = self.watched_files.cache_file_data(
-                                &new_variant_url,
-                                language_data.validator.as_mut(),
-                                &mut language_data.language,
-                                &language_data.symbol_provider,
-                                &self.config,
-                                None,
-                            )?;
-                            removed_files
-                        } else {
-                            HashSet::new() // TODO: Not a main file. ignore for now.
-                        }
-                    }
-                    None => HashSet::new(), // Not a watched file. ignore for now.
-                },
+                Some(new_variant) => {
+                    let new_variant_url = new_variant.url.clone();
+                    self.watched_files.watch_variant_file(
+                        &new_variant_url,
+                        lang,
+                        &mut language_data.language,
+                        &language_data.symbol_provider,
+                        language_data.validator.as_mut(),
+                        &self.config,
+                    )?
+                }
                 None => HashSet::new(), // No new variant to cache.
             };
 
@@ -233,7 +227,7 @@ impl ServerLanguage {
                                 Some(&file_to_update.to_file_path().unwrap()),
                             )?;
                             all_removed_files.extend(removed_files)
-                        } // TODO: Not a main file. ignore for now.
+                        }
                     }
                     None => {} // Not a watched file. ignore for now.
                 };

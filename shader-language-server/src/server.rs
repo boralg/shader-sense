@@ -740,7 +740,7 @@ impl ServerLanguage {
                 match ShadingLanguage::from_str(params.text_document.language_id.as_str()) {
                     Ok(shading_language) => {
                         let language_data = self.language_data.get_mut(&shading_language).unwrap();
-                        match self.watched_files.watch_file(
+                        match self.watched_files.watch_main_file(
                             &uri,
                             shading_language.clone(),
                             &params.text_document.text,
@@ -750,9 +750,11 @@ impl ServerLanguage {
                             &self.config,
                         ) {
                             Ok(_) => {
-                                // Should compute following after variant received.
-                                // + it seems variant are coming too early on client and too late here...
-                                self.publish_diagnostic(&uri, Some(params.text_document.version));
+                                let url_to_republish = self
+                                    .watched_files
+                                    .get_relying_variant(&uri)
+                                    .unwrap_or(uri.clone());
+                                self.publish_diagnostic(&url_to_republish, None);
                             }
                             Err(error) => self.connection.send_notification_error(format!(
                                 "Failed to watch file {}: {}",
@@ -850,7 +852,7 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.remove_file(&uri) {
+                match self.watched_files.remove_main_file(&uri) {
                     Ok(removed_urls) => {
                         for removed_url in removed_urls {
                             self.clear_diagnostic(&removed_url);
