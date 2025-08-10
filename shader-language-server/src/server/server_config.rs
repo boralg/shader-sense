@@ -219,7 +219,11 @@ impl ServerLanguage {
                             Some(&url.to_file_path().unwrap()),
                         ) {
                             Ok(removed_files) => {
-                                files_to_republish.insert(url.clone());
+                                let url_to_republish = server
+                                    .watched_files
+                                    .get_relying_variant(&url)
+                                    .unwrap_or(url.clone());
+                                files_to_republish.insert(url_to_republish);
                                 files_to_clear.extend(removed_files);
                             }
                             Err(err) => server

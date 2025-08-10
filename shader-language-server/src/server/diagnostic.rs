@@ -63,6 +63,11 @@ impl ServerLanguage {
         &mut self,
         uri: &Url,
     ) -> Result<HashMap<Url, Vec<Diagnostic>>, ShaderError> {
+        assert!(
+            self.watched_files.get_file(uri).is_some(),
+            "Trying to recolt diagnostic for file {} that is not watched.",
+            uri
+        );
         // If file not watched, send empty diagnostic.
         let cached_file = self.watched_files.get_file(uri).unwrap();
         let data = cached_file.get_data();
@@ -102,6 +107,14 @@ impl ServerLanguage {
                 );
                 diagnostics.insert(uri.clone(), vec![]);
             }
+            // Add empty diagnostics to dependencies without errors to clear them.
+            data.symbol_cache.visit_includes(&mut |include| {
+                let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
+                if diagnostics.get(&include_uri).is_none() {
+                    info!("Clearing diagnostic for deps file {}", include_uri);
+                    diagnostics.insert(include_uri.clone(), vec![]);
+                }
+            });
         } else {
             info!("Diagnostic disabled.");
         }

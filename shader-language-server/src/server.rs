@@ -816,7 +816,11 @@ impl ServerLanguage {
                                                 for removed_file in removed_files {
                                                     self.clear_diagnostic(&removed_file);
                                                 }
-                                                self.publish_diagnostic(&uri, None);
+                                                let url_to_republish = self
+                                                    .watched_files
+                                                    .get_relying_variant(&uri)
+                                                    .unwrap_or(uri.clone());
+                                                self.publish_diagnostic(&url_to_republish, None);
                                             }
                                             Err(err) => self
                                                 .connection
@@ -896,7 +900,14 @@ impl ServerLanguage {
                                 for removed_file in removed_files {
                                     self.clear_diagnostic(&removed_file);
                                 }
-                                self.publish_diagnostic(&uri, Some(params.text_document.version));
+                                let url_to_republish = self
+                                    .watched_files
+                                    .get_relying_variant(&uri)
+                                    .unwrap_or(uri.clone());
+                                self.publish_diagnostic(
+                                    &url_to_republish,
+                                    Some(params.text_document.version),
+                                );
                             }
                             Err(err) => self.connection.send_notification_error(format!("{}", err)),
                         }
@@ -928,10 +939,16 @@ impl ServerLanguage {
                         .unwrap_or("None".into()),
                     self.debug(&new_variant)
                 );
+                let new_variant_url = new_variant.as_ref().map(|v| v.url.clone());
                 match self.update_variant(new_variant) {
-                    Ok(updated_files) => {
-                        for updated_file in updated_files {
-                            self.publish_diagnostic(&updated_file, None);
+                    Ok(removed_files) => {
+                        for removed_file in removed_files {
+                            self.clear_diagnostic(&removed_file);
+                        }
+                        if let Some(new_variant_url) = new_variant_url {
+                            if self.watched_files.files.get(&new_variant_url).is_some() {
+                                self.publish_diagnostic(&new_variant_url, None);
+                            }
                         }
                     }
                     Err(err) => self.connection.send_notification_error(format!("{}", err)),
