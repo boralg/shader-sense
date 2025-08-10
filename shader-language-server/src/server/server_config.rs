@@ -204,8 +204,6 @@ impl ServerLanguage {
                     .collect();
                 for (url, shading_language) in watched_urls {
                     profile_scope!("Updating server config for file: {}", url);
-                    // Clear diags
-                    server.clear_diagnostic(&url);
                     let language_data = server.language_data.get_mut(&shading_language).unwrap();
                     // Update symbols & republish diags.
                     match server.watched_files.cache_file_data(
