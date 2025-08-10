@@ -957,16 +957,13 @@ impl ServerLanguage {
                         .unwrap_or("None".into()),
                     self.debug(&new_variant)
                 );
-                let new_variant_url = new_variant.as_ref().map(|v| v.url.clone());
                 match self.update_variant(new_variant) {
-                    Ok(removed_files) => {
+                    Ok((removed_files, updated_files)) => {
                         for removed_file in removed_files {
                             self.clear_diagnostic(&removed_file);
                         }
-                        if let Some(new_variant_url) = new_variant_url {
-                            if self.watched_files.files.get(&new_variant_url).is_some() {
-                                self.publish_diagnostic(&new_variant_url, None);
-                            }
+                        for file in updated_files {
+                            self.publish_diagnostic(&file, None);
                         }
                     }
                     Err(err) => self.connection.send_notification_error(format!("{}", err)),

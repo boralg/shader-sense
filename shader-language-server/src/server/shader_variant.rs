@@ -142,7 +142,7 @@ impl ServerLanguage {
     pub fn update_variant(
         &mut self,
         new_variant: Option<ShaderVariant>,
-    ) -> Result<HashSet<Url>, ShaderError> {
+    ) -> Result<(HashSet<Url>, HashSet<Url>), ShaderError> {
         // Store it in cache.
         let old_variant = self.watched_files.variant.take();
         if old_variant != new_variant {
@@ -194,7 +194,7 @@ impl ServerLanguage {
                 HashSet::new() // No new variant.
             };
 
-            // Check if we need to update old variant or its already done.
+            // Check if we need to update variant or its already done.
             let mut files_to_update = match old_variant {
                 Some(old_variant) => {
                     if new_relying_files
@@ -207,12 +207,15 @@ impl ServerLanguage {
                             true
                         }
                     {
-                        vec![old_variant.url.clone()] // Not already updated.
+                        HashSet::from([old_variant.url.clone()]) // Not already updated.
                     } else {
-                        vec![] // Already updated.
+                        HashSet::new() // Already updated.
                     }
                 }
-                None => vec![],
+                None => match &self.watched_files.variant {
+                    Some(new_variant) => HashSet::from([new_variant.url.clone()]),
+                    None => HashSet::new(),
+                },
             };
 
             // Keep only relying file that are not in the other one.
@@ -225,7 +228,7 @@ impl ServerLanguage {
             files_to_update.extend(old_relying_files);
 
             // Update all of them
-            for file_to_update in files_to_update {
+            for file_to_update in &files_to_update {
                 match self.watched_files.get_file(&file_to_update) {
                     Some(cached_file) => {
                         if cached_file.is_main_file() {
@@ -247,10 +250,10 @@ impl ServerLanguage {
                     None => {} // Not a watched file. ignore for now.
                 };
             }
-            Ok(all_removed_files)
+            Ok((all_removed_files, files_to_update))
         } else {
             info!("Variant unchanged.");
-            Ok(HashSet::new()) // Nothing changed
+            Ok((HashSet::new(), HashSet::new())) // Nothing changed
         }
     }
 }
