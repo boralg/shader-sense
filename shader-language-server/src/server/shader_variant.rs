@@ -8,7 +8,7 @@ use lsp_types::{notification::Notification, request::Request, TextDocumentIdenti
 use serde::{Deserialize, Serialize};
 use shader_sense::{shader::ShaderStage, shader_error::ShaderError};
 
-use crate::server::ServerLanguage;
+use crate::server::{clean_url, ServerLanguage};
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,7 +80,10 @@ impl ServerLanguage {
             pub shader_variant: Option<OldShaderVariant>,
         }
         match serde_json::from_value::<DidChangeShaderVariantParams>(value.clone()) {
-            Ok(variant) => Ok(variant.shader_variant),
+            Ok(variant) => Ok(variant.shader_variant.map(|mut v| {
+                v.url = clean_url(&v.url);
+                v
+            })),
             Err(_) => match serde_json::from_value::<OldDidChangeShaderVariantParams>(value) {
                 Ok(new_variant) => {
                     log::warn!("Client sending old variant version. Should use the new variant version instead. Only the latest enabled variant sent to server will be used.");
@@ -94,7 +97,7 @@ impl ServerLanguage {
                             } else if new_variant.shader_variant.is_some() {
                                 // If we pass a variant with new URL, update (will pick the latest enabled.)
                                 Ok(new_variant.shader_variant.map(|v| ShaderVariant {
-                                    url: new_variant.text_document.uri,
+                                    url: clean_url(&new_variant.text_document.uri),
                                     entry_point: v.entry_point,
                                     stage: v.stage,
                                     defines: v.defines,
@@ -106,7 +109,7 @@ impl ServerLanguage {
                         }
                         // If no variant, set new one.
                         None => Ok(new_variant.shader_variant.map(|v| ShaderVariant {
-                            url: new_variant.text_document.uri,
+                            url: clean_url(&new_variant.text_document.uri),
                             entry_point: v.entry_point,
                             stage: v.stage,
                             defines: v.defines,
@@ -121,11 +124,14 @@ impl ServerLanguage {
     pub fn update_variant(
         &mut self,
         new_variant: Option<ShaderVariant>,
-    ) -> Result<Vec<Url>, ShaderError> {
+    ) -> Result<HashSet<Url>, ShaderError> {
         // Store it in cache.
         let old_variant = self.watched_files.variant.take();
         if old_variant != new_variant {
-            info!("Detected changes, updating variant");
+            info!(
+                "Detected changes, updating variant {:#?} to {:#?}",
+                old_variant, new_variant
+            );
             // Set the new variant.
             self.watched_files.variant = new_variant;
 
@@ -158,15 +164,15 @@ impl ServerLanguage {
                                 &self.config,
                                 None,
                             )?;
-                            updated_files.push(new_variant_url);
+                            updated_files.insert(new_variant_url);
                             updated_files
                         } else {
-                            vec![] // TODO: Not a main file. ignore for now.
+                            HashSet::new() // TODO: Not a main file. ignore for now.
                         }
                     }
-                    None => vec![], // Not a watched file. ignore for now.
+                    None => HashSet::new(), // Not a watched file. ignore for now.
                 },
-                None => vec![], // No new variant to cache.
+                None => HashSet::new(), // No new variant to cache.
             };
 
             // Get new relying files after update.
@@ -227,7 +233,7 @@ impl ServerLanguage {
                                 &self.config,
                                 Some(&file_to_update.to_file_path().unwrap()),
                             )?;
-                            all_updated_files.push(file_to_update);
+                            all_updated_files.insert(file_to_update);
                             all_updated_files.extend(updated_files)
                         } // TODO: Not a main file. ignore for now.
                     }
@@ -237,7 +243,7 @@ impl ServerLanguage {
             Ok(all_updated_files)
         } else {
             info!("Variant unchanged.");
-            Ok(vec![]) // Nothing changed
+            Ok(HashSet::new()) // Nothing changed
         }
     }
 }

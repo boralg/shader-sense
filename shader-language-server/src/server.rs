@@ -919,12 +919,7 @@ impl ServerLanguage {
                 self.request_configuration();
             }
             DidChangeShaderVariant::METHOD => {
-                let new_variant = self
-                    .parse_variant_params(notification.params)?
-                    .map(|mut v| {
-                        v.url = clean_url(&v.url);
-                        v
-                    });
+                let new_variant = self.parse_variant_params(notification.params)?;
                 profile_scope!(
                     "Received did change shader variant notification for file {}: {}",
                     new_variant

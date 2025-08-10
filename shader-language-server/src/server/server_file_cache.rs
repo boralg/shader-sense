@@ -388,7 +388,7 @@ impl ServerLanguageFileCache {
         symbol_provider: &SymbolProvider,
         config: &ServerConfig,
         dirty_deps: Option<&Path>,
-    ) -> Result<Vec<Url>, ShaderError> {
+    ) -> Result<HashSet<Url>, ShaderError> {
         profile_scope!("Caching file data for file {}", uri);
         assert!(
             self.files.get(&uri).unwrap().is_main_file(),
@@ -410,16 +410,16 @@ impl ServerLanguageFileCache {
 
         // Update dependent files before so that currently cached file diag are overriding them.
         if dirty_deps.is_some() {
-            let dependent_files = self.get_dependent_main_files(uri);
-            let mut unique_dependent_files: HashSet<_> = dependent_files.iter().cloned().collect();
+            let mut dependent_files = self.get_dependent_main_files(uri);
             // Remove variant and its dependent file as its already updated later.
             if let Some(relying_variant_uri) = &relying_variant_uri {
-                unique_dependent_files.remove(&relying_variant_uri);
+                dependent_files.remove(&relying_variant_uri);
                 for variant_dependent in self.get_dependent_main_files(relying_variant_uri) {
-                    unique_dependent_files.remove(&variant_dependent);
+                    dependent_files.remove(&variant_dependent);
                 }
             }
-            for dependent_file in unique_dependent_files {
+            for dependent_file in dependent_files {
+                info!("Caching file {} which depend on {}", dependent_file, uri);
                 self.__cache_file_data(
                     &dependent_file,
                     validator,
@@ -442,7 +442,7 @@ impl ServerLanguageFileCache {
                 dirty_deps,
             )?
         } else {
-            info!("Caching file {} as variant: {}", uri, variant.is_some());
+            info!("Caching file {} as variant: {:#?}", uri, variant);
             let mut old_relying_files = if self.files.get(&uri).unwrap().data.is_some() {
                 self.get_all_relying_files(uri)
             } else {
@@ -457,7 +457,7 @@ impl ServerLanguageFileCache {
                 dirty_deps,
             )?;
 
-            let mut updated_files = vec![uri.clone()];
+            let mut updated_files = HashSet::from([uri.clone()]);
 
             // Copy variant deps data to all its relying data.
             if let Some(variant) = &variant {
@@ -483,10 +483,10 @@ impl ServerLanguageFileCache {
                                                 .diagnostics
                                                 .iter()
                                                 .filter(|d| {
-                                                    let deps_file_path = &d.range.start.file_path;
-                                                    *deps_file_path == file_path
+                                                    let diag_file_path = &d.range.start.file_path;
+                                                    *diag_file_path == include.get_absolute_path()
                                                         || symbol_cache
-                                                            .has_dependency(deps_file_path)
+                                                            .has_dependency(diag_file_path)
                                                 })
                                                 .cloned()
                                                 .collect(),
@@ -543,7 +543,7 @@ impl ServerLanguageFileCache {
                         });
                     self.files.get_mut(&include_url).unwrap().data = Some(include_data);
                     // Mark them for publishing diagnostics.
-                    updated_files.push(include_url);
+                    updated_files.insert(include_url);
                 }
             }
             // Get dangling dependencies that need to be removed.

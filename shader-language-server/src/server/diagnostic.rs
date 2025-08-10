@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use log::{info, warn};
+use log::info;
 use lsp_types::{Diagnostic, DiagnosticSeverity, DiagnosticTag, PublishDiagnosticsParams, Url};
 
 use shader_sense::shader_error::{ShaderDiagnosticSeverity, ShaderError};
@@ -62,12 +62,7 @@ impl ServerLanguage {
         uri: &Url,
     ) -> Result<HashMap<Url, Vec<Diagnostic>>, ShaderError> {
         // If file not watched, send empty diagnostic.
-        let cached_file = if let Some(cached_file) = self.watched_files.get_file(uri) {
-            cached_file
-        } else {
-            warn!("Trying to recolt_diagnostic for file {} that is not watched. Sending empty diagnostic.", uri);
-            return Ok(HashMap::from([(uri.clone(), Vec::new())]));
-        };
+        let cached_file = self.watched_files.get_file(uri).unwrap();
         let data = cached_file.get_data();
         // Diagnostic for included file stored in main cache.
         let mut diagnostics: HashMap<Url, Vec<Diagnostic>> = HashMap::new();
@@ -105,14 +100,6 @@ impl ServerLanguage {
                 );
                 diagnostics.insert(uri.clone(), vec![]);
             }
-            // Add empty diagnostics to dependencies without errors to clear them.
-            data.symbol_cache.visit_includes(&mut |include| {
-                let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
-                if diagnostics.get(&include_uri).is_none() {
-                    info!("Clearing diagnostic for deps file {}", include_uri);
-                    diagnostics.insert(include_uri.clone(), vec![]);
-                }
-            });
         } else {
             info!("Diagnostic disabled.");
         }
