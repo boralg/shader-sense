@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use log::info;
 use lsp_types::{request::WorkspaceConfiguration, ConfigurationParams, Url};
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +18,7 @@ use crate::{profile_scope, server::ServerLanguage};
 
 use super::shader_variant::ShaderVariant;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerHlslConfig {
     pub shader_model: Option<HlslShaderModel>,
@@ -26,7 +27,7 @@ pub struct ServerHlslConfig {
     pub spirv: Option<bool>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerGlslConfig {
     pub target_client: Option<GlslTargetClient>,
@@ -42,7 +43,7 @@ pub enum ServerTraceLevel {
     Verbose,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerTrace {
     server: ServerTraceLevel,
@@ -55,7 +56,7 @@ impl ServerTrace {
 }
 
 // Only use option to allow non defined values.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerConfig {
     includes: Option<Vec<String>>,
@@ -161,16 +162,16 @@ impl ServerConfig {
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
-            includes: Some(Vec::new()),
-            defines: Some(HashMap::new()),
-            path_remapping: Some(HashMap::new()),
-            validate: Some(ServerConfig::DEFAULT_VALIDATE),
-            symbols: Some(ServerConfig::DEFAULT_SYMBOLS),
-            symbol_diagnostics: Some(ServerConfig::DEFAULT_SYMBOL_DIAGNOSTIC),
-            trace: Some(ServerConfig::DEFAULT_TRACE),
-            severity: Some(ServerConfig::DEFAULT_SEVERITY.to_string()),
-            hlsl: Some(ServerHlslConfig::default()),
-            glsl: Some(ServerGlslConfig::default()),
+            includes: None,
+            defines: None,
+            path_remapping: None,
+            validate: None,
+            symbols: None,
+            symbol_diagnostics: None,
+            trace: None,
+            severity: None,
+            hlsl: None,
+            glsl: None,
         }
     }
 }
@@ -190,49 +191,54 @@ impl ServerLanguage {
                 let mut parsed_config: Vec<Option<ServerConfig>> =
                     serde_json::from_value(value).expect("Failed to parse received config");
                 let config = parsed_config.remove(0).unwrap_or_default();
-                profile_scope!("Updating server config: {:#?}", config);
-                server.config = config.clone();
-                // Republish all diagnostics
-                let mut files_to_republish = HashSet::new();
-                let mut files_to_clear = HashSet::new();
-                let watched_urls: Vec<(Url, ShadingLanguage)> = server
-                    .watched_files
-                    .files
-                    .iter()
-                    .filter(|(_, file)| file.is_cachable_file())
-                    .map(|(url, file)| (url.clone(), file.shading_language))
-                    .collect();
-                for (url, shading_language) in watched_urls {
-                    profile_scope!("Updating server config for file: {}", url);
-                    let language_data = server.language_data.get_mut(&shading_language).unwrap();
-                    // Update symbols & republish diags.
-                    match server.watched_files.cache_file_data(
-                        &url,
-                        language_data.validator.as_mut(),
-                        &mut language_data.language,
-                        &language_data.symbol_provider,
-                        &server.config,
-                        Some(&url.to_file_path().unwrap()),
-                    ) {
-                        Ok(removed_files) => {
-                            let url_to_republish = server
-                                .watched_files
-                                .get_relying_variant(&url)
-                                .unwrap_or(url.clone());
-                            files_to_republish.insert(url_to_republish);
-                            files_to_clear.extend(removed_files);
+                if server.config != config {
+                    profile_scope!("Updating server config: {:#?}", config);
+                    server.config = config.clone();
+                    // Republish all diagnostics
+                    let mut files_to_republish = HashSet::new();
+                    let mut files_to_clear = HashSet::new();
+                    let watched_urls: Vec<(Url, ShadingLanguage)> = server
+                        .watched_files
+                        .files
+                        .iter()
+                        .filter(|(_, file)| file.is_cachable_file())
+                        .map(|(url, file)| (url.clone(), file.shading_language))
+                        .collect();
+                    for (url, shading_language) in watched_urls {
+                        profile_scope!("Updating server config for file: {}", url);
+                        let language_data =
+                            server.language_data.get_mut(&shading_language).unwrap();
+                        // Update symbols & republish diags.
+                        match server.watched_files.cache_file_data(
+                            &url,
+                            language_data.validator.as_mut(),
+                            &mut language_data.language,
+                            &language_data.symbol_provider,
+                            &server.config,
+                            Some(&url.to_file_path().unwrap()),
+                        ) {
+                            Ok(removed_files) => {
+                                let url_to_republish = server
+                                    .watched_files
+                                    .get_relying_variant(&url)
+                                    .unwrap_or(url.clone());
+                                files_to_republish.insert(url_to_republish);
+                                files_to_clear.extend(removed_files);
+                            }
+                            Err(err) => server
+                                .connection
+                                .send_notification_error(format!("{}", err)),
                         }
-                        Err(err) => server
-                            .connection
-                            .send_notification_error(format!("{}", err)),
                     }
-                }
-                // Republish all diagnostics with new settings.
-                for url in &files_to_clear {
-                    server.clear_diagnostic(url);
-                }
-                for url in &files_to_republish {
-                    server.publish_diagnostic(url, None);
+                    // Republish all diagnostics with new settings.
+                    for url in &files_to_clear {
+                        server.clear_diagnostic(url);
+                    }
+                    for url in &files_to_republish {
+                        server.publish_diagnostic(url, None);
+                    }
+                } else {
+                    info!("Requested configuration has not changed.");
                 }
             },
         );

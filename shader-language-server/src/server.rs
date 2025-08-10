@@ -88,13 +88,29 @@ fn clean_url(url: &Url) -> Url {
     }
 }
 
+#[derive(Debug, Default, PartialEq, Eq)]
+pub enum Transport {
+    #[default]
+    Stdio,
+    Tcp,    // TODO: supported by lsp_server
+    Memory, // TODO: supported by lsp_server
+}
+
 impl ServerLanguage {
-    pub fn new() -> Self {
+    pub fn new(config: ServerConfig, transport: Transport) -> Self {
+        assert!(
+            transport == Transport::Stdio,
+            "Only stdio transport implemented for now"
+        );
         // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
+        info!(
+            "Creating server with transport {:?} and config {:#?}",
+            transport, config
+        );
         Self {
             connection: ServerConnection::new(),
             watched_files: ServerLanguageFileCache::new(),
-            config: ServerConfig::default(),
+            config: config,
             language_data: HashMap::from([
                 (ShadingLanguage::Glsl, ServerLanguageData::glsl()),
                 (ShadingLanguage::Hlsl, ServerLanguageData::hlsl()),
@@ -966,8 +982,8 @@ impl ServerLanguage {
     }
 }
 
-pub fn run() {
-    let mut server = ServerLanguage::new();
+pub fn run(config: ServerConfig, transport: Transport) {
+    let mut server = ServerLanguage::new(config, transport);
 
     match server.initialize() {
         Ok(_) => info!("Server initialization successfull"),

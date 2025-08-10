@@ -176,7 +176,7 @@ pub struct HlslCompilationParams {
     pub spirv: bool,
 }
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum GlslTargetClient {
     Vulkan1_0,
     Vulkan1_1,
@@ -195,7 +195,7 @@ impl GlslTargetClient {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum GlslSpirvVersion {
     SPIRV1_0,
     SPIRV1_1,
