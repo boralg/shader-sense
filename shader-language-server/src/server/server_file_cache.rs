@@ -94,7 +94,7 @@ impl ServerLanguageFileCache {
             .iter()
             .filter(|(file_url, file)| {
                 *file_url != dependent_url
-                    && file.is_main_file()
+                    && file.is_cachable_file()
                     && file
                         .get_data()
                         .symbol_cache
@@ -111,7 +111,7 @@ impl ServerLanguageFileCache {
                 file.get_data().symbol_cache.visit_includes(&mut |include| {
                     let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
                     let is_relying_on = match self.files.get(&include_uri) {
-                        Some(deps) => deps.is_main_file(),
+                        Some(deps) => deps.is_cachable_file(),
                         None => false,
                     };
                     if is_relying_on {
