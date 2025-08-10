@@ -120,11 +120,30 @@ impl ServerLanguage {
         }
 
         // Add inactive regions to diag for open file.
+        // For current file
+        let inactive_diagnostics: Vec<Diagnostic> = cached_file
+            .get_data()
+            .symbol_cache
+            .get_preprocessor()
+            .regions
+            .iter()
+            .filter_map(|region| {
+                (!region.is_active).then_some(Diagnostic {
+                    range: shader_range_to_lsp_range(&region.range),
+                    severity: Some(DiagnosticSeverity::HINT),
+                    message: "Code disabled by currently used macros".into(),
+                    source: Some("shader-validator".to_string()),
+                    tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+                    ..Default::default()
+                })
+            })
+            .collect();
+        // For includes.
         data.symbol_cache.visit_includes(&mut |include| {
             let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
-            if let Some(cached_file) = self.watched_files.files.get(&include_uri) {
-                if cached_file.is_cachable_file() {
-                    let inactive_diagnostics: Vec<Diagnostic> = cached_file
+            if let Some(include_cached_file) = self.watched_files.files.get(&include_uri) {
+                if include_cached_file.is_cachable_file() {
+                    let include_inactive_diagnostics: Vec<Diagnostic> = include_cached_file
                         .get_data()
                         .symbol_cache
                         .get_preprocessor()
@@ -143,10 +162,10 @@ impl ServerLanguage {
                         .collect();
                     match diagnostics.get_mut(&include_uri) {
                         Some(diagnostics) => {
-                            diagnostics.extend(inactive_diagnostics);
+                            diagnostics.extend(include_inactive_diagnostics);
                         }
                         None => {
-                            diagnostics.insert(include_uri, inactive_diagnostics);
+                            diagnostics.insert(include_uri, include_inactive_diagnostics);
                         }
                     }
                 }
@@ -170,8 +189,9 @@ impl ServerLanguage {
                             }),
                     );
                 }
+                diagnostics.extend(inactive_diagnostics);
             }
-            None => {}
+            None => unreachable!(), // Because we should have added empty diag if none.
         }
         Ok(diagnostics)
     }
