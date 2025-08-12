@@ -150,15 +150,26 @@ impl ServerLanguage {
                 "Detected changes, updating variant {:#?} to {:#?}",
                 old_variant, new_variant
             );
+            let is_same_file = if let Some(old_variant) = &old_variant {
+                if let Some(new_variant) = &new_variant {
+                    new_variant.url == old_variant.url
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
             // Set the new variant.
             self.watched_files.variant = new_variant;
 
             // Get old relying files before update.
             let mut old_relying_files = if let Some(old_variant) = &old_variant {
                 let old_relying_files = self.watched_files.get_relying_main_files(&old_variant.url);
-                let removed_urls = self.watched_files.remove_variant_file(&old_variant.url)?;
-                for removed_url in removed_urls {
-                    self.clear_diagnostic(&removed_url);
+                if !is_same_file {
+                    let removed_urls = self.watched_files.remove_variant_file(&old_variant.url)?;
+                    for removed_url in removed_urls {
+                        self.clear_diagnostic(&removed_url);
+                    }
                 }
                 old_relying_files
             } else {
@@ -171,14 +182,25 @@ impl ServerLanguage {
                     let lang = new_variant.language;
                     let language_data = self.language_data.get_mut(&lang).unwrap();
                     let new_variant_url = new_variant.url.clone();
-                    self.watched_files.watch_variant_file(
-                        &new_variant_url,
-                        lang,
-                        &mut language_data.language,
-                        &language_data.symbol_provider,
-                        language_data.validator.as_mut(),
-                        &self.config,
-                    )?
+                    if is_same_file {
+                        self.watched_files.cache_file_data(
+                            &new_variant_url,
+                            language_data.validator.as_mut(),
+                            &mut language_data.language,
+                            &language_data.symbol_provider,
+                            &self.config,
+                            None,
+                        )?
+                    } else {
+                        self.watched_files.watch_variant_file(
+                            &new_variant_url,
+                            lang,
+                            &mut language_data.language,
+                            &language_data.symbol_provider,
+                            language_data.validator.as_mut(),
+                            &self.config,
+                        )?
+                    }
                 }
                 None => HashSet::new(), // No new variant to cache.
             };
@@ -226,6 +248,10 @@ impl ServerLanguage {
                     .is_none()
             });
             files_to_update.extend(old_relying_files);
+
+            if let Some(new_variant) = &self.watched_files.variant {
+                files_to_update.insert(new_variant.url.clone());
+            }
 
             // Update all of them
             for file_to_update in &files_to_update {

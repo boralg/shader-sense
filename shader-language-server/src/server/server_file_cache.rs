@@ -590,18 +590,15 @@ impl ServerLanguageFileCache {
         // Check if watched file already watched as deps or variant.
         match self.files.get_mut(&uri) {
             Some(cached_file) => {
-                assert!(
-                    !cached_file.is_variant_file,
-                    "File {} already watched as variant.",
-                    uri
-                );
-                cached_file.is_variant_file = true;
-                info!(
-                    "Starting watching {:#?} file as variant file at {}. {} files in cache.",
-                    lang,
-                    file_path.display(),
-                    self.files.len(),
-                );
+                if !cached_file.is_variant_file {
+                    cached_file.is_variant_file = true;
+                    info!(
+                        "Starting watching {:#?} file as variant file at {}. {} files in cache.",
+                        lang,
+                        file_path.display(),
+                        self.files.len(),
+                    );
+                }
             }
             None => {
                 let text = read_string_lossy(&file_path).unwrap();
