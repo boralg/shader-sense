@@ -105,12 +105,7 @@ impl SymbolWordProvider for GlslSymbolWordProvider {
                                         );
                                         break;
                                     }
-                                    _ => {
-                                        return Err(ShaderError::InternalErr(format!(
-                                            "Failed to get word from call_expression {}",
-                                            field.kind()
-                                        )))
-                                    }
+                                    _ => return Err(ShaderError::NoSymbol),
                                 }
                             }
                             "identifier" => {
@@ -128,12 +123,7 @@ impl SymbolWordProvider for GlslSymbolWordProvider {
                                 );
                                 break;
                             }
-                            _ => {
-                                return Err(ShaderError::InternalErr(format!(
-                                    "Failed to get word from cursor {}",
-                                    current_node.kind()
-                                )));
-                            }
+                            _ => return Err(ShaderError::NoSymbol),
                         }
                     }
                     return word.ok_or(ShaderError::NoSymbol);
