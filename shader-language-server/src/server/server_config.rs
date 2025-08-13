@@ -188,8 +188,7 @@ impl ServerLanguage {
             config,
             |server: &mut ServerLanguage, value: Value| {
                 // Sent 1 item, received 1 in an array
-                let mut parsed_config: Vec<Option<ServerConfig>> =
-                    serde_json::from_value(value).expect("Failed to parse received config");
+                let mut parsed_config: Vec<Option<ServerConfig>> = serde_json::from_value(value)?;
                 let config = parsed_config.remove(0).unwrap_or_default();
                 if server.config != config {
                     profile_scope!("Updating server config: {:#?}", config);
@@ -240,6 +239,7 @@ impl ServerLanguage {
                 } else {
                     info!("Requested configuration has not changed.");
                 }
+                Ok(())
             },
         );
     }

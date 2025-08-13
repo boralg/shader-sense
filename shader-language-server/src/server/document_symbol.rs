@@ -11,7 +11,7 @@ impl ServerLanguage {
         &mut self,
         uri: &Url,
     ) -> Result<Vec<DocumentSymbol>, ShaderError> {
-        let cached_file = self.watched_files.get_file(uri).unwrap();
+        let cached_file = self.get_main_file(&uri)?;
         let symbols = cached_file
             .get_data()
             .symbol_cache

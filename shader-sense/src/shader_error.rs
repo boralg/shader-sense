@@ -1,4 +1,5 @@
 use core::fmt;
+use std::path::PathBuf;
 
 use crate::symbols::symbols::ShaderRange;
 
@@ -65,6 +66,9 @@ pub enum ShaderError {
     SymbolQueryError(String, ShaderRange),
     IoErr(std::io::Error),
     InternalErr(String),
+    InvalidParams(String),
+    FileNotWatched(PathBuf),
+    SerializationError(serde_json::Error),
 }
 
 impl ShaderError {
@@ -98,14 +102,23 @@ impl From<regex::Error> for ShaderError {
     }
 }
 
+impl From<serde_json::Error> for ShaderError {
+    fn from(error: serde_json::Error) -> Self {
+        ShaderError::SerializationError(error)
+    }
+}
+
 impl fmt::Display for ShaderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ShaderError::IoErr(err) => write!(f, "IoError: {}", err),
-            ShaderError::InternalErr(err) => write!(f, "Error: {}", err),
-            ShaderError::NoSymbol => write!(f, "NoSymbol"),
-            ShaderError::ParseSymbolError(err) => write!(f, "ParseSymbolError: {}", err),
-            ShaderError::ValidationError(err) => write!(f, "ValidationError: {}", err),
+            ShaderError::InternalErr(err) => write!(f, "Internal server error: {}", err),
+            ShaderError::NoSymbol => write!(f, "No symbol found"),
+            ShaderError::ParseSymbolError(err) => write!(f, "Failed to parse symbols: {}", err),
+            ShaderError::ValidationError(err) => write!(f, "Validation error: {}", err),
+            ShaderError::SerializationError(err) => write!(f, "Error with serialization: {}", err),
+            ShaderError::FileNotWatched(uri) => write!(f, "File not watched: {}", uri.display()),
+            ShaderError::InvalidParams(err) => write!(f, "Invalid params: {}", err),
             ShaderError::SymbolQueryError(err, range) => {
                 write!(f, "SymbolQueryError: {} at {:?}", err, range)
             }

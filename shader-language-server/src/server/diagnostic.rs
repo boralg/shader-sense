@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 
 use log::info;
-use lsp_types::{Diagnostic, DiagnosticSeverity, DiagnosticTag, PublishDiagnosticsParams, Url};
+use lsp_types::{
+    Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticReport,
+    DocumentDiagnosticReportKind, DocumentDiagnosticReportResult, FullDocumentDiagnosticReport,
+    PublishDiagnosticsParams, RelatedFullDocumentDiagnosticReport, Url,
+};
 
 use shader_sense::shader_error::{ShaderDiagnosticSeverity, ShaderError};
 
@@ -37,6 +41,38 @@ impl ServerLanguage {
             )),
         }
     }
+    pub fn recolt_document_diagnostic(
+        &mut self,
+        uri: &Url,
+    ) -> Result<DocumentDiagnosticReportResult, ShaderError> {
+        let mut diagnostics = self.recolt_diagnostic(&uri)?;
+        let main_diagnostic = match diagnostics.remove(&uri) {
+            Some(diag) => diag,
+            None => vec![],
+        };
+        Ok(DocumentDiagnosticReportResult::Report(
+            DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+                related_documents: Some(
+                    diagnostics
+                        .into_iter()
+                        .map(|diagnostic| {
+                            (
+                                diagnostic.0,
+                                DocumentDiagnosticReportKind::Full(FullDocumentDiagnosticReport {
+                                    result_id: None,
+                                    items: diagnostic.1,
+                                }),
+                            )
+                        })
+                        .collect(),
+                ),
+                full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                    result_id: None,
+                    items: main_diagnostic,
+                },
+            }),
+        ))
+    }
 
     pub fn clear_diagnostic(&self, uri: &Url) {
         // TODO: check it exist ?
@@ -63,13 +99,7 @@ impl ServerLanguage {
         &mut self,
         uri: &Url,
     ) -> Result<HashMap<Url, Vec<Diagnostic>>, ShaderError> {
-        assert!(
-            self.watched_files.get_file(uri).is_some(),
-            "Trying to recolt diagnostic for file {} that is not watched.",
-            uri
-        );
-        // If file not watched, send empty diagnostic.
-        let cached_file = self.watched_files.get_file(uri).unwrap();
+        let cached_file = self.get_main_file(&uri)?;
         let data = cached_file.get_data();
         // Diagnostic for included file stored in main cache.
         let mut diagnostics: HashMap<Url, Vec<Diagnostic>> = HashMap::new();

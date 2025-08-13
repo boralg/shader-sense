@@ -4,6 +4,7 @@ use log::error;
 use lsp_server::{Connection, IoThreads, Message, RequestId, Response};
 use lsp_types::{InitializeParams, MessageType, ShowMessageParams};
 use serde_json::Value;
+use shader_sense::shader_error::ShaderError;
 
 use super::ServerLanguage;
 
@@ -11,7 +12,8 @@ pub struct ServerConnection {
     pub connection: Connection,
     io_threads: Option<IoThreads>,
     request_id: i32,
-    request_callbacks: HashMap<RequestId, fn(&mut ServerLanguage, Value)>,
+    request_callbacks:
+        HashMap<RequestId, fn(&mut ServerLanguage, Value) -> Result<(), ShaderError>>,
 }
 
 impl ServerConnection {
@@ -47,7 +49,7 @@ impl ServerConnection {
     pub fn remove_callback(
         &mut self,
         request_id: &RequestId,
-    ) -> Option<fn(&mut ServerLanguage, Value)> {
+    ) -> Option<fn(&mut ServerLanguage, Value) -> Result<(), ShaderError>> {
         self.request_callbacks.remove(request_id)
     }
     pub fn send_response<N: lsp_types::request::Request>(
@@ -81,7 +83,7 @@ impl ServerConnection {
     pub fn send_request<R: lsp_types::request::Request>(
         &mut self,
         params: R::Params,
-        callback: fn(&mut ServerLanguage, Value),
+        callback: fn(&mut ServerLanguage, Value) -> Result<(), ShaderError>,
     ) {
         let request_id = RequestId::from(self.request_id);
         self.request_id = self.request_id + 1;

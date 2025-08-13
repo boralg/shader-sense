@@ -58,8 +58,8 @@ impl ServerLanguage {
         uri: &Url,
         range: Option<ShaderRange>,
     ) -> Result<Vec<TextEdit>, ShaderError> {
+        let cached_file = self.get_main_file(&uri)?;
         let file_path = uri.to_file_path().unwrap();
-        let cached_file = self.watched_files.get_file(uri).unwrap();
         match &cached_file.shading_language {
             ShadingLanguage::Wgsl => {
                 // TODO: Find a formatter for wgsl.

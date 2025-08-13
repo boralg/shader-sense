@@ -15,7 +15,7 @@ impl ServerLanguage {
         uri: &Url,
         position: Position,
     ) -> Result<Option<GotoDefinitionResponse>, ShaderError> {
-        let cached_file = self.watched_files.get_file(uri).unwrap();
+        let cached_file = self.get_main_file(&uri)?;
         let language_data = self
             .language_data
             .get(&cached_file.shading_language)

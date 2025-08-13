@@ -19,10 +19,10 @@ impl ServerLanguage {
         position: Position,
         trigger_character: Option<String>,
     ) -> Result<Vec<CompletionItem>, ShaderError> {
-        let cached_file = self.watched_files.get_file(uri).unwrap();
+        let cached_file = self.get_main_file(&uri)?;
         let language_data = self
             .language_data
-            .get_mut(&cached_file.shading_language)
+            .get(&cached_file.shading_language)
             .unwrap();
         let file_path = uri.to_file_path().unwrap();
         let symbol_list = self.watched_files.get_all_symbols(uri);

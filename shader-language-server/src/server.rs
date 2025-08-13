@@ -8,6 +8,7 @@ mod completion;
 mod debug;
 mod diagnostic;
 mod document_symbol;
+mod folding_range;
 mod formatting;
 mod goto;
 mod hover;
@@ -38,16 +39,14 @@ use lsp_types::{
     CompletionOptionsCompletionItem, CompletionParams, CompletionResponse,
     DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
-    DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentDiagnosticReportResult,
     DocumentFormattingParams, DocumentRangeFormattingParams, DocumentSymbolOptions,
-    DocumentSymbolParams, DocumentSymbolResponse, FoldingRange, FoldingRangeKind,
-    FoldingRangeParams, FoldingRangeProviderCapability, FullDocumentDiagnosticReport,
-    GotoDefinitionParams, HoverParams, HoverProviderCapability, InlayHintParams, OneOf,
-    RelatedFullDocumentDiagnosticReport, SemanticTokenType, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
-    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
-    SignatureHelpParams, TextDocumentSyncKind, Url, WorkDoneProgressOptions,
-    WorkspaceSymbolOptions, WorkspaceSymbolParams, WorkspaceSymbolResponse,
+    DocumentSymbolParams, DocumentSymbolResponse, FoldingRangeParams,
+    FoldingRangeProviderCapability, GotoDefinitionParams, HoverParams, HoverProviderCapability,
+    InlayHintParams, OneOf, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensParams, SemanticTokensServerCapabilities,
+    ServerCapabilities, SignatureHelpOptions, SignatureHelpParams, TextDocumentSyncKind, Url,
+    WorkDoneProgressOptions, WorkspaceSymbolOptions, WorkspaceSymbolParams,
+    WorkspaceSymbolResponse,
 };
 use shader_sense::shader::ShadingLanguage;
 
@@ -57,10 +56,12 @@ use server_config::ServerConfig;
 use server_connection::ServerConnection;
 use server_file_cache::ServerLanguageFileCache;
 use server_language_data::ServerLanguageData;
+use shader_sense::shader_error::ShaderError;
 use shader_variant::DidChangeShaderVariant;
 
 use crate::profile_scope;
 use crate::server::common::lsp_range_to_shader_range;
+use crate::server::server_file_cache::ServerFileCache;
 
 pub struct ServerLanguage {
     connection: ServerConnection,
@@ -193,9 +194,26 @@ impl ServerLanguage {
                         if self.connection.connection.handle_shutdown(&req)? {
                             return Ok(());
                         }
+                        let id = req.id.clone();
                         match self.on_request(req) {
                             Ok(_) => {}
-                            Err(err) => self.connection.send_notification_error(err.to_string()),
+                            Err(err) => self.connection.send_response_error(
+                                id,
+                                match &err {
+                                    ShaderError::ValidationError(_)
+                                    | ShaderError::ParseSymbolError(_)
+                                    | ShaderError::IoErr(_)
+                                    | ShaderError::InternalErr(_)
+                                    | ShaderError::FileNotWatched(_) => ErrorCode::InternalError,
+                                    ShaderError::InvalidParams(_) => ErrorCode::InvalidParams,
+                                    ShaderError::SerializationError(_) => ErrorCode::InvalidParams,
+                                    // Should have been caught before getting here.
+                                    ShaderError::SymbolQueryError(_, _) | ShaderError::NoSymbol => {
+                                        unreachable!()
+                                    }
+                                },
+                                err.to_string(),
+                            ),
                         }
                     }
                     Message::Response(resp) => match self.on_response(resp) {
@@ -221,7 +239,15 @@ impl ServerLanguage {
             "{}".into()
         }
     }
-    fn on_request(&mut self, req: lsp_server::Request) -> Result<(), serde_json::Error> {
+    fn get_main_file(&self, uri: &Url) -> Result<&ServerFileCache, ShaderError> {
+        let main_file = self
+            .watched_files
+            .get_file(&uri)
+            .ok_or(ShaderError::FileNotWatched(uri.to_file_path().unwrap()))?;
+        debug_assert!(main_file.is_main_file(), "File {} is not a main file.", uri);
+        Ok(main_file)
+    }
+    fn on_request(&mut self, req: lsp_server::Request) -> Result<(), ShaderError> {
         match req.method.as_str() {
             DocumentDiagnosticRequest::METHOD => {
                 let params: DocumentDiagnosticParams = serde_json::from_value(req.params)?;
@@ -231,65 +257,11 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        match self.recolt_diagnostic(&uri) {
-                            Ok(mut diagnostics) => {
-                                let main_diagnostic = match diagnostics.remove(&uri) {
-                                    Some(diag) => diag,
-                                    None => vec![],
-                                };
-                                self.connection.send_response::<DocumentDiagnosticRequest>(
-                                    req.id.clone(),
-                                    DocumentDiagnosticReportResult::Report(
-                                        DocumentDiagnosticReport::Full(
-                                            RelatedFullDocumentDiagnosticReport {
-                                                related_documents: Some(
-                                                    diagnostics
-                                                        .into_iter()
-                                                        .map(|diagnostic| {
-                                                            (
-                                                                diagnostic.0,
-                                                                DocumentDiagnosticReportKind::Full(
-                                                                    FullDocumentDiagnosticReport {
-                                                                        result_id: Some(
-                                                                            req.id.to_string(),
-                                                                        ),
-                                                                        items: diagnostic.1,
-                                                                    },
-                                                                ),
-                                                            )
-                                                        })
-                                                        .collect(),
-                                                ),
-                                                full_document_diagnostic_report:
-                                                    FullDocumentDiagnosticReport {
-                                                        result_id: Some(req.id.to_string()),
-                                                        items: main_diagnostic,
-                                                    },
-                                            },
-                                        ),
-                                    ),
-                                )
-                            }
-                            // Send empty report.
-                            Err(error) => self.connection.send_response_error(
-                                req.id.clone(),
-                                lsp_server::ErrorCode::InternalError,
-                                error.to_string(),
-                            ),
-                        };
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                };
+                let document_diagnostic = self.recolt_document_diagnostic(&uri)?;
+                self.connection.send_response::<DocumentDiagnosticRequest>(
+                    req.id.clone(),
+                    document_diagnostic,
+                );
             }
             GotoDefinition::METHOD => {
                 let params: GotoDefinitionParams = serde_json::from_value(req.params)?;
@@ -299,30 +271,10 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        let position = params.text_document_position_params.position;
-                        match self.recolt_goto(&uri, position) {
-                            Ok(value) => self
-                                .connection
-                                .send_response::<GotoDefinition>(req.id.clone(), value),
-                            Err(err) => self.connection.send_response_error(
-                                req.id.clone(),
-                                ErrorCode::InvalidParams,
-                                format!("Failed to recolt signature : {:#?}", err),
-                            ),
-                        }
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                };
+                let position = params.text_document_position_params.position;
+                let value = self.recolt_goto(&uri, position)?;
+                self.connection
+                    .send_response::<GotoDefinition>(req.id.clone(), value);
             }
             Completion::METHOD => {
                 let params: CompletionParams = serde_json::from_value(req.params)?;
@@ -332,37 +284,18 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        match self.recolt_completion(
-                            &uri,
-                            params.text_document_position.position,
-                            match &params.context {
-                                Some(context) => context.trigger_character.clone(),
-                                None => None,
-                            },
-                        ) {
-                            Ok(value) => self.connection.send_response::<Completion>(
-                                req.id.clone(),
-                                Some(CompletionResponse::Array(value)),
-                            ),
-                            Err(error) => self.connection.send_response_error(
-                                req.id.clone(),
-                                lsp_server::ErrorCode::InternalError,
-                                error.to_string(),
-                            ),
-                        }
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                };
+                let value = self.recolt_completion(
+                    &uri,
+                    params.text_document_position.position,
+                    match &params.context {
+                        Some(context) => context.trigger_character.clone(),
+                        None => None,
+                    },
+                )?;
+                self.connection.send_response::<Completion>(
+                    req.id.clone(),
+                    Some(CompletionResponse::Array(value)),
+                );
             }
             SignatureHelpRequest::METHOD => {
                 let params: SignatureHelpParams = serde_json::from_value(req.params)?;
@@ -372,31 +305,10 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        match self
-                            .recolt_signature(&uri, params.text_document_position_params.position)
-                        {
-                            Ok(value) => self
-                                .connection
-                                .send_response::<SignatureHelpRequest>(req.id.clone(), value),
-                            Err(err) => self.connection.send_response_error(
-                                req.id.clone(),
-                                ErrorCode::InvalidParams,
-                                format!("Failed to recolt signature : {:#?}", err),
-                            ),
-                        }
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                };
+                let value =
+                    self.recolt_signature(&uri, params.text_document_position_params.position)?;
+                self.connection
+                    .send_response::<SignatureHelpRequest>(req.id.clone(), value);
             }
             HoverRequest::METHOD => {
                 let params: HoverParams = serde_json::from_value(req.params)?;
@@ -406,30 +318,10 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        let position = params.text_document_position_params.position;
-                        match self.recolt_hover(&uri, position) {
-                            Ok(value) => self
-                                .connection
-                                .send_response::<HoverRequest>(req.id.clone(), value),
-                            Err(err) => self.connection.send_response_error(
-                                req.id.clone(),
-                                ErrorCode::InvalidParams,
-                                format!("Failed to recolt signature : {:#?}", err),
-                            ),
-                        }
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                }
+                let position = params.text_document_position_params.position;
+                let value = self.recolt_hover(&uri, position)?;
+                self.connection
+                    .send_response::<HoverRequest>(req.id.clone(), value);
             }
             InlayHintRequest::METHOD => {
                 let params: InlayHintParams = serde_json::from_value(req.params)?;
@@ -439,34 +331,10 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        match self.recolt_inlay_hint(&uri, &params.range) {
-                            Ok(inlay_hints) => {
-                                self.connection.send_response::<InlayHintRequest>(
-                                    req.id.clone(),
-                                    Some(inlay_hints),
-                                );
-                            }
-                            Err(err) => self.connection.send_response_error(
-                                req.id.clone(),
-                                ErrorCode::InvalidParams,
-                                format!("Failed to compute inlay hint : {:#?}", err),
-                            ),
-                        }
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                }
+                let inlay_hints = self.recolt_inlay_hint(&uri, &params.range)?;
+                self.connection
+                    .send_response::<InlayHintRequest>(req.id.clone(), Some(inlay_hints));
             }
-            // Provider not enabled as vscode already does this nicely with grammar files
             FoldingRangeRequest::METHOD => {
                 let params: FoldingRangeParams = serde_json::from_value(req.params)?;
                 let uri = clean_url(&params.text_document.uri);
@@ -475,81 +343,19 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        // Adding regions
-                        let mut folding_ranges: Vec<FoldingRange> = cached_file
-                            .data
-                            .as_ref()
-                            .unwrap()
-                            .symbol_cache
-                            .get_preprocessor()
-                            .regions
-                            .iter()
-                            .map(|region| FoldingRange {
-                                start_line: region.range.start.line,
-                                start_character: Some(region.range.start.pos),
-                                end_line: region.range.end.line,
-                                end_character: Some(region.range.end.pos),
-                                kind: Some(FoldingRangeKind::Region),
-                                collapsed_text: None,
-                            })
-                            .collect();
-                        // Adding scopes from file
-                        let symbol_provider = &self
-                            .language_data
-                            .get(&cached_file.shading_language)
-                            .unwrap()
-                            .symbol_provider;
-                        let scopes = symbol_provider
-                            .query_file_scopes(&RefCell::borrow(&cached_file.shader_module));
-                        let mut folded_scopes: Vec<FoldingRange> = scopes
-                            .iter()
-                            .map(|s| FoldingRange {
-                                start_line: s.start.line,
-                                start_character: Some(s.start.pos),
-                                end_line: s.end.line,
-                                end_character: Some(s.end.pos),
-                                kind: Some(FoldingRangeKind::Region),
-                                collapsed_text: None,
-                            })
-                            .collect();
-                        // Adding struct to scopes.
-                        //cached_file.data.get_symbols().iter().map(|e| e.0.iter().map(|e| match &e.data {
-                        //    // We dont have its range stored here...
-                        //    shader_sense::symbols::symbols::ShaderSymbolData::Struct { members, methods } => todo!(),
-                        //}));
-                        folding_ranges.append(&mut folded_scopes);
-                        self.connection.send_response::<FoldingRangeRequest>(
-                            req.id.clone(),
-                            Some(folding_ranges),
-                        );
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                }
+                let folding_ranges = self.recolt_folding_range(&uri)?;
+                self.connection
+                    .send_response::<FoldingRangeRequest>(req.id.clone(), Some(folding_ranges));
             }
             WorkspaceSymbolRequest::METHOD => {
                 let params: WorkspaceSymbolParams = serde_json::from_value(req.params)?;
                 profile_scope!("Received workspace symbol request: {}", self.debug(&params));
-                let _ = params.query; // Should we filter ?
-                match self.recolt_workspace_symbol() {
-                    Ok(symbols) => self.connection.send_response::<WorkspaceSymbolRequest>(
-                        req.id.clone(),
-                        Some(WorkspaceSymbolResponse::Flat(symbols)),
-                    ),
-                    Err(err) => self.connection.send_notification_error(format!(
-                        "Failed to compute symbols for workspace : {}",
-                        err.to_string()
-                    )),
-                }
+                let _ = params.query; // TODO: Should we filter ?
+                let symbols = self.recolt_workspace_symbol()?;
+                self.connection.send_response::<WorkspaceSymbolRequest>(
+                    req.id.clone(),
+                    Some(WorkspaceSymbolResponse::Flat(symbols)),
+                )
             }
             DocumentSymbolRequest::METHOD => {
                 let params: DocumentSymbolParams = serde_json::from_value(req.params)?;
@@ -559,30 +365,11 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        match self.recolt_document_symbol(&uri) {
-                            Ok(symbols) => self.connection.send_response::<DocumentSymbolRequest>(
-                                req.id.clone(),
-                                Some(DocumentSymbolResponse::Nested(symbols)),
-                            ),
-                            Err(err) => self.connection.send_notification_error(format!(
-                                "Failed to compute symbols for file {} : {}",
-                                uri,
-                                err.to_string()
-                            )),
-                        }
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                }
+                let symbols = self.recolt_document_symbol(&uri)?;
+                self.connection.send_response::<DocumentSymbolRequest>(
+                    req.id.clone(),
+                    Some(DocumentSymbolResponse::Nested(symbols)),
+                );
             }
             // Debug request
             DumpAstRequest::METHOD => {
@@ -593,22 +380,10 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        let ast = RefCell::borrow(&cached_file.shader_module).dump_ast();
-                        self.connection
-                            .send_response::<DumpAstRequest>(req.id.clone(), Some(ast));
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                }
+                let cached_file = self.get_main_file(&uri)?;
+                let ast = RefCell::borrow(&cached_file.shader_module).dump_ast();
+                self.connection
+                    .send_response::<DumpAstRequest>(req.id.clone(), Some(ast));
             }
             DumpDependencyRequest::METHOD => {
                 let params: DumpDependencyParams = serde_json::from_value(req.params)?;
@@ -618,29 +393,15 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        let deps_tree = cached_file
-                            .data
-                            .as_ref()
-                            .unwrap()
-                            .symbol_cache
-                            .dump_dependency_tree(&uri.to_file_path().unwrap());
-                        self.connection.send_response::<DumpDependencyRequest>(
-                            req.id.clone(),
-                            Some(deps_tree),
-                        );
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                }
+                let cached_file = self.get_main_file(&uri)?;
+                let deps_tree = cached_file
+                    .data
+                    .as_ref()
+                    .unwrap()
+                    .symbol_cache
+                    .dump_dependency_tree(&uri.to_file_path().unwrap());
+                self.connection
+                    .send_response::<DumpDependencyRequest>(req.id.clone(), Some(deps_tree));
             }
             SemanticTokensFullRequest::METHOD => {
                 let params: SemanticTokensParams = serde_json::from_value(req.params)?;
@@ -650,31 +411,11 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        match self.recolt_semantic_tokens(&uri) {
-                            Ok(semantic_tokens) => {
-                                self.connection.send_response::<SemanticTokensFullRequest>(
-                                    req.id.clone(),
-                                    Some(semantic_tokens),
-                                )
-                            }
-                            Err(err) => self.connection.send_notification_error(format!(
-                                "Failed to recolt semantic tokens for {}: {}",
-                                uri, err
-                            )),
-                        }
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
-                }
+                let semantic_tokens = self.recolt_semantic_tokens(&uri)?;
+                self.connection.send_response::<SemanticTokensFullRequest>(
+                    req.id.clone(),
+                    Some(semantic_tokens),
+                );
             }
             Formatting::METHOD => {
                 let params: DocumentFormattingParams = serde_json::from_value(req.params)?;
@@ -684,15 +425,9 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.recolt_formatting(&uri, None) {
-                    Ok(formatting) => self
-                        .connection
-                        .send_response::<Formatting>(req.id.clone(), Some(formatting)),
-                    Err(err) => self.connection.send_notification_error(format!(
-                        "Failed to recolt formatting for {}: {}",
-                        uri, err
-                    )),
-                }
+                let formatting = self.recolt_formatting(&uri, None)?;
+                self.connection
+                    .send_response::<Formatting>(req.id.clone(), Some(formatting));
             }
             RangeFormatting::METHOD => {
                 let params: DocumentRangeFormattingParams = serde_json::from_value(req.params)?;
@@ -702,38 +437,39 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                let file_path = uri.to_file_path().unwrap();
-                match self.recolt_formatting(
+                let formatting = self.recolt_formatting(
                     &uri,
-                    Some(lsp_range_to_shader_range(&params.range, &file_path)),
-                ) {
-                    Ok(formatting) => self
-                        .connection
-                        .send_response::<Formatting>(req.id.clone(), Some(formatting)),
-                    Err(err) => self.connection.send_notification_error(format!(
-                        "Failed to recolt formatting for {}: {}",
-                        uri, err
+                    Some(lsp_range_to_shader_range(
+                        &params.range,
+                        &uri.to_file_path().unwrap(),
                     )),
-                }
+                )?;
+                self.connection
+                    .send_response::<Formatting>(req.id.clone(), Some(formatting));
             }
             _ => warn!("Received unhandled request: {:#?}", req),
         }
         Ok(())
     }
-    fn on_response(&mut self, response: lsp_server::Response) -> Result<(), serde_json::Error> {
+    fn on_response(&mut self, response: lsp_server::Response) -> Result<(), ShaderError> {
         match self.connection.remove_callback(&response.id) {
             Some(callback) => match response.result {
                 Some(result) => callback(self, result),
-                None => callback(self, serde_json::from_str("{}").unwrap()),
+                None => Err(ShaderError::InternalErr(format!(
+                    "Received response without result: {:#?}",
+                    response
+                ))),
             },
-            None => warn!("Received unhandled response: {:#?}", response),
+            None => Err(ShaderError::InternalErr(format!(
+                "Received unhandled response: {:#?}",
+                response
+            ))),
         }
-        Ok(())
     }
     fn on_notification(
         &mut self,
         notification: lsp_server::Notification,
-    ) -> Result<(), serde_json::Error> {
+    ) -> Result<(), ShaderError> {
         match notification.method.as_str() {
             DidOpenTextDocument::METHOD => {
                 let params: DidOpenTextDocumentParams =
@@ -747,43 +483,34 @@ impl ServerLanguage {
 
                 // Skip non file uri.
                 if uri.scheme() != "file" {
-                    self.connection.send_notification_error(format!(
+                    // Invalid Params
+                    return Err(ShaderError::InvalidParams(format!(
                         "Trying to watch file with unsupported scheme : {}",
                         uri.scheme()
-                    ));
-                    return Ok(());
+                    )));
                 }
-                match ShadingLanguage::from_str(params.text_document.language_id.as_str()) {
-                    Ok(shading_language) => {
-                        let language_data = self.language_data.get_mut(&shading_language).unwrap();
-                        match self.watched_files.watch_main_file(
-                            &uri,
-                            shading_language.clone(),
-                            &params.text_document.text,
-                            &mut language_data.language,
-                            &language_data.symbol_provider,
-                            language_data.validator.as_mut(),
-                            &self.config,
-                        ) {
-                            Ok(_) => {
-                                let url_to_republish = self
-                                    .watched_files
-                                    .get_relying_variant(&uri)
-                                    .unwrap_or(uri.clone());
-                                self.publish_diagnostic(&url_to_republish, None);
-                            }
-                            Err(error) => self.connection.send_notification_error(format!(
-                                "Failed to watch file {}: {}",
-                                uri.to_string(),
-                                error.to_string()
-                            )),
-                        }
-                    }
-                    Err(_) => self.connection.send_notification_error(format!(
-                        "Failed to parse language id : {}",
-                        params.text_document.language_id
-                    )),
-                }
+                let shading_language = ShadingLanguage::from_str(&params.text_document.language_id)
+                    .map_err(|_| {
+                        ShaderError::InvalidParams(format!(
+                            "Trying to watch file with unsupported langID : {}",
+                            params.text_document.language_id
+                        ))
+                    })?;
+                let language_data = self.language_data.get_mut(&shading_language).unwrap();
+                let _ = self.watched_files.watch_main_file(
+                    &uri,
+                    shading_language.clone(),
+                    &params.text_document.text,
+                    &mut language_data.language,
+                    &language_data.symbol_provider,
+                    language_data.validator.as_mut(),
+                    &self.config,
+                )?;
+                let url_to_republish = self
+                    .watched_files
+                    .get_relying_variant(&uri)
+                    .unwrap_or(uri.clone());
+                self.publish_diagnostic(&url_to_republish, None);
             }
             DidSaveTextDocument::METHOD => {
                 let params: DidSaveTextDocumentParams =
@@ -795,68 +522,43 @@ impl ServerLanguage {
                     self.debug(&params)
                 );
                 // File content is updated through DidChangeTextDocument.
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(
-                            cached_file.is_main_file(),
-                            "File {} is not a main file.",
-                            uri
-                        );
-                        assert!(
-                            params.text.is_none()
-                                || (params.text.is_some()
-                                    && RefCell::borrow(&cached_file.shader_module).content
-                                        == *params.text.as_ref().unwrap())
-                        );
-                        // Only update cache if content changed.
-                        match params.text {
-                            Some(text) => {
-                                if text != RefCell::borrow(&cached_file.shader_module).content {
-                                    let shading_language = cached_file.shading_language;
-                                    let language_data =
-                                        self.language_data.get_mut(&shading_language).unwrap();
-                                    match self.watched_files.update_file(
-                                        &uri,
-                                        &mut language_data.language,
-                                        None,
-                                        None,
-                                    ) {
-                                        // Cache once all changes have been applied.
-                                        Ok(_) => match self.watched_files.cache_file_data(
-                                            &uri,
-                                            language_data.validator.as_mut(),
-                                            &mut language_data.language,
-                                            &language_data.symbol_provider,
-                                            &self.config,
-                                            Some(&uri.to_file_path().unwrap()), // Force update
-                                        ) {
-                                            Ok(removed_files) => {
-                                                for removed_file in removed_files {
-                                                    self.clear_diagnostic(&removed_file);
-                                                }
-                                                let url_to_republish = self
-                                                    .watched_files
-                                                    .get_relying_variant(&uri)
-                                                    .unwrap_or(uri.clone());
-                                                self.publish_diagnostic(&url_to_republish, None);
-                                            }
-                                            Err(err) => self
-                                                .connection
-                                                .send_notification_error(format!("{}", err)),
-                                        },
-                                        Err(err) => self
-                                            .connection
-                                            .send_notification_error(format!("{}", err)),
-                                    };
-                                }
-                            }
-                            None => {}
+                let cached_file = self.get_main_file(&uri)?;
+
+                assert!(
+                    params.text.is_none()
+                        || (params.text.is_some()
+                            && RefCell::borrow(&cached_file.shader_module).content
+                                == *params.text.as_ref().unwrap())
+                );
+                // Only update cache if content changed.
+                if let Some(text) = params.text {
+                    if text != RefCell::borrow(&cached_file.shader_module).content {
+                        let shading_language = cached_file.shading_language;
+                        let language_data = self.language_data.get_mut(&shading_language).unwrap();
+                        let _ = self.watched_files.update_file(
+                            &uri,
+                            &mut language_data.language,
+                            None,
+                            None,
+                        )?;
+                        // Cache once all changes have been applied.
+                        let removed_files = self.watched_files.cache_file_data(
+                            &uri,
+                            language_data.validator.as_mut(),
+                            &mut language_data.language,
+                            &language_data.symbol_provider,
+                            &self.config,
+                            Some(&uri.to_file_path().unwrap()), // Force update
+                        )?;
+                        for removed_file in removed_files {
+                            self.clear_diagnostic(&removed_file);
                         }
+                        let url_to_republish = self
+                            .watched_files
+                            .get_relying_variant(&uri)
+                            .unwrap_or(uri.clone());
+                        self.publish_diagnostic(&url_to_republish, None);
                     }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
                 }
             }
             DidCloseTextDocument::METHOD => {
@@ -868,13 +570,9 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.remove_main_file(&uri) {
-                    Ok(removed_urls) => {
-                        for removed_url in removed_urls {
-                            self.clear_diagnostic(&removed_url);
-                        }
-                    }
-                    Err(err) => self.connection.send_notification_error(format!("{}", err)),
+                let removed_urls = self.watched_files.remove_main_file(&uri)?;
+                for removed_url in removed_urls {
+                    self.clear_diagnostic(&removed_url);
                 }
             }
             DidChangeTextDocument::METHOD => {
@@ -886,55 +584,38 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                match self.watched_files.get_file(&uri) {
-                    Some(cached_file) => {
-                        assert!(cached_file.is_main_file(), "{} is not a main file.", uri);
-                        let shading_language = cached_file.shading_language;
-                        let language_data = self.language_data.get_mut(&shading_language).unwrap();
-                        // Update all content before caching data.
-                        for content in &params.content_changes {
-                            match self.watched_files.update_file(
-                                &uri,
-                                &mut language_data.language,
-                                content.range,
-                                Some(&content.text),
-                            ) {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    self.connection.send_notification_error(format!("{}", err))
-                                }
-                            };
-                        }
-                        // Cache once all changes have been applied.
-                        match self.watched_files.cache_file_data(
-                            &uri,
-                            language_data.validator.as_mut(),
-                            &mut language_data.language,
-                            &language_data.symbol_provider,
-                            &self.config,
-                            Some(&uri.to_file_path().unwrap()),
-                        ) {
-                            Ok(removed_files) => {
-                                for removed_file in removed_files {
-                                    self.clear_diagnostic(&removed_file);
-                                }
-                                let url_to_republish = self
-                                    .watched_files
-                                    .get_relying_variant(&uri)
-                                    .unwrap_or(uri.clone());
-                                self.publish_diagnostic(
-                                    &url_to_republish,
-                                    Some(params.text_document.version),
-                                );
-                            }
-                            Err(err) => self.connection.send_notification_error(format!("{}", err)),
-                        }
-                    }
-                    None => self.connection.send_notification_error(format!(
-                        "Trying to visit file that is not watched : {}",
-                        uri
-                    )),
+                let cached_file = self.get_main_file(&uri)?;
+                let shading_language = cached_file.shading_language;
+                let language_data = self.language_data.get_mut(&shading_language).unwrap();
+                // Update all content before caching data.
+                for content in &params.content_changes {
+                    match self.watched_files.update_file(
+                        &uri,
+                        &mut language_data.language,
+                        content.range,
+                        Some(&content.text),
+                    ) {
+                        Ok(_) => {}
+                        Err(err) => self.connection.send_notification_error(format!("{}", err)),
+                    };
                 }
+                // Cache once all changes have been applied.
+                let removed_files = self.watched_files.cache_file_data(
+                    &uri,
+                    language_data.validator.as_mut(),
+                    &mut language_data.language,
+                    &language_data.symbol_provider,
+                    &self.config,
+                    Some(&uri.to_file_path().unwrap()),
+                )?;
+                for removed_file in removed_files {
+                    self.clear_diagnostic(&removed_file);
+                }
+                let url_to_republish = self
+                    .watched_files
+                    .get_relying_variant(&uri)
+                    .unwrap_or(uri.clone());
+                self.publish_diagnostic(&url_to_republish, Some(params.text_document.version));
             }
             DidChangeConfiguration::METHOD => {
                 let params: DidChangeConfigurationParams =
@@ -957,19 +638,15 @@ impl ServerLanguage {
                         .unwrap_or("None".into()),
                     self.debug(&new_variant)
                 );
-                match self.update_variant(new_variant) {
-                    Ok((removed_files, updated_files)) => {
-                        for removed_file in removed_files {
-                            self.clear_diagnostic(&removed_file);
-                        }
-                        for file in updated_files {
-                            self.publish_diagnostic(&file, None);
-                        }
-                    }
-                    Err(err) => self.connection.send_notification_error(format!("{}", err)),
+                let (removed_files, updated_files) = self.update_variant(new_variant)?;
+                for removed_file in removed_files {
+                    self.clear_diagnostic(&removed_file);
+                }
+                for file in updated_files {
+                    self.publish_diagnostic(&file, None);
                 }
             }
-            _ => info!(
+            _ => warn!(
                 "Received unhandled notification {}: {}",
                 notification.method,
                 self.debug(&notification)
