@@ -392,6 +392,140 @@ mod tests {
     }
 
     #[test]
+    fn glsl_stages() {
+        #[rustfmt::skip] // Keep them inline
+        let stages = vec![
+            ("graphics.vert.glsl", "VSMain", ShaderStage::Vertex),
+            ("graphics.frag.glsl", "PSMain", ShaderStage::Fragment),
+            ("graphics.geom.glsl", "GSMain", ShaderStage::Geometry),
+            ("graphics.tesc.glsl", "TCSMain", ShaderStage::TesselationControl),
+            ("graphics.tese.glsl", "TESMain", ShaderStage::TesselationEvaluation),
+            ("compute.comp.glsl", "CSMain", ShaderStage::Compute),
+            ("mesh.task.glsl", "TSMain", ShaderStage::Task),
+            ("mesh.mesh.glsl", "MSMain", ShaderStage::Mesh),
+            ("raytracing.rgen.glsl", "RayGenMain", ShaderStage::RayGeneration,),
+            ("raytracing.rint.glsl", "IntersectionMain", ShaderStage::Intersect),
+            ("raytracing.rmiss.glsl", "MissMain", ShaderStage::Miss),
+            ("raytracing.rahit.glsl", "AnyHitMain", ShaderStage::AnyHit),
+            ("raytracing.rchit.glsl", "ClosestHitMain", ShaderStage::ClosestHit),
+            ("raytracing.rcall.glsl", "CallableMain", ShaderStage::Callable),
+        ];
+        let mut validator = create_validator(ShadingLanguage::Glsl);
+        for (file_name, entry_point, shader_stage) in stages {
+            let file_path = Path::new("./test/glsl/stages/").join(file_name);
+            let shader_content = std::fs::read_to_string(&file_path).unwrap();
+            match validator.validate_shader(
+                &shader_content,
+                &file_path,
+                &ShaderParams {
+                    compilation: ShaderCompilationParams {
+                        entry_point: Some(entry_point.into()),
+                        shader_stage: Some(shader_stage),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                &mut default_include_callback,
+            ) {
+                Ok(result) => {
+                    println!(
+                        "Diagnostic should be empty for stage {:?}: {:#?}",
+                        shader_stage, result
+                    );
+                    assert!(result.is_empty())
+                }
+                Err(err) => panic!("{}", err),
+            };
+        }
+    }
+
+    #[test]
+    fn hlsl_stages() {
+        #[rustfmt::skip] // Keep them inline
+        let stages = vec![
+            ("graphics.hlsl", "VSMain", ShaderStage::Vertex),
+            ("graphics.hlsl", "PSMain", ShaderStage::Fragment),
+            ("graphics.hlsl", "GSMain", ShaderStage::Geometry),
+            ("graphics.hlsl", "HSMain", ShaderStage::TesselationControl),
+            ("graphics.hlsl", "DSMain", ShaderStage::TesselationEvaluation),
+            ("compute.hlsl", "CSMain", ShaderStage::Compute),
+            ("mesh.hlsl", "ASMain", ShaderStage::Task),
+            ("mesh.hlsl", "MSMain", ShaderStage::Mesh),
+            ("raytracing.hlsl", "RayGenMain", ShaderStage::RayGeneration),
+            ("raytracing.hlsl", "IntersectionMain", ShaderStage::Intersect),
+            ("raytracing.hlsl", "MissMain", ShaderStage::Miss),
+            ("raytracing.hlsl", "AnyHitMain", ShaderStage::AnyHit),
+            ("raytracing.hlsl", "ClosestHitMain", ShaderStage::ClosestHit),
+            ("raytracing.hlsl", "CallableMain", ShaderStage::Callable),
+        ];
+        let mut validator = create_validator(ShadingLanguage::Hlsl);
+        for (file_name, entry_point, shader_stage) in stages {
+            let file_path = Path::new("./test/hlsl/stages/").join(file_name);
+            let shader_content = std::fs::read_to_string(&file_path).unwrap();
+            match validator.validate_shader(
+                &shader_content,
+                &file_path,
+                &ShaderParams {
+                    compilation: ShaderCompilationParams {
+                        entry_point: Some(entry_point.into()),
+                        shader_stage: Some(shader_stage),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                &mut default_include_callback,
+            ) {
+                Ok(result) => {
+                    println!(
+                        "Diagnostic should be empty for stage {:?}: {:#?}",
+                        shader_stage, result
+                    );
+                    assert!(result.is_empty())
+                }
+                Err(err) => panic!("{}", err),
+            };
+        }
+    }
+
+    #[test]
+    fn wgsl_stages() {
+        // Wgsl only support three stages.
+        #[rustfmt::skip] // Keep them inline
+        let stages = vec![
+            ("graphics.wgsl", "VSMain", ShaderStage::Vertex),
+            ("graphics.wgsl", "PSMain", ShaderStage::Fragment),
+            ("compute.wgsl", "CSMain", ShaderStage::Compute),
+        ];
+        let mut validator = create_validator(ShadingLanguage::Wgsl);
+        for (file_name, entry_point, shader_stage) in stages {
+            let file_path = Path::new("./test/wgsl/stages/").join(file_name);
+            let shader_content = std::fs::read_to_string(&file_path).unwrap();
+            match validator.validate_shader(
+                &shader_content,
+                &file_path,
+                &ShaderParams {
+                    compilation: ShaderCompilationParams {
+                        entry_point: Some(entry_point.into()),
+                        shader_stage: Some(shader_stage),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                &mut default_include_callback,
+            ) {
+                Ok(result) => {
+                    println!(
+                        "Diagnostic should be empty for stage {:?}: {:#?}",
+                        shader_stage, result
+                    );
+                    assert!(result.is_empty())
+                }
+                Err(err) => panic!("{}", err),
+            };
+        }
+    }
+
+    #[test]
     fn wgsl_ok() {
         let mut validator = create_validator(ShadingLanguage::Wgsl);
         let file_path = Path::new("./test/wgsl/ok.wgsl");
