@@ -268,8 +268,8 @@ fn get_profile(shader_stage: Option<ShaderStage>) -> &'static str {
             ShaderStage::Vertex => "vs",
             ShaderStage::Fragment => "ps",
             ShaderStage::Compute => "cs",
-            ShaderStage::TesselationControl => "ds",
-            ShaderStage::TesselationEvaluation => "hs",
+            ShaderStage::TesselationControl => "hs",
+            ShaderStage::TesselationEvaluation => "ds",
             ShaderStage::Geometry => "gs",
             // Mesh shader not in spec. but seems to be it
             ShaderStage::Mesh => "ms", // Check these
