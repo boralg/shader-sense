@@ -46,7 +46,9 @@ impl ServerLanguage {
                 // Need to ignore comment aswell... Might need tree sitter instead.
                 // Looking for preproc_arg & identifier might be enough.
                 // Need to check for regions too...
-                let reg = regex::Regex::new(format!("\\b({})\\b", symbol.label).as_str()).unwrap();
+                let reg =
+                    regex::Regex::new(format!("\\b({})\\b", regex::escape(&symbol.label)).as_str())
+                        .unwrap();
                 let word_byte_offsets: Vec<usize> = reg
                     .captures_iter(&content)
                     .map(|e| e.get(0).unwrap().range().start)
@@ -110,7 +112,8 @@ impl ServerLanguage {
                                     // Push occurences in scope
                                     // TODO: NOT dot at beginning of capture (as its a field.)
                                     let reg = regex::Regex::new(
-                                        format!("\\b({})\\b", parameter.label).as_str(),
+                                        format!("\\b({})\\b", regex::escape(&parameter.label))
+                                            .as_str(),
                                     )
                                     .unwrap();
                                     let word_byte_offsets: Vec<usize> = reg
