@@ -40,7 +40,7 @@ impl ShaderSymbols {
             symbol_list: ShaderSymbolList::default(),
         }
     }
-    pub fn get_all_symbols(&self) -> ShaderSymbolListRef {
+    pub fn get_all_symbols<'a>(&'a self) -> ShaderSymbolListRef<'a> {
         let mut symbols = self.get_local_symbols();
         for include in &self.preprocessor.includes {
             assert!(
@@ -53,7 +53,7 @@ impl ShaderSymbols {
         }
         symbols
     }
-    pub fn get_local_symbols(&self) -> ShaderSymbolListRef {
+    pub fn get_local_symbols<'a>(&'a self) -> ShaderSymbolListRef<'a> {
         self.preprocessor.preprocess_symbols(&self.symbol_list)
     }
     pub fn get_context(&self) -> &ShaderPreprocessorContext {

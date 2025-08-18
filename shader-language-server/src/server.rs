@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::str::FromStr;
 
+// TODO:ASYNC: move provider to specific folder and file updater in another one.
 mod async_message;
 mod common;
 mod completion;
@@ -59,9 +60,7 @@ use shader_sense::shader_error::ShaderError;
 use shader_variant::DidChangeShaderVariant;
 
 use crate::profile_scope;
-use crate::server::async_message::{
-    AsyncCacheRequest, AsyncMessage, AsyncRequest, AsyncVariantRequest,
-};
+use crate::server::async_message::{AsyncCacheRequest, AsyncMessage, AsyncRequest};
 use crate::server::common::lsp_range_to_shader_range;
 use crate::server::server_file_cache::ServerFileCache;
 
@@ -202,35 +201,28 @@ impl ServerLanguage {
 
         return Ok(());
     }
-    fn update_main_file_cache(&mut self, uri: &Url) -> Result<(), ShaderError> {
-        let cached_file = self.get_main_file(uri).unwrap();
-        let shading_language = cached_file.shading_language;
-        let file_path = uri.to_file_path().unwrap();
-        let language = self.language_data.get_mut(&shading_language).unwrap();
-        let removed_files = self.watched_files.cache_file_data(
-            uri,
-            language.validator.as_mut(),
-            &mut language.language,
-            &mut language.symbol_provider,
+    fn update_main_file_cache(
+        &mut self,
+        requests: HashSet<AsyncCacheRequest>,
+    ) -> Result<(), ShaderError> {
+        let (files_to_clear, files_to_publish) = self.watched_files.cache_batched_file_data(
+            requests,
+            &mut self.language_data,
             &self.config,
-            Some(&file_path), // TODO:ASYNC: dirty deps handle
-                              // TODO:ASYNC: pass version in cache_file_data.
         )?;
-        for removed_file in removed_files {
-            self.clear_diagnostic(&removed_file);
+        for file_to_clear in files_to_clear {
+            self.clear_diagnostic(&file_to_clear);
         }
-        let url_to_republish = self
-            .watched_files
-            .get_relying_variant(&uri)
-            .unwrap_or(uri.clone());
-        self.publish_diagnostic(&url_to_republish, None);
+        for file_to_publish in files_to_publish {
+            self.publish_diagnostic(&file_to_publish, None);
+        }
         Ok(())
     }
     fn resolve_async_request(&mut self, request: AsyncMessage) -> Result<(), ShaderError> {
         // TODO:ASYNC: Discard all messages which version is too old.
         // For variant, we handle requesting items again on client side, so it does not change version.
         match request {
-            AsyncMessage::None | AsyncMessage::UpdateCache(_) | AsyncMessage::UpdateVariant(_) => {
+            AsyncMessage::None | AsyncMessage::UpdateCache(_) => {
                 unreachable!()
             }
             AsyncMessage::DocumentSymbolRequest(async_request) => {
@@ -508,50 +500,33 @@ impl ServerLanguage {
                 },
                 Err(err) => match err {
                     TryRecvError::Empty => {
-                        // Now that we do not have messages in queue, process them in batch.
+                        // Now that we do not have messages in queue, batch them.
                         let mut async_queue: Vec<AsyncMessage> =
                             async_messages_queue.drain(..).collect();
                         let async_update_queue: Vec<AsyncMessage> =
                             async_queue.extract_if(.., |m| m.is_update()).collect();
                         let async_request_queue = async_queue;
+                        // First we list all unique file to update.
                         let mut files_to_update = HashSet::new();
-                        // TODO:ASYNC: should batch all updates here and avoid duplicated updates.
                         for async_update in async_update_queue {
                             match async_update {
                                 AsyncMessage::None => {}
                                 AsyncMessage::UpdateCache(async_cache_request) => {
+                                    // Simply store update for batching.
                                     for update in async_cache_request {
-                                        files_to_update.insert(update.url);
-                                    }
-                                }
-                                AsyncMessage::UpdateVariant(async_variant_request) => {
-                                    // TODO:ASYNC: batch variant updates along cache update to avoid duplicated updates.
-                                    match self.update_variant(async_variant_request.variant) {
-                                        Ok((removed_files, updated_files)) => {
-                                            for removed_file in removed_files {
-                                                self.clear_diagnostic(&removed_file);
-                                            }
-                                            for file in updated_files {
-                                                self.publish_diagnostic(&file, None);
-                                            }
-                                        }
-                                        Err(err) => self.connection.send_notification_error(
-                                            format!("Failed to update variant: {}", err),
-                                        ),
+                                        files_to_update.insert(update);
                                     }
                                 }
                                 _ => unreachable!(),
                             }
                         }
                         // Update files for all requested updates.
-                        for file_to_update in files_to_update {
-                            match self.update_main_file_cache(&file_to_update) {
-                                Ok(_) => {}
-                                Err(err) => self.connection.send_notification_error(format!(
-                                    "Failed to update cache for file {}: {}",
-                                    file_to_update, err
-                                )),
-                            }
+                        match self.update_main_file_cache(files_to_update) {
+                            Ok(_) => {}
+                            Err(err) => self.connection.send_notification_error(format!(
+                                "Failed to update cache: {}",
+                                err
+                            )),
                         }
                         // Solve all pending request.
                         for request in async_request_queue {
@@ -706,7 +681,11 @@ impl ServerLanguage {
                     &params.text_document.text,
                     &mut language_data.language,
                 )?;
-                Ok(AsyncMessage::UpdateCache(vec![AsyncCacheRequest::new(uri)]))
+                Ok(AsyncMessage::UpdateCache(vec![AsyncCacheRequest::new(
+                    uri,
+                    shading_language,
+                    false, // Just opened file
+                )]))
             }
             DidSaveTextDocument::METHOD => {
                 let params: DidSaveTextDocumentParams =
@@ -737,7 +716,11 @@ impl ServerLanguage {
                             None,
                             None,
                         )?;
-                        Ok(AsyncMessage::UpdateCache(vec![AsyncCacheRequest::new(uri)]))
+                        Ok(AsyncMessage::UpdateCache(vec![AsyncCacheRequest::new(
+                            uri,
+                            shading_language,
+                            true,
+                        )]))
                     } else {
                         Ok(AsyncMessage::None)
                     }
@@ -784,7 +767,11 @@ impl ServerLanguage {
                         Err(err) => self.connection.send_notification_error(format!("{}", err)),
                     };
                 }
-                Ok(AsyncMessage::UpdateCache(vec![AsyncCacheRequest::new(uri)]))
+                Ok(AsyncMessage::UpdateCache(vec![AsyncCacheRequest::new(
+                    uri,
+                    shading_language,
+                    true,
+                )]))
             }
             DidChangeConfiguration::METHOD => {
                 let params: DidChangeConfigurationParams =
@@ -808,9 +795,83 @@ impl ServerLanguage {
                         .unwrap_or("None".into()),
                     self.debug(&new_variant)
                 );
-                Ok(AsyncMessage::UpdateVariant(AsyncVariantRequest::new(
-                    new_variant,
-                )))
+                if new_variant != self.watched_files.variant {
+                    let updated_url = if let Some(new_variant) = &new_variant {
+                        let language_data =
+                            self.language_data.get_mut(&new_variant.language).unwrap();
+                        if let Some(old_variant) = &self.watched_files.variant {
+                            // Remove old variant if not used anymore.
+                            if new_variant.url != old_variant.url {
+                                let old_variant_url = old_variant.url.clone();
+                                let old_variant_language = old_variant.language;
+                                // Watch new variant
+                                self.watched_files.watch_variant_file(
+                                    &new_variant.url,
+                                    new_variant.language,
+                                    &mut language_data.language,
+                                )?;
+                                // Remove old one.
+                                let removed_urls =
+                                    self.watched_files.remove_variant_file(&old_variant_url)?;
+                                for removed_url in removed_urls {
+                                    self.clear_diagnostic(&removed_url);
+                                }
+                                vec![
+                                    AsyncCacheRequest::new(
+                                        new_variant.url.clone(),
+                                        new_variant.language,
+                                        false, // Only context changed
+                                    ),
+                                    AsyncCacheRequest::new(
+                                        old_variant_url,
+                                        old_variant_language,
+                                        false, // Only context changed
+                                    ),
+                                ]
+                            } else {
+                                // Simply update.
+                                vec![AsyncCacheRequest::new(
+                                    new_variant.url.clone(),
+                                    old_variant.language,
+                                    false, // Only context changed
+                                )]
+                            }
+                        } else {
+                            // Watch new variant
+                            self.watched_files.watch_variant_file(
+                                &new_variant.url,
+                                new_variant.language,
+                                &mut language_data.language,
+                            )?;
+                            vec![AsyncCacheRequest::new(
+                                new_variant.url.clone(),
+                                new_variant.language,
+                                false, // Only context changed
+                            )]
+                        }
+                    } else if let Some(old_variant) = &self.watched_files.variant {
+                        // Remove old variant if not used anymore.
+                        let old_variant_url = old_variant.url.clone();
+                        let old_variant_language = old_variant.language;
+                        let removed_urls =
+                            self.watched_files.remove_variant_file(&old_variant_url)?;
+                        for removed_url in removed_urls {
+                            self.clear_diagnostic(&removed_url);
+                        }
+                        vec![AsyncCacheRequest::new(
+                            old_variant_url,
+                            old_variant_language,
+                            false, // Only context changed
+                        )]
+                    } else {
+                        unreachable!();
+                    };
+                    // Set new variant.
+                    self.watched_files.variant = new_variant;
+                    Ok(AsyncMessage::UpdateCache(updated_url))
+                } else {
+                    Ok(AsyncMessage::None)
+                }
             }
             _ => {
                 warn!(

@@ -10,30 +10,29 @@ use lsp_types::{
     HoverParams, InlayHintParams, SemanticTokensParams, SignatureHelpParams, Url,
     WorkspaceSymbolParams,
 };
+use shader_sense::shader::ShadingLanguage;
 
 use crate::server::{
     clean_url,
     debug::{DumpAstParams, DumpAstRequest, DumpDependencyParams, DumpDependencyRequest},
-    shader_variant::ShaderVariant,
 };
 
 pub struct AsyncRequest<R: Request> {
     pub req_id: RequestId,
     pub params: R::Params,
 }
+#[derive(PartialEq, Eq, Hash)]
 pub struct AsyncCacheRequest {
     pub url: Url,
+    pub lang: ShadingLanguage,
+    pub dirty: bool,
     //version: u32,
-}
-pub struct AsyncVariantRequest {
-    pub variant: Option<ShaderVariant>,
 }
 pub enum AsyncMessage {
     None,
     // All notification and content changes are processed intantaneously.
     // Cache request are enqueued with version.
     UpdateCache(Vec<AsyncCacheRequest>),
-    UpdateVariant(AsyncVariantRequest),
 
     // All request available.
     DocumentSymbolRequest(AsyncRequest<DocumentSymbolRequest>),
@@ -54,24 +53,18 @@ pub enum AsyncMessage {
 }
 
 impl AsyncCacheRequest {
-    pub fn new(url: Url) -> Self {
+    pub fn new(url: Url, lang: ShadingLanguage, dirty: bool) -> Self {
         Self {
-            url: url,
+            url,
+            lang,
+            dirty,
             //version: 0,
         }
     }
 }
-impl AsyncVariantRequest {
-    pub fn new(variant: Option<ShaderVariant>) -> Self {
-        Self { variant }
-    }
-}
 impl AsyncMessage {
     pub fn is_update(&self) -> bool {
-        matches!(
-            self,
-            Self::None | Self::UpdateCache(_) | Self::UpdateVariant(_)
-        )
+        matches!(self, Self::None | Self::UpdateCache(_))
     }
     pub fn get_request_id(&self) -> &RequestId {
         match self {
@@ -90,7 +83,7 @@ impl AsyncMessage {
             AsyncMessage::DumpDependencyRequest(async_request) => &async_request.req_id,
             AsyncMessage::DumpAstRequest(async_request) => &async_request.req_id,
             // These variants do not have a RequestId
-            AsyncMessage::None | AsyncMessage::UpdateCache(_) | AsyncMessage::UpdateVariant(_) => {
+            AsyncMessage::None | AsyncMessage::UpdateCache(_) => {
                 unreachable!("Should not be reached. Update AsyncMessage::is_update accordingly.");
             }
         }

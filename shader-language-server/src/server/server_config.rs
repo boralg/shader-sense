@@ -205,7 +205,10 @@ impl ServerLanguage {
                         .files
                         .iter()
                         .filter(|(_, file)| file.is_cachable_file())
-                        .map(|(url, _)| AsyncCacheRequest::new(url.clone()))
+                        .map(|(url, cached_file)| {
+                            // Only context changed.
+                            AsyncCacheRequest::new(url.clone(), cached_file.shading_language, false)
+                        })
                         .collect();
                     Ok(AsyncMessage::UpdateCache(async_updates))
                 } else {

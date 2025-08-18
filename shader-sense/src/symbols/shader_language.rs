@@ -72,10 +72,10 @@ impl ShaderLanguage {
     pub fn create_validator(&self) -> Box<dyn Validator> {
         create_validator(self.shading_language)
     }
-    pub fn get_intrinsics_symbol(
-        &self,
+    pub fn get_intrinsics_symbol<'a>(
+        &'a self,
         shader_compilation_params: &ShaderCompilationParams,
-    ) -> ShaderSymbolListRef {
+    ) -> ShaderSymbolListRef<'a> {
         // Filter intrinsics with given params.
         self.shader_intrinsics
             .filter(|_ty, symbol| match &symbol.requirement {

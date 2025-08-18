@@ -189,16 +189,21 @@ impl ServerLanguage {
                             &mut language_data.language,
                             &language_data.symbol_provider,
                             &self.config,
-                            None,
+                            HashSet::new(),
                         )?
                     } else {
                         self.watched_files.watch_variant_file(
                             &new_variant_url,
                             lang,
                             &mut language_data.language,
-                            &language_data.symbol_provider,
+                        )?;
+                        self.watched_files.cache_file_data(
+                            &new_variant_url,
                             language_data.validator.as_mut(),
+                            &mut language_data.language,
+                            &language_data.symbol_provider,
                             &self.config,
+                            HashSet::new(),
                         )?
                     }
                 }
@@ -268,7 +273,7 @@ impl ServerLanguage {
                                 &mut language_data.language,
                                 &language_data.symbol_provider,
                                 &self.config,
-                                Some(&file_to_update.to_file_path().unwrap()),
+                                HashSet::from([file_to_update.to_file_path().unwrap()]),
                             )?;
                             all_removed_files.extend(removed_files)
                         }
