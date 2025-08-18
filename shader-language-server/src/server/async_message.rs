@@ -32,7 +32,7 @@ pub enum AsyncMessage {
     None,
     // All notification and content changes are processed intantaneously.
     // Cache request are enqueued with version.
-    UpdateCache(AsyncCacheRequest),
+    UpdateCache(Vec<AsyncCacheRequest>),
     UpdateVariant(AsyncVariantRequest),
 
     // All request available.

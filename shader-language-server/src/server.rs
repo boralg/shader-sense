@@ -205,6 +205,7 @@ impl ServerLanguage {
     fn update_main_file_cache(&mut self, uri: &Url) -> Result<(), ShaderError> {
         let cached_file = self.get_main_file(uri).unwrap();
         let shading_language = cached_file.shading_language;
+        let file_path = uri.to_file_path().unwrap();
         let language = self.language_data.get_mut(&shading_language).unwrap();
         let removed_files = self.watched_files.cache_file_data(
             uri,
@@ -212,8 +213,8 @@ impl ServerLanguage {
             &mut language.language,
             &mut language.symbol_provider,
             &self.config,
-            None, // TODO:ASYNC: dirty deps handle
-                  // TODO:ASYNC: pass version in cache_file_data.
+            Some(&file_path), // TODO:ASYNC: dirty deps handle
+                              // TODO:ASYNC: pass version in cache_file_data.
         )?;
         for removed_file in removed_files {
             self.clear_diagnostic(&removed_file);
@@ -519,7 +520,9 @@ impl ServerLanguage {
                             match async_update {
                                 AsyncMessage::None => {}
                                 AsyncMessage::UpdateCache(async_cache_request) => {
-                                    files_to_update.insert(async_cache_request.url);
+                                    for update in async_cache_request {
+                                        files_to_update.insert(update.url);
+                                    }
                                 }
                                 AsyncMessage::UpdateVariant(async_variant_request) => {
                                     // TODO:ASYNC: batch variant updates along cache update to avoid duplicated updates.
@@ -703,7 +706,7 @@ impl ServerLanguage {
                     &params.text_document.text,
                     &mut language_data.language,
                 )?;
-                Ok(AsyncMessage::UpdateCache(AsyncCacheRequest::new(uri)))
+                Ok(AsyncMessage::UpdateCache(vec![AsyncCacheRequest::new(uri)]))
             }
             DidSaveTextDocument::METHOD => {
                 let params: DidSaveTextDocumentParams =
@@ -734,7 +737,7 @@ impl ServerLanguage {
                             None,
                             None,
                         )?;
-                        Ok(AsyncMessage::UpdateCache(AsyncCacheRequest::new(uri)))
+                        Ok(AsyncMessage::UpdateCache(vec![AsyncCacheRequest::new(uri)]))
                     } else {
                         Ok(AsyncMessage::None)
                     }
@@ -781,7 +784,7 @@ impl ServerLanguage {
                         Err(err) => self.connection.send_notification_error(format!("{}", err)),
                     };
                 }
-                Ok(AsyncMessage::UpdateCache(AsyncCacheRequest::new(uri)))
+                Ok(AsyncMessage::UpdateCache(vec![AsyncCacheRequest::new(uri)]))
             }
             DidChangeConfiguration::METHOD => {
                 let params: DidChangeConfigurationParams =
