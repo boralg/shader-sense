@@ -14,7 +14,10 @@ use shader_sense::{
     shader_error::ShaderDiagnosticSeverity,
 };
 
-use crate::{profile_scope, server::ServerLanguage};
+use crate::{
+    profile_scope,
+    server::{async_message::AsyncMessage, ServerLanguage},
+};
 
 use super::shader_variant::ShaderVariant;
 
@@ -239,7 +242,7 @@ impl ServerLanguage {
                 } else {
                     info!("Requested configuration has not changed.");
                 }
-                Ok(())
+                Ok(AsyncMessage::None) // TODO:ASYNC: Pass a list of all files updated instead of updating them here.
             },
         );
     }

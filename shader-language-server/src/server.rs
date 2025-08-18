@@ -1,8 +1,9 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::str::FromStr;
 
+mod async_message;
 mod common;
 mod completion;
 mod debug;
@@ -24,7 +25,8 @@ mod server_connection;
 mod server_file_cache;
 mod server_language_data;
 
-use debug::{DumpAstParams, DumpAstRequest, DumpDependencyParams, DumpDependencyRequest};
+use crossbeam_channel::TryRecvError;
+use debug::{DumpAstRequest, DumpDependencyRequest};
 use log::{debug, error, info, warn};
 use lsp_types::notification::{
     DidChangeConfiguration, DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument,
@@ -36,16 +38,13 @@ use lsp_types::request::{
     SemanticTokensFullRequest, SignatureHelpRequest, WorkspaceSymbolRequest,
 };
 use lsp_types::{
-    CompletionOptionsCompletionItem, CompletionParams, CompletionResponse,
-    DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentDiagnosticParams,
-    DocumentFormattingParams, DocumentRangeFormattingParams, DocumentSymbolOptions,
-    DocumentSymbolParams, DocumentSymbolResponse, FoldingRangeParams,
-    FoldingRangeProviderCapability, GotoDefinitionParams, HoverParams, HoverProviderCapability,
-    InlayHintParams, OneOf, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensParams, SemanticTokensServerCapabilities,
-    ServerCapabilities, SignatureHelpOptions, SignatureHelpParams, TextDocumentSyncKind, Url,
-    WorkDoneProgressOptions, WorkspaceSymbolOptions, WorkspaceSymbolParams,
+    CompletionOptionsCompletionItem, CompletionResponse, DidChangeConfigurationParams,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, DocumentSymbolOptions, DocumentSymbolResponse,
+    FoldingRangeProviderCapability, HoverProviderCapability, OneOf, SemanticTokenType,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncKind, Url, WorkDoneProgressOptions, WorkspaceSymbolOptions,
     WorkspaceSymbolResponse,
 };
 use shader_sense::shader::ShadingLanguage;
@@ -60,6 +59,9 @@ use shader_sense::shader_error::ShaderError;
 use shader_variant::DidChangeShaderVariant;
 
 use crate::profile_scope;
+use crate::server::async_message::{
+    AsyncCacheRequest, AsyncMessage, AsyncRequest, AsyncVariantRequest,
+};
 use crate::server::common::lsp_range_to_shader_range;
 use crate::server::server_file_cache::ServerFileCache;
 
@@ -86,6 +88,21 @@ fn clean_url(url: &Url) -> Url {
     #[cfg(target_os = "wasi")]
     {
         url.clone()
+    }
+}
+fn shader_error_to_lsp_error(error: &ShaderError) -> ErrorCode {
+    match error {
+        ShaderError::ValidationError(_)
+        | ShaderError::ParseSymbolError(_)
+        | ShaderError::IoErr(_)
+        | ShaderError::InternalErr(_)
+        | ShaderError::FileNotWatched(_) => ErrorCode::InternalError,
+        ShaderError::InvalidParams(_) => ErrorCode::InvalidParams,
+        ShaderError::SerializationError(_) => ErrorCode::InvalidParams,
+        // Should have been caught before getting here.
+        ShaderError::SymbolQueryError(_, _) | ShaderError::NoSymbol => {
+            unreachable!()
+        }
     }
 }
 
@@ -185,9 +202,284 @@ impl ServerLanguage {
 
         return Ok(());
     }
+    fn update_main_file_cache(&mut self, uri: &Url) -> Result<(), ShaderError> {
+        let cached_file = self.get_main_file(uri).unwrap();
+        let shading_language = cached_file.shading_language;
+        let language = self.language_data.get_mut(&shading_language).unwrap();
+        let removed_files = self.watched_files.cache_file_data(
+            uri,
+            language.validator.as_mut(),
+            &mut language.language,
+            &mut language.symbol_provider,
+            &self.config,
+            None, // TODO:ASYNC: dirty deps handle
+                  // TODO:ASYNC: pass version in cache_file_data.
+        )?;
+        for removed_file in removed_files {
+            self.clear_diagnostic(&removed_file);
+        }
+        let url_to_republish = self
+            .watched_files
+            .get_relying_variant(&uri)
+            .unwrap_or(uri.clone());
+        self.publish_diagnostic(&url_to_republish, None);
+        Ok(())
+    }
+    fn resolve_async_request(&mut self, request: AsyncMessage) -> Result<(), ShaderError> {
+        // TODO:ASYNC: Discard all messages which version is too old.
+        // For variant, we handle requesting items again on client side, so it does not change version.
+        match request {
+            AsyncMessage::None | AsyncMessage::UpdateCache(_) | AsyncMessage::UpdateVariant(_) => {
+                unreachable!()
+            }
+            AsyncMessage::DocumentSymbolRequest(async_request) => {
+                profile_scope!(
+                    "Received document symbol request for file {}: {}",
+                    async_request.params.text_document.uri,
+                    self.debug(&async_request.params)
+                );
+                let symbols =
+                    self.recolt_document_symbol(&async_request.params.text_document.uri)?;
+                self.connection.send_response::<DocumentSymbolRequest>(
+                    async_request.req_id.clone(),
+                    Some(DocumentSymbolResponse::Nested(symbols)),
+                );
+            }
+            AsyncMessage::WorkspaceSymbolRequest(async_request) => {
+                profile_scope!(
+                    "Received workspace symbol request: {}",
+                    self.debug(&async_request.params)
+                );
+                let _ = async_request.params.query; // TODO: Should we filter ?
+                let symbols = self.recolt_workspace_symbol()?;
+                self.connection.send_response::<WorkspaceSymbolRequest>(
+                    async_request.req_id.clone(),
+                    Some(WorkspaceSymbolResponse::Flat(symbols)),
+                )
+            }
+            AsyncMessage::RangeFormatting(async_request) => {
+                profile_scope!(
+                    "Received formatting range request for file {}: {}",
+                    async_request.params.text_document.uri,
+                    self.debug(&async_request.params)
+                );
+                let formatting = self.recolt_formatting(
+                    &async_request.params.text_document.uri,
+                    Some(lsp_range_to_shader_range(
+                        &async_request.params.range,
+                        &async_request
+                            .params
+                            .text_document
+                            .uri
+                            .to_file_path()
+                            .unwrap(),
+                    )),
+                )?;
+                self.connection
+                    .send_response::<Formatting>(async_request.req_id, Some(formatting));
+            }
+            AsyncMessage::FoldingRangeRequest(async_request) => {
+                profile_scope!(
+                    "Received folding range request for file {}: {}",
+                    async_request.params.text_document.uri,
+                    self.debug(&async_request.params)
+                );
+                let folding_ranges =
+                    self.recolt_folding_range(&async_request.params.text_document.uri)?;
+                self.connection.send_response::<FoldingRangeRequest>(
+                    async_request.req_id.clone(),
+                    Some(folding_ranges),
+                );
+            }
+            AsyncMessage::Formatting(async_request) => {
+                profile_scope!(
+                    "Received formatting request for file {}: {}",
+                    async_request.params.text_document.uri,
+                    self.debug(&async_request.params)
+                );
+                let formatting =
+                    self.recolt_formatting(&async_request.params.text_document.uri, None)?;
+                self.connection
+                    .send_response::<Formatting>(async_request.req_id.clone(), Some(formatting));
+            }
+            AsyncMessage::InlayHintRequest(async_request) => {
+                profile_scope!(
+                    "Received inlay hint request for file {}: {}",
+                    async_request.params.text_document.uri,
+                    self.debug(&async_request.params)
+                );
+                let inlay_hints = self.recolt_inlay_hint(
+                    &async_request.params.text_document.uri,
+                    &async_request.params.range,
+                )?;
+                self.connection.send_response::<InlayHintRequest>(
+                    async_request.req_id.clone(),
+                    Some(inlay_hints),
+                );
+            }
+            AsyncMessage::HoverRequest(async_request) => {
+                profile_scope!(
+                    "Received hover request for file {}: {}",
+                    async_request
+                        .params
+                        .text_document_position_params
+                        .text_document
+                        .uri,
+                    self.debug(&async_request.params)
+                );
+                let position = async_request.params.text_document_position_params.position;
+                let value = self.recolt_hover(
+                    &async_request
+                        .params
+                        .text_document_position_params
+                        .text_document
+                        .uri,
+                    position,
+                )?;
+                self.connection
+                    .send_response::<HoverRequest>(async_request.req_id.clone(), value);
+            }
+            AsyncMessage::SignatureHelpRequest(async_request) => {
+                profile_scope!(
+                    "Received completion request for file {}: {}",
+                    async_request
+                        .params
+                        .text_document_position_params
+                        .text_document
+                        .uri,
+                    self.debug(&async_request.params)
+                );
+                let value = self.recolt_signature(
+                    &async_request
+                        .params
+                        .text_document_position_params
+                        .text_document
+                        .uri,
+                    async_request.params.text_document_position_params.position,
+                )?;
+                self.connection
+                    .send_response::<SignatureHelpRequest>(async_request.req_id.clone(), value);
+            }
+            AsyncMessage::Completion(async_request) => {
+                profile_scope!(
+                    "Received completion request for file {}: {}",
+                    async_request
+                        .params
+                        .text_document_position
+                        .text_document
+                        .uri,
+                    self.debug(&async_request.params)
+                );
+                let value = self.recolt_completion(
+                    &async_request
+                        .params
+                        .text_document_position
+                        .text_document
+                        .uri,
+                    async_request.params.text_document_position.position,
+                    match &async_request.params.context {
+                        Some(context) => context.trigger_character.clone(),
+                        None => None,
+                    },
+                )?;
+                self.connection.send_response::<Completion>(
+                    async_request.req_id.clone(),
+                    Some(CompletionResponse::Array(value)),
+                );
+            }
+            AsyncMessage::GotoDefinition(async_request) => {
+                profile_scope!(
+                    "Received gotoDefinition request for file {}: {}",
+                    async_request
+                        .params
+                        .text_document_position_params
+                        .text_document
+                        .uri,
+                    self.debug(&async_request.params)
+                );
+                let position = async_request.params.text_document_position_params.position;
+                let value = self.recolt_goto(
+                    &async_request
+                        .params
+                        .text_document_position_params
+                        .text_document
+                        .uri,
+                    position,
+                )?;
+                self.connection
+                    .send_response::<GotoDefinition>(async_request.req_id.clone(), value);
+            }
+            AsyncMessage::DocumentDiagnosticRequest(async_request) => {
+                profile_scope!(
+                    "Received document diagnostic request for file {}: {}",
+                    async_request.params.text_document.uri,
+                    self.debug(&async_request.params)
+                );
+                let document_diagnostic =
+                    self.recolt_document_diagnostic(&async_request.params.text_document.uri)?;
+                self.connection.send_response::<DocumentDiagnosticRequest>(
+                    async_request.req_id.clone(),
+                    document_diagnostic,
+                );
+            }
+            AsyncMessage::SemanticTokensFullRequest(async_request) => {
+                profile_scope!(
+                    "Received semantic token request for file {}: {}",
+                    async_request.params.text_document.uri,
+                    self.debug(&async_request.params)
+                );
+                let semantic_tokens =
+                    self.recolt_semantic_tokens(&async_request.params.text_document.uri)?;
+                self.connection.send_response::<SemanticTokensFullRequest>(
+                    async_request.req_id.clone(),
+                    Some(semantic_tokens),
+                );
+            }
+            AsyncMessage::DumpDependencyRequest(async_request) => {
+                profile_scope!(
+                    "Received dump dependency request for file {}: {}",
+                    async_request.params.text_document.uri,
+                    self.debug(&async_request.params)
+                );
+                let cached_file = self.get_main_file(&async_request.params.text_document.uri)?;
+                let deps_tree = cached_file
+                    .data
+                    .as_ref()
+                    .unwrap()
+                    .symbol_cache
+                    .dump_dependency_tree(
+                        &async_request
+                            .params
+                            .text_document
+                            .uri
+                            .to_file_path()
+                            .unwrap(),
+                    );
+                self.connection.send_response::<DumpDependencyRequest>(
+                    async_request.req_id.clone(),
+                    Some(deps_tree),
+                );
+            }
+            AsyncMessage::DumpAstRequest(async_request) => {
+                profile_scope!(
+                    "Received dump ast request for file {}: {}",
+                    async_request.params.text_document.uri,
+                    self.debug(&async_request.params)
+                );
+                let cached_file = self.get_main_file(&async_request.params.text_document.uri)?;
+                let ast = RefCell::borrow(&cached_file.shader_module).dump_ast();
+                self.connection
+                    .send_response::<DumpAstRequest>(async_request.req_id.clone(), Some(ast));
+            }
+        }
+        Ok(())
+    }
     pub fn run(&mut self) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
+        let mut async_messages_queue = Vec::new();
         loop {
-            let msg_err = self.connection.connection.receiver.recv();
+            // Use try_recv to get all messages and process update in batch
+            // while discarding request for previous document versions.
+            let msg_err = self.connection.connection.receiver.try_recv();
             match msg_err {
                 Ok(msg) => match msg {
                     Message::Request(req) => {
@@ -196,39 +488,88 @@ impl ServerLanguage {
                         }
                         let id = req.id.clone();
                         match self.on_request(req) {
-                            Ok(_) => {}
+                            Ok(async_message) => async_messages_queue.push(async_message),
                             Err(err) => self.connection.send_response_error(
                                 id,
-                                match &err {
-                                    ShaderError::ValidationError(_)
-                                    | ShaderError::ParseSymbolError(_)
-                                    | ShaderError::IoErr(_)
-                                    | ShaderError::InternalErr(_)
-                                    | ShaderError::FileNotWatched(_) => ErrorCode::InternalError,
-                                    ShaderError::InvalidParams(_) => ErrorCode::InvalidParams,
-                                    ShaderError::SerializationError(_) => ErrorCode::InvalidParams,
-                                    // Should have been caught before getting here.
-                                    ShaderError::SymbolQueryError(_, _) | ShaderError::NoSymbol => {
-                                        unreachable!()
-                                    }
-                                },
+                                shader_error_to_lsp_error(&err),
                                 err.to_string(),
                             ),
                         }
                     }
                     Message::Response(resp) => match self.on_response(resp) {
-                        Ok(_) => {}
+                        Ok(async_message) => async_messages_queue.push(async_message),
                         Err(err) => self.connection.send_notification_error(err.to_string()),
                     },
                     Message::Notification(not) => match self.on_notification(not) {
-                        Ok(_) => {}
+                        Ok(async_message) => async_messages_queue.push(async_message),
                         Err(err) => self.connection.send_notification_error(err.to_string()),
                     },
                 },
-                Err(_) => {
-                    // Recv error means disconnected.
-                    return Ok(());
-                }
+                Err(err) => match err {
+                    TryRecvError::Empty => {
+                        // Now that we do not have messages in queue, process them in batch.
+                        let mut async_queue: Vec<AsyncMessage> =
+                            async_messages_queue.drain(..).collect();
+                        let async_update_queue: Vec<AsyncMessage> =
+                            async_queue.extract_if(.., |m| m.is_update()).collect();
+                        let async_request_queue = async_queue;
+                        let mut files_to_update = HashSet::new();
+                        // TODO:ASYNC: should batch all updates here and avoid duplicated updates.
+                        for async_update in async_update_queue {
+                            match async_update {
+                                AsyncMessage::None => {}
+                                AsyncMessage::UpdateCache(async_cache_request) => {
+                                    files_to_update.insert(async_cache_request.url);
+                                }
+                                AsyncMessage::UpdateVariant(async_variant_request) => {
+                                    // TODO:ASYNC: batch variant updates along cache update to avoid duplicated updates.
+                                    match self.update_variant(async_variant_request.variant) {
+                                        Ok((removed_files, updated_files)) => {
+                                            for removed_file in removed_files {
+                                                self.clear_diagnostic(&removed_file);
+                                            }
+                                            for file in updated_files {
+                                                self.publish_diagnostic(&file, None);
+                                            }
+                                        }
+                                        Err(err) => self.connection.send_notification_error(
+                                            format!("Failed to update variant: {}", err),
+                                        ),
+                                    }
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        // Update files for all requested updates.
+                        for file_to_update in files_to_update {
+                            match self.update_main_file_cache(&file_to_update) {
+                                Ok(_) => {}
+                                Err(err) => self.connection.send_notification_error(format!(
+                                    "Failed to update cache for file {}: {}",
+                                    file_to_update, err
+                                )),
+                            }
+                        }
+                        // Solve all pending request.
+                        for request in async_request_queue {
+                            let req_id = request.get_request_id().clone();
+                            match self.resolve_async_request(request) {
+                                Ok(_) => {}
+                                Err(err) => self.connection.send_response_error(
+                                    req_id,
+                                    shader_error_to_lsp_error(&err),
+                                    err.to_string(),
+                                ),
+                            }
+                        }
+
+                        // TODO:ASYNC: should have condvar & co instead to restart queue ideally
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                    TryRecvError::Disconnected => {
+                        return Ok(());
+                    }
+                },
             }
         }
     }
@@ -247,211 +588,67 @@ impl ServerLanguage {
         debug_assert!(main_file.is_main_file(), "File {} is not a main file.", uri);
         Ok(main_file)
     }
-    fn on_request(&mut self, req: lsp_server::Request) -> Result<(), ShaderError> {
+    fn on_request(&mut self, req: lsp_server::Request) -> Result<AsyncMessage, ShaderError> {
+        // Simply parse the request and delay them.
         match req.method.as_str() {
-            DocumentDiagnosticRequest::METHOD => {
-                let params: DocumentDiagnosticParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document.uri);
-                profile_scope!(
-                    "Received document diagnostic request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let document_diagnostic = self.recolt_document_diagnostic(&uri)?;
-                self.connection.send_response::<DocumentDiagnosticRequest>(
-                    req.id.clone(),
-                    document_diagnostic,
-                );
-            }
-            GotoDefinition::METHOD => {
-                let params: GotoDefinitionParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document_position_params.text_document.uri);
-                profile_scope!(
-                    "Received gotoDefinition request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let position = params.text_document_position_params.position;
-                let value = self.recolt_goto(&uri, position)?;
-                self.connection
-                    .send_response::<GotoDefinition>(req.id.clone(), value);
-            }
-            Completion::METHOD => {
-                let params: CompletionParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document_position.text_document.uri);
-                profile_scope!(
-                    "Received completion request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let value = self.recolt_completion(
-                    &uri,
-                    params.text_document_position.position,
-                    match &params.context {
-                        Some(context) => context.trigger_character.clone(),
-                        None => None,
-                    },
-                )?;
-                self.connection.send_response::<Completion>(
-                    req.id.clone(),
-                    Some(CompletionResponse::Array(value)),
-                );
-            }
-            SignatureHelpRequest::METHOD => {
-                let params: SignatureHelpParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document_position_params.text_document.uri);
-                profile_scope!(
-                    "Received completion request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let value =
-                    self.recolt_signature(&uri, params.text_document_position_params.position)?;
-                self.connection
-                    .send_response::<SignatureHelpRequest>(req.id.clone(), value);
-            }
-            HoverRequest::METHOD => {
-                let params: HoverParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document_position_params.text_document.uri);
-                profile_scope!(
-                    "Received hover request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let position = params.text_document_position_params.position;
-                let value = self.recolt_hover(&uri, position)?;
-                self.connection
-                    .send_response::<HoverRequest>(req.id.clone(), value);
-            }
-            InlayHintRequest::METHOD => {
-                let params: InlayHintParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document.uri);
-                profile_scope!(
-                    "Received inlay hint request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let inlay_hints = self.recolt_inlay_hint(&uri, &params.range)?;
-                self.connection
-                    .send_response::<InlayHintRequest>(req.id.clone(), Some(inlay_hints));
-            }
-            FoldingRangeRequest::METHOD => {
-                let params: FoldingRangeParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document.uri);
-                profile_scope!(
-                    "Received folding range request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let folding_ranges = self.recolt_folding_range(&uri)?;
-                self.connection
-                    .send_response::<FoldingRangeRequest>(req.id.clone(), Some(folding_ranges));
-            }
-            WorkspaceSymbolRequest::METHOD => {
-                let params: WorkspaceSymbolParams = serde_json::from_value(req.params)?;
-                profile_scope!("Received workspace symbol request: {}", self.debug(&params));
-                let _ = params.query; // TODO: Should we filter ?
-                let symbols = self.recolt_workspace_symbol()?;
-                self.connection.send_response::<WorkspaceSymbolRequest>(
-                    req.id.clone(),
-                    Some(WorkspaceSymbolResponse::Flat(symbols)),
-                )
-            }
-            DocumentSymbolRequest::METHOD => {
-                let params: DocumentSymbolParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document.uri);
-                profile_scope!(
-                    "Received document symbol request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let symbols = self.recolt_document_symbol(&uri)?;
-                self.connection.send_response::<DocumentSymbolRequest>(
-                    req.id.clone(),
-                    Some(DocumentSymbolResponse::Nested(symbols)),
-                );
-            }
+            DocumentDiagnosticRequest::METHOD => Ok(AsyncMessage::DocumentDiagnosticRequest(
+                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+            )),
+            GotoDefinition::METHOD => Ok(AsyncMessage::GotoDefinition(AsyncRequest::new(
+                req.id,
+                serde_json::from_value(req.params)?,
+            ))),
+            Completion::METHOD => Ok(AsyncMessage::Completion(AsyncRequest::new(
+                req.id,
+                serde_json::from_value(req.params)?,
+            ))),
+            SignatureHelpRequest::METHOD => Ok(AsyncMessage::SignatureHelpRequest(
+                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+            )),
+            HoverRequest::METHOD => Ok(AsyncMessage::HoverRequest(AsyncRequest::new(
+                req.id,
+                serde_json::from_value(req.params)?,
+            ))),
+            InlayHintRequest::METHOD => Ok(AsyncMessage::InlayHintRequest(AsyncRequest::new(
+                req.id,
+                serde_json::from_value(req.params)?,
+            ))),
+            FoldingRangeRequest::METHOD => Ok(AsyncMessage::FoldingRangeRequest(
+                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+            )),
+            WorkspaceSymbolRequest::METHOD => Ok(AsyncMessage::WorkspaceSymbolRequest(
+                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+            )),
+            DocumentSymbolRequest::METHOD => Ok(AsyncMessage::DocumentSymbolRequest(
+                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+            )),
+            SemanticTokensFullRequest::METHOD => Ok(AsyncMessage::SemanticTokensFullRequest(
+                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+            )),
+            Formatting::METHOD => Ok(AsyncMessage::Formatting(AsyncRequest::new(
+                req.id,
+                serde_json::from_value(req.params)?,
+            ))),
+            RangeFormatting::METHOD => Ok(AsyncMessage::RangeFormatting(AsyncRequest::new(
+                req.id,
+                serde_json::from_value(req.params)?,
+            ))),
             // Debug request
-            DumpAstRequest::METHOD => {
-                let params: DumpAstParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document.uri);
-                profile_scope!(
-                    "Received dump ast request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let cached_file = self.get_main_file(&uri)?;
-                let ast = RefCell::borrow(&cached_file.shader_module).dump_ast();
-                self.connection
-                    .send_response::<DumpAstRequest>(req.id.clone(), Some(ast));
+            DumpAstRequest::METHOD => Ok(AsyncMessage::DumpAstRequest(AsyncRequest::new(
+                req.id,
+                serde_json::from_value(req.params)?,
+            ))),
+            DumpDependencyRequest::METHOD => Ok(AsyncMessage::DumpDependencyRequest(
+                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+            )),
+            _ => {
+                warn!("Received unhandled request: {:#?}", req);
+                Ok(AsyncMessage::None)
             }
-            DumpDependencyRequest::METHOD => {
-                let params: DumpDependencyParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document.uri);
-                profile_scope!(
-                    "Received dump dependency request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let cached_file = self.get_main_file(&uri)?;
-                let deps_tree = cached_file
-                    .data
-                    .as_ref()
-                    .unwrap()
-                    .symbol_cache
-                    .dump_dependency_tree(&uri.to_file_path().unwrap());
-                self.connection
-                    .send_response::<DumpDependencyRequest>(req.id.clone(), Some(deps_tree));
-            }
-            SemanticTokensFullRequest::METHOD => {
-                let params: SemanticTokensParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document.uri);
-                profile_scope!(
-                    "Received semantic token request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let semantic_tokens = self.recolt_semantic_tokens(&uri)?;
-                self.connection.send_response::<SemanticTokensFullRequest>(
-                    req.id.clone(),
-                    Some(semantic_tokens),
-                );
-            }
-            Formatting::METHOD => {
-                let params: DocumentFormattingParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document.uri);
-                profile_scope!(
-                    "Received formatting request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let formatting = self.recolt_formatting(&uri, None)?;
-                self.connection
-                    .send_response::<Formatting>(req.id.clone(), Some(formatting));
-            }
-            RangeFormatting::METHOD => {
-                let params: DocumentRangeFormattingParams = serde_json::from_value(req.params)?;
-                let uri = clean_url(&params.text_document.uri);
-                profile_scope!(
-                    "Received formatting range request for file {}: {}",
-                    uri,
-                    self.debug(&params)
-                );
-                let formatting = self.recolt_formatting(
-                    &uri,
-                    Some(lsp_range_to_shader_range(
-                        &params.range,
-                        &uri.to_file_path().unwrap(),
-                    )),
-                )?;
-                self.connection
-                    .send_response::<Formatting>(req.id.clone(), Some(formatting));
-            }
-            _ => warn!("Received unhandled request: {:#?}", req),
         }
-        Ok(())
     }
-    fn on_response(&mut self, response: lsp_server::Response) -> Result<(), ShaderError> {
+    fn on_response(&mut self, response: lsp_server::Response) -> Result<AsyncMessage, ShaderError> {
+        // Here the callback return a delayed update
         match self.connection.remove_callback(&response.id) {
             Some(callback) => match response.result {
                 Some(result) => callback(self, result),
@@ -469,7 +666,10 @@ impl ServerLanguage {
     fn on_notification(
         &mut self,
         notification: lsp_server::Notification,
-    ) -> Result<(), ShaderError> {
+    ) -> Result<AsyncMessage, ShaderError> {
+        // Watch & remove file as expected and return a delayed update.
+        // We still update text content & AST here as performances are OK to be done here.
+        // But symbol parsing & validation is done asynchronously.
         match notification.method.as_str() {
             DidOpenTextDocument::METHOD => {
                 let params: DidOpenTextDocumentParams =
@@ -502,15 +702,8 @@ impl ServerLanguage {
                     shading_language.clone(),
                     &params.text_document.text,
                     &mut language_data.language,
-                    &language_data.symbol_provider,
-                    language_data.validator.as_mut(),
-                    &self.config,
                 )?;
-                let url_to_republish = self
-                    .watched_files
-                    .get_relying_variant(&uri)
-                    .unwrap_or(uri.clone());
-                self.publish_diagnostic(&url_to_republish, None);
+                Ok(AsyncMessage::UpdateCache(AsyncCacheRequest::new(uri)))
             }
             DidSaveTextDocument::METHOD => {
                 let params: DidSaveTextDocumentParams =
@@ -541,24 +734,12 @@ impl ServerLanguage {
                             None,
                             None,
                         )?;
-                        // Cache once all changes have been applied.
-                        let removed_files = self.watched_files.cache_file_data(
-                            &uri,
-                            language_data.validator.as_mut(),
-                            &mut language_data.language,
-                            &language_data.symbol_provider,
-                            &self.config,
-                            Some(&uri.to_file_path().unwrap()), // Force update
-                        )?;
-                        for removed_file in removed_files {
-                            self.clear_diagnostic(&removed_file);
-                        }
-                        let url_to_republish = self
-                            .watched_files
-                            .get_relying_variant(&uri)
-                            .unwrap_or(uri.clone());
-                        self.publish_diagnostic(&url_to_republish, None);
+                        Ok(AsyncMessage::UpdateCache(AsyncCacheRequest::new(uri)))
+                    } else {
+                        Ok(AsyncMessage::None)
                     }
+                } else {
+                    Ok(AsyncMessage::None)
                 }
             }
             DidCloseTextDocument::METHOD => {
@@ -574,6 +755,7 @@ impl ServerLanguage {
                 for removed_url in removed_urls {
                     self.clear_diagnostic(&removed_url);
                 }
+                Ok(AsyncMessage::None)
             }
             DidChangeTextDocument::METHOD => {
                 let params: DidChangeTextDocumentParams =
@@ -599,23 +781,7 @@ impl ServerLanguage {
                         Err(err) => self.connection.send_notification_error(format!("{}", err)),
                     };
                 }
-                // Cache once all changes have been applied.
-                let removed_files = self.watched_files.cache_file_data(
-                    &uri,
-                    language_data.validator.as_mut(),
-                    &mut language_data.language,
-                    &language_data.symbol_provider,
-                    &self.config,
-                    Some(&uri.to_file_path().unwrap()),
-                )?;
-                for removed_file in removed_files {
-                    self.clear_diagnostic(&removed_file);
-                }
-                let url_to_republish = self
-                    .watched_files
-                    .get_relying_variant(&uri)
-                    .unwrap_or(uri.clone());
-                self.publish_diagnostic(&url_to_republish, Some(params.text_document.version));
+                Ok(AsyncMessage::UpdateCache(AsyncCacheRequest::new(uri)))
             }
             DidChangeConfiguration::METHOD => {
                 let params: DidChangeConfigurationParams =
@@ -627,6 +793,7 @@ impl ServerLanguage {
                 // Here config received is empty. we need to request it to user.
                 //let config : ServerConfig = serde_json::from_value(params.settings)?;
                 self.request_configuration();
+                Ok(AsyncMessage::None) // Its request_configuration job to return async task here.
             }
             DidChangeShaderVariant::METHOD => {
                 let new_variant = self.parse_variant_params(notification.params)?;
@@ -638,21 +805,19 @@ impl ServerLanguage {
                         .unwrap_or("None".into()),
                     self.debug(&new_variant)
                 );
-                let (removed_files, updated_files) = self.update_variant(new_variant)?;
-                for removed_file in removed_files {
-                    self.clear_diagnostic(&removed_file);
-                }
-                for file in updated_files {
-                    self.publish_diagnostic(&file, None);
-                }
+                Ok(AsyncMessage::UpdateVariant(AsyncVariantRequest::new(
+                    new_variant,
+                )))
             }
-            _ => warn!(
-                "Received unhandled notification {}: {}",
-                notification.method,
-                self.debug(&notification)
-            ),
+            _ => {
+                warn!(
+                    "Received unhandled notification {}: {}",
+                    notification.method,
+                    self.debug(&notification)
+                );
+                Ok(AsyncMessage::None)
+            }
         }
-        Ok(())
     }
 }
 

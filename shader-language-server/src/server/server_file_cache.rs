@@ -74,19 +74,6 @@ impl ServerLanguageFileCache {
             variant: None,
         }
     }
-    pub fn create_data(
-        &mut self,
-        uri: &Url,
-        symbol_cache: ShaderSymbols,
-        intrinsics: ShaderSymbolList,
-        diagnostic_cache: ShaderDiagnosticList,
-    ) {
-        self.files.get_mut(uri).unwrap().data = Some(ServerFileCacheData {
-            symbol_cache,
-            intrinsics,
-            diagnostic_cache,
-        })
-    }
     // Get all main dependent files using the given file.
     pub fn get_dependent_main_files(&self, dependent_url: &Url) -> HashSet<Url> {
         let dependant_file_path = dependent_url.to_file_path().unwrap();
@@ -380,7 +367,11 @@ impl ServerLanguageFileCache {
         let intrinsics = shader_language
             .get_intrinsics_symbol(&shader_params.compilation)
             .to_owned();
-        self.create_data(uri, symbols, intrinsics, diagnostics);
+        self.files.get_mut(uri).unwrap().data = Some(ServerFileCacheData {
+            symbol_cache: symbols,
+            intrinsics,
+            diagnostic_cache: diagnostics,
+        });
         Ok(())
     }
     pub fn cache_file_data(
@@ -640,9 +631,6 @@ impl ServerLanguageFileCache {
         lang: ShadingLanguage,
         text: &str,
         shader_language: &mut ShaderLanguage,
-        symbol_provider: &SymbolProvider,
-        validator: &mut dyn Validator,
-        config: &ServerConfig,
     ) -> Result<&ServerFileCache, ShaderError> {
         assert!(*uri == clean_url(&uri));
         let file_path = uri.to_file_path().unwrap();
@@ -691,16 +679,6 @@ impl ServerLanguageFileCache {
                 );
             }
         };
-        // Cache file data from new context.
-        // We dont update content here, so we can ignore removed_files.
-        let _removed_files = self.cache_file_data(
-            uri,
-            validator,
-            shader_language,
-            symbol_provider,
-            config,
-            None, // We simply open the file. No change detected.
-        )?;
         Ok(self.files.get(&uri).unwrap())
     }
     pub fn watch_dependency(
