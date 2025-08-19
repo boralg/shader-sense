@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::str::FromStr;
+use std::time::Duration;
 
 // TODO:ASYNC: move provider to specific folder and file updater in another one.
 mod async_message;
@@ -26,7 +27,7 @@ mod server_connection;
 mod server_file_cache;
 mod server_language_data;
 
-use crossbeam_channel::TryRecvError;
+use crossbeam_channel::RecvTimeoutError;
 use debug::{DumpAstRequest, DumpDependencyRequest};
 use log::{debug, error, info, warn};
 use lsp_types::notification::{
@@ -457,7 +458,11 @@ impl ServerLanguage {
         loop {
             // Use try_recv to get all messages and process update in batch
             // while discarding request for previous document versions.
-            let msg_err = self.connection.connection.receiver.try_recv();
+            let msg_err = self
+                .connection
+                .connection
+                .receiver
+                .recv_timeout(Duration::from_millis(200));
             match msg_err {
                 Ok(msg) => match msg {
                     Message::Request(req) => {
@@ -484,7 +489,7 @@ impl ServerLanguage {
                     },
                 },
                 Err(err) => match err {
-                    TryRecvError::Empty => {
+                    RecvTimeoutError::Timeout => {
                         async_messages_queue.retain(|m| !matches!(m, AsyncMessage::None));
                         if async_messages_queue.len() > 0 {
                             profile_scope!(
@@ -607,7 +612,7 @@ impl ServerLanguage {
                         // TODO:ASYNC: should have condvar & co instead to restart queue ideally
                         std::thread::sleep(std::time::Duration::from_millis(100));
                     }
-                    TryRecvError::Disconnected => {
+                    RecvTimeoutError::Disconnected => {
                         return Ok(());
                     }
                 },
