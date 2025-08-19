@@ -629,6 +629,14 @@ impl ServerLanguageFileCache {
             files_to_publish.insert(variant_url);
         }
         for remaining_file in &unique_remaining_files {
+            let file_name = get_file_name(&remaining_file);
+            file_progress_index += 1;
+            progress_callback(
+                &file_name,
+                file_progress_index,
+                (unique_remaining_files.len() + dependent_files_to_update.len()) as u32
+                    + need_to_recompute_variant as u32,
+            );
             // Check file is still watched and a main file
             let shading_language = match self.files.get(&remaining_file) {
                 Some(file) => {
@@ -646,14 +654,6 @@ impl ServerLanguageFileCache {
                 }
             };
             let language_data = language_data.get_mut(&shading_language).unwrap();
-            let file_name = get_file_name(&remaining_file);
-            file_progress_index += 1;
-            progress_callback(
-                &file_name,
-                file_progress_index,
-                (unique_remaining_files.len() + dependent_files_to_update.len()) as u32
-                    + need_to_recompute_variant as u32,
-            );
             let removed_files = self.cache_file_data(
                 &remaining_file,
                 language_data.validator.as_mut(),
@@ -705,7 +705,11 @@ impl ServerLanguageFileCache {
                 + dependent_files_to_update.len()
                 + need_to_recompute_variant as usize)
                 == file_progress_index as usize,
-            "Invalid count for progress report"
+            "Invalid count for progress report ({} unique files, {} dependent, {} variant, expecting a total of {})",
+            unique_remaining_files.len(),
+            dependent_files_to_update.len(),
+            need_to_recompute_variant as u32,
+            file_progress_index
         );
         // TODO:ASYNC: Diagnostics return here are unique but might be in incorrect order...
         files_to_publish.extend(dependent_files_to_update);
