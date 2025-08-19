@@ -31,22 +31,24 @@ use debug::{DumpAstRequest, DumpDependencyRequest};
 use log::{debug, error, info, warn};
 use lsp_types::notification::{
     DidChangeConfiguration, DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument,
-    DidSaveTextDocument, Notification,
+    DidSaveTextDocument, Notification, Progress,
 };
 use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, FoldingRangeRequest, Formatting,
     GotoDefinition, HoverRequest, InlayHintRequest, RangeFormatting, Request,
-    SemanticTokensFullRequest, SignatureHelpRequest, WorkspaceSymbolRequest,
+    SemanticTokensFullRequest, SignatureHelpRequest, WorkDoneProgressCreate,
+    WorkspaceSymbolRequest,
 };
 use lsp_types::{
     CompletionOptionsCompletionItem, CompletionResponse, DidChangeConfigurationParams,
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DidSaveTextDocumentParams, DocumentSymbolOptions, DocumentSymbolResponse,
-    FoldingRangeProviderCapability, HoverProviderCapability, OneOf, SemanticTokenType,
-    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    FoldingRangeProviderCapability, HoverProviderCapability, OneOf, ProgressParams,
+    SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
     SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncKind, Url, WorkDoneProgressOptions, WorkspaceSymbolOptions,
-    WorkspaceSymbolResponse,
+    TextDocumentSyncKind, Url, WorkDoneProgress, WorkDoneProgressBegin,
+    WorkDoneProgressCreateParams, WorkDoneProgressEnd, WorkDoneProgressOptions,
+    WorkDoneProgressReport, WorkspaceSymbolOptions, WorkspaceSymbolResponse,
 };
 use shader_sense::shader::ShadingLanguage;
 
@@ -512,10 +514,56 @@ impl ServerLanguage {
                                     "Updating {} batched file(s).",
                                     files_to_update.len()
                                 );
+                                let token = lsp_types::NumberOrString::Number(0);
+                                self.connection.send_request::<WorkDoneProgressCreate>(
+                                    WorkDoneProgressCreateParams {
+                                        token: token.clone(),
+                                    },
+                                    |_, _| Ok(AsyncMessage::None),
+                                );
+                                self.connection
+                                    .send_notification::<Progress>(ProgressParams {
+                                        token: token.clone(),
+                                        value: lsp_types::ProgressParamsValue::WorkDone(
+                                            WorkDoneProgress::Begin(WorkDoneProgressBegin {
+                                                title: "Analyzing shader files".into(),
+                                                cancellable: Some(false),
+                                                message: Some(format!(
+                                                    "Analyzing {} shader file(s) for validation and symbols.",
+                                                    files_to_update.len()
+                                                )),
+                                                percentage: Some(0),
+                                            }),
+                                        ),
+                                    });
                                 match self.watched_files.cache_batched_file_data(
                                     files_to_update,
                                     &mut self.language_data,
                                     &self.config,
+                                    |file_updating, progress, total| {
+                                        self.connection.send_notification::<Progress>(
+                                            ProgressParams {
+                                                token: token.clone(),
+                                                value: lsp_types::ProgressParamsValue::WorkDone(
+                                                    WorkDoneProgress::Report(
+                                                        WorkDoneProgressReport {
+                                                            cancellable: Some(false),
+                                                            message: Some(format!(
+                                                                "{}/{} {} ",
+                                                                progress, total, file_updating
+                                                            )),
+                                                            percentage: Some(
+                                                                (((progress as f32)
+                                                                    / (total as f32))
+                                                                    * 100.0)
+                                                                    as u32,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                            },
+                                        );
+                                    },
                                 ) {
                                     Ok((files_to_clear, files_to_publish)) => {
                                         for file_to_clear in files_to_clear {
@@ -530,6 +578,15 @@ impl ServerLanguage {
                                         err
                                     )),
                                 }
+                                self.connection
+                                    .send_notification::<Progress>(ProgressParams {
+                                        token: token.clone(),
+                                        value: lsp_types::ProgressParamsValue::WorkDone(
+                                            WorkDoneProgress::End(WorkDoneProgressEnd {
+                                                message: Some("Finished analyzing files".into()),
+                                            }),
+                                        ),
+                                    });
                             }
                             // Solve all pending request.
                             if async_request_queue.len() > 0 {
@@ -643,10 +700,7 @@ impl ServerLanguage {
         match self.connection.remove_callback(&response.id) {
             Some(callback) => match response.result {
                 Some(result) => callback(self, result),
-                None => Err(ShaderError::InternalErr(format!(
-                    "Received response without result: {:#?}",
-                    response
-                ))),
+                None => Ok(AsyncMessage::None), // Received message can be empty.
             },
             None => Err(ShaderError::InternalErr(format!(
                 "Received unhandled response: {:#?}",

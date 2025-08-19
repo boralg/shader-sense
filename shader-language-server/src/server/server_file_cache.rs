@@ -526,12 +526,21 @@ impl ServerLanguageFileCache {
         );
         Ok(old_relying_files)
     }
-    pub fn cache_batched_file_data(
+    pub fn cache_batched_file_data<F: Fn(&str, u32, u32)>(
         &mut self,
         async_cache_requests: Vec<AsyncCacheRequest>,
         language_data: &mut HashMap<ShadingLanguage, ServerLanguageData>,
         config: &ServerConfig,
+        progress_callback: F,
     ) -> Result<(HashSet<Url>, HashSet<Url>), ShaderError> {
+        fn get_file_name(uri: &Url) -> String {
+            uri.to_file_path()
+                .unwrap()
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned()
+        }
         // Get unique files to update in batch aswell as dirty ones.
         let dirty_files: HashSet<Url> = async_cache_requests
             .iter()
@@ -572,12 +581,21 @@ impl ServerLanguageFileCache {
             async_cache_requests.iter().map(|r| r.url.clone()).collect();
         let mut unique_remaining_files = files_updating.clone();
         let mut files_to_publish = HashSet::new();
+        let mut file_progress_index = 0;
         if need_to_recompute_variant {
             // Recompute variant.
             let variant = self.variant.as_ref().unwrap();
             let variant_url = variant.url.clone();
             let variant_shading_language = variant.language; // TODO:ASYNC: rename for compat.
             let language_data = language_data.get_mut(&variant_shading_language).unwrap();
+            unique_remaining_files.remove(&variant_url);
+            let file_name = get_file_name(&variant_url);
+            file_progress_index += 1;
+            progress_callback(
+                &file_name,
+                file_progress_index,
+                unique_remaining_files.len() as u32 + 1,
+            );
             let removed_files = self.cache_file_data(
                 &variant_url,
                 language_data.validator.as_mut(),
@@ -590,7 +608,6 @@ impl ServerLanguageFileCache {
             // Remove request for relying files as they are already updated by variant.
             let relying_files = self.get_all_relying_files(&variant_url);
             unique_remaining_files.retain(|f| relying_files.contains(f));
-            unique_remaining_files.remove(&variant_url);
             files_updating.extend(relying_files);
             // If file is dirty, request update for dependent files.
             if dirty_files.contains(&variant_url) {
@@ -626,6 +643,14 @@ impl ServerLanguageFileCache {
                 }
             };
             let language_data = language_data.get_mut(&shading_language).unwrap();
+            let file_name = get_file_name(&remaining_file);
+            file_progress_index += 1;
+            progress_callback(
+                &file_name,
+                file_progress_index,
+                (unique_remaining_files.len() + dependent_files_to_update.len()) as u32
+                    + need_to_recompute_variant as u32,
+            );
             let removed_files = self.cache_file_data(
                 &remaining_file,
                 language_data.validator.as_mut(),
@@ -654,6 +679,14 @@ impl ServerLanguageFileCache {
         for dependent_file in &dependent_files_to_update {
             let shading_language = self.files.get(&dependent_file).unwrap().shading_language;
             let language_data = language_data.get_mut(&shading_language).unwrap();
+            let file_name = get_file_name(&dependent_file);
+            file_progress_index += 1;
+            progress_callback(
+                &file_name,
+                file_progress_index,
+                (unique_remaining_files.len() + dependent_files_to_update.len()) as u32
+                    + need_to_recompute_variant as u32,
+            );
             let removed_files = self.cache_file_data(
                 &dependent_file,
                 language_data.validator.as_mut(),
@@ -664,6 +697,13 @@ impl ServerLanguageFileCache {
             )?;
             files_to_clear.extend(removed_files);
         }
+        debug_assert!(
+            (unique_remaining_files.len()
+                + dependent_files_to_update.len()
+                + need_to_recompute_variant as usize)
+                == file_progress_index as usize,
+            "Invalid count for progress report"
+        );
         // TODO:ASYNC: Diagnostics return here are unique but might be in incorrect order...
         files_to_publish.extend(dependent_files_to_update);
         Ok((files_to_clear, files_to_publish))
