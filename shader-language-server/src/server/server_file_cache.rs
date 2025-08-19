@@ -558,17 +558,22 @@ impl ServerLanguageFileCache {
         let variant_url = self.variant.clone().map(|v| v.url);
 
         let need_to_recompute_variant = if let Some(variant_url) = &variant_url {
-            let variant_file_path = variant_url.to_file_path().unwrap();
             let has_variant_in_request = async_cache_requests
                 .iter()
                 .find(|r| r.url == *variant_url)
                 .is_some();
             let has_variant_relying_files_in_request =
                 if let Some(variant_data) = &self.files.get(&variant_url).unwrap().data {
-                    variant_data
-                        .symbol_cache
-                        .find_include(&mut |include| {
-                            include.get_absolute_path().as_os_str() == variant_file_path.as_os_str()
+                    async_cache_requests
+                        .iter()
+                        .find(|r| {
+                            let file_path = r.url.to_file_path().unwrap();
+                            variant_data
+                                .symbol_cache
+                                .find_include(&mut |include| {
+                                    include.get_absolute_path().as_os_str() == file_path.as_os_str()
+                                })
+                                .is_some()
                         })
                         .is_some()
                 } else {
@@ -592,6 +597,8 @@ impl ServerLanguageFileCache {
             let variant_shading_language = variant.language; // TODO:ASYNC: rename for compat.
             let language_data = language_data.get_mut(&variant_shading_language).unwrap();
             unique_remaining_files.remove(&variant_url);
+            files_to_publish.insert(variant_url.clone());
+            files_updating.insert(variant_url.clone());
             let file_name = get_file_name(&variant_url);
             file_progress_index += 1;
             progress_callback(
@@ -610,7 +617,7 @@ impl ServerLanguageFileCache {
             files_to_clear.extend(removed_files);
             // Remove request for relying files as they are already updated by variant.
             let relying_files = self.get_all_relying_files(&variant_url);
-            unique_remaining_files.retain(|f| relying_files.contains(f));
+            unique_remaining_files.retain(|f| !relying_files.contains(f));
             files_updating.extend(relying_files);
             // If file is dirty, request update for dependent files.
             if dirty_files.contains(&variant_url) {
@@ -626,7 +633,6 @@ impl ServerLanguageFileCache {
                     }
                 }
             }
-            files_to_publish.insert(variant_url);
         }
         for remaining_file in &unique_remaining_files {
             let file_name = get_file_name(&remaining_file);
