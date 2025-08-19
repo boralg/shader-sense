@@ -54,6 +54,9 @@ impl ServerFileCache {
     pub fn is_cachable_file(&self) -> bool {
         self.is_main_file || self.is_variant_file
     }
+    pub fn has_data(&self) -> bool {
+        self.data.is_some()
+    }
     pub fn get_data(&self) -> &ServerFileCacheData {
         assert!(
             self.data.is_some(),
@@ -916,7 +919,7 @@ impl ServerLanguageFileCache {
         let file_path = uri.to_file_path().unwrap();
         self.files.iter().find(|(file_url, file_cache)| {
             if *file_url != uri {
-                file_cache.is_cachable_file()
+                file_cache.has_data()
                     && file_cache
                         .get_data()
                         .symbol_cache
@@ -1054,10 +1057,6 @@ impl ServerLanguageFileCache {
                     match self.files.remove(uri) {
                         Some(mut cached_file) => {
                             let shading_language = cached_file.shading_language;
-                            assert!(
-                                cached_file.data.is_some(),
-                                "Removing main file without data"
-                            );
                             // Get dangling dependencies that need to be removed.
                             dangling_files.retain(|f| {
                                 if uri != f {
@@ -1067,8 +1066,9 @@ impl ServerLanguageFileCache {
                                 }
                             });
                             // Remove main file before deps & drop cache for ref.
-                            let data = cached_file.data.unwrap();
-                            drop(data);
+                            if let Some(data) = cached_file.data {
+                                drop(data);
+                            }
                             cached_file.is_main_file = false; // Just to be sure.
                             info!(
                                 "Removed {:#?} main file at {}. {} files in cache.",
