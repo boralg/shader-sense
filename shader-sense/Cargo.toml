@@ -8,6 +8,7 @@ version = "0.5.2"
 edition = "2021"
 license-file = "../LICENSE"
 readme = "../README.md"
+rust-version = "1.88" # Minimal version required for HashSet::extract_if
 
 [dependencies]
 glslang = "0.6.1"
