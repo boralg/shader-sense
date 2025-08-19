@@ -570,6 +570,8 @@ impl ServerLanguageFileCache {
         let mut dependent_files_to_update = HashSet::new();
         let mut files_updating: HashSet<Url> =
             async_cache_requests.iter().map(|r| r.url.clone()).collect();
+        let mut unique_remaining_files = files_updating.clone();
+        let mut files_to_publish = HashSet::new();
         if need_to_recompute_variant {
             // Recompute variant.
             let variant = self.variant.as_ref().unwrap();
@@ -587,22 +589,25 @@ impl ServerLanguageFileCache {
             files_to_clear.extend(removed_files);
             // Remove request for relying files as they are already updated by variant.
             let relying_files = self.get_all_relying_files(&variant_url);
+            unique_remaining_files.retain(|f| relying_files.contains(f));
+            unique_remaining_files.remove(&variant_url);
             files_updating.extend(relying_files);
             // If file is dirty, request update for dependent files.
             if dirty_files.contains(&variant_url) {
                 let dependent_files = self.get_dependent_main_files(&variant_url);
                 for dependent_file in dependent_files {
                     if !files_updating.contains(&dependent_file) {
+                        info!(
+                            "File {} is being updated as its relying on {}",
+                            dependent_file, variant_url
+                        );
                         files_updating.insert(dependent_file.clone());
                         dependent_files_to_update.insert(dependent_file);
                     }
                 }
             }
+            files_to_publish.insert(variant_url);
         }
-        let mut files_to_publish = HashSet::new();
-        // Compute all remaining files (And their dependent files aswell.)
-        let unique_remaining_files: HashSet<Url> =
-            async_cache_requests.into_iter().map(|r| r.url).collect();
         for remaining_file in &unique_remaining_files {
             // Check file is still watched and a main file
             let shading_language = match self.files.get(&remaining_file) {
@@ -635,6 +640,10 @@ impl ServerLanguageFileCache {
                 let dependent_files = self.get_dependent_main_files(&remaining_file);
                 for dependent_file in dependent_files {
                     if !files_updating.contains(&dependent_file) {
+                        info!(
+                            "File {} is being updated as its relying on {}",
+                            dependent_file, remaining_file
+                        );
                         files_updating.insert(dependent_file.clone());
                         dependent_files_to_update.insert(dependent_file);
                     }
