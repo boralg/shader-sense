@@ -145,6 +145,7 @@ impl ServerLanguageFileCache {
             }
         }
     }
+    #[allow(unused)]
     pub fn get_relying_variant(&self, url: &Url) -> Option<Url> {
         let file_path = url.to_file_path().unwrap();
         match &self.variant {
@@ -377,177 +378,137 @@ impl ServerLanguageFileCache {
         Ok(())
     }
 
-    pub fn cache_single_main_file(
-        &mut self,
-        url: &Url,
-        shading_language: ShadingLanguage,
-        language_data: &mut HashMap<ShadingLanguage, ServerLanguageData>,
-        dirty_files: &HashSet<Url>,
-        config: &ServerConfig,
-    ) -> Result<(HashSet<Url>, HashSet<Url>), ShaderError> {
-        let cached_file = self.files.get(&url).unwrap();
-        let dirty_deps: HashSet<PathBuf> = if cached_file.data.is_some() {
-            // Updating cache
-            // TODO:ASYNC: wtf, need to use cache to find relying & co.
-            dirty_files
-                .iter()
-                .map(|url| url.to_file_path().unwrap())
-                .collect()
-        } else {
-            // New cache request.
-            HashSet::new()
-        };
-        let language_data = language_data.get_mut(&shading_language).unwrap();
-        let removed_files = self.cache_file_data(
-            &url,
-            language_data.validator.as_mut(),
-            &mut language_data.language,
-            &mut language_data.symbol_provider,
-            &config,
-            dirty_deps,
-        )?;
-        let url_to_republish = self.get_relying_variant(&url).unwrap_or(url.clone());
-        Ok((removed_files, HashSet::from([url_to_republish])))
-    }
-
     pub fn cache_batched_file_data(
         &mut self,
-        requests: HashSet<AsyncCacheRequest>,
+        async_cache_requests: Vec<AsyncCacheRequest>,
         language_data: &mut HashMap<ShadingLanguage, ServerLanguageData>,
         config: &ServerConfig,
     ) -> Result<(HashSet<Url>, HashSet<Url>), ShaderError> {
         // Get unique files to update in batch aswell as dirty ones.
-        let mut unique_files: HashSet<Url> = requests.iter().map(|r| r.url.clone()).collect();
-        let dirty_files: HashSet<Url> = requests
+        let dirty_files: HashSet<Url> = async_cache_requests
             .iter()
             .filter(|r| r.dirty)
             .map(|r| r.url.clone())
             .collect();
+        let dirty_dependencies: HashSet<PathBuf> = dirty_files
+            .iter()
+            .map(|url| url.to_file_path().unwrap())
+            .collect();
 
-        let mut files_to_clear = HashSet::new();
-        let mut files_to_publish = HashSet::new();
-        // Check if variant need update (or it has dirty relying files).
-        if let Some(variant) = &self.variant {
-            // Compute dependent files first
-            let variant_url = variant.url.clone();
-            let variant_language = variant.language;
-            let mut dependent_files = self.get_dependent_main_files(&variant_url);
-            let relying_files = self.get_relying_main_files(&variant_url);
-            dependent_files.retain(|f| !relying_files.contains(f));
-            unique_files.retain(|url| dependent_files.contains(url));
-            for dependent_file in dependent_files {
-                // Update single file.
-                let (removed_files, updated_files) = self.cache_single_main_file(
-                    &dependent_file,
-                    variant_language,
-                    language_data,
-                    &dirty_files,
-                    config,
-                )?;
-                files_to_clear.extend(removed_files);
-                files_to_publish.extend(updated_files);
-            }
+        let variant_url = self.variant.clone().map(|v| v.url);
 
-            // Now cache variant.
-            let variant_update: HashSet<Url> =
-                unique_files.extract_if(|url| *url == variant_url).collect();
-            assert!(variant_update.len() <= 1, "More than one variant found...");
-            let relying_files = self.get_relying_main_files(&variant_url);
-            let dirty_relying_files: HashSet<&Url> = relying_files
+        let need_to_recompute_variant = if let Some(variant_url) = &variant_url {
+            let variant_file_path = variant_url.to_file_path().unwrap();
+            let has_variant_in_request = async_cache_requests
                 .iter()
-                .filter(|f| dirty_files.contains(f))
-                .collect();
-            let is_variant_dirty = !variant_update.is_empty() || !dirty_relying_files.is_empty();
-            if is_variant_dirty {
-                let cached_file = self.files.get(&variant_url).unwrap();
-                let dirty_deps: HashSet<PathBuf> = if cached_file.data.is_some() {
-                    // Updating cache
-                    dirty_files
-                        .iter()
-                        .map(|url| url.to_file_path().unwrap())
-                        .collect()
+                .find(|r| r.url == *variant_url)
+                .is_some();
+            let has_variant_relying_files_in_request =
+                if let Some(variant_data) = &self.files.get(&variant_url).unwrap().data {
+                    variant_data
+                        .symbol_cache
+                        .find_include(&mut |include| {
+                            include.get_absolute_path().as_os_str() == variant_file_path.as_os_str()
+                        })
+                        .is_some()
                 } else {
-                    // New cache request.
-                    HashSet::new()
+                    false
                 };
-                let language_data = language_data.get_mut(&variant_language).unwrap();
-                let removed_files = self.cache_file_data(
-                    &variant_url,
-                    language_data.validator.as_mut(),
-                    &mut language_data.language,
-                    &mut language_data.symbol_provider,
-                    &config,
-                    dirty_deps,
-                )?;
-                let mut files_to_publish = HashSet::new();
-                let url_to_republish = self
-                    .get_relying_variant(&variant_url)
-                    .unwrap_or(variant_url.clone());
-                files_to_clear.extend(removed_files);
-                files_to_publish.insert(url_to_republish);
-            }
-            // Now cache dependencies of variant.
-            unique_files.retain(|url| relying_files.contains(url));
-            for relying_file in relying_files {
-                // Update single file.
-                let (removed_files, updated_files) = self.cache_single_main_file(
-                    &relying_file,
-                    variant_language,
-                    language_data,
-                    &dirty_files,
-                    config,
-                )?;
-                files_to_clear.extend(removed_files);
-                files_to_publish.extend(updated_files);
-            }
-
-            // Now cache remaining files.
-            for remaining_file in unique_files {
-                // Update single file.
-                let (removed_files, updated_files) = self.cache_single_main_file(
-                    &remaining_file,
-                    variant_language,
-                    language_data,
-                    &dirty_files,
-                    config,
-                )?;
-                files_to_clear.extend(removed_files);
-                files_to_publish.extend(updated_files);
-            }
+            has_variant_in_request || has_variant_relying_files_in_request
         } else {
-            // First in, first out, skip duplicates.
-            // For dirty files, should update relying & dependent.
-            for url in unique_files {
-                let cached_file = self.files.get(&url).unwrap();
-                let dirty_deps: HashSet<PathBuf> = if cached_file.data.is_some() {
-                    // Updating cache
-                    dirty_files
-                        .iter()
-                        .map(|url| url.to_file_path().unwrap())
-                        .collect()
-                } else {
-                    // New cache request.
-                    HashSet::new()
-                };
-                let language_data = language_data
-                    .get_mut(&cached_file.shading_language)
-                    .unwrap();
-                let removed_files = self.cache_file_data(
-                    &url,
-                    language_data.validator.as_mut(),
-                    &mut language_data.language,
-                    &mut language_data.symbol_provider,
-                    &config,
-                    dirty_deps,
-                )?;
-                let mut files_to_publish = HashSet::new();
-                let url_to_republish = self.get_relying_variant(&url).unwrap_or(url.clone());
-                files_to_publish.insert(url_to_republish);
-                files_to_clear.extend(removed_files);
-                // TODO:ASYNC: dependencies update aswell. Should be done for all.
-                // for every file, gather dependent ones and relying ones. Update in correct order.
+            false // no variant.
+        };
+        let mut files_to_clear = HashSet::new();
+        let mut dependent_files_to_update = HashSet::new();
+        let mut files_updating: HashSet<Url> =
+            async_cache_requests.iter().map(|r| r.url.clone()).collect();
+        if need_to_recompute_variant {
+            // Recompute variant.
+            let variant = self.variant.as_ref().unwrap();
+            let variant_url = variant.url.clone();
+            let variant_shading_language = variant.language; // TODO:ASYNC: rename for compat.
+            let language_data = language_data.get_mut(&variant_shading_language).unwrap();
+            let removed_files = self.cache_file_data(
+                &variant_url,
+                language_data.validator.as_mut(),
+                &mut language_data.language,
+                &mut language_data.symbol_provider,
+                &config,
+                dirty_dependencies.clone(),
+            )?;
+            files_to_clear.extend(removed_files);
+            // Remove request for relying files as they are already updated by variant.
+            let relying_files = self.get_all_relying_files(&variant_url);
+            files_updating.extend(relying_files);
+            // If file is dirty, request update for dependent files.
+            if dirty_files.contains(&variant_url) {
+                let dependent_files = self.get_dependent_main_files(&variant_url);
+                for dependent_file in dependent_files {
+                    if !files_updating.contains(&dependent_file) {
+                        files_updating.insert(dependent_file.clone());
+                        dependent_files_to_update.insert(dependent_file);
+                    }
+                }
             }
         }
+        let mut files_to_publish = HashSet::new();
+        // Compute all remaining files (And their dependent files aswell.)
+        let unique_remaining_files: HashSet<Url> =
+            async_cache_requests.into_iter().map(|r| r.url).collect();
+        for remaining_file in &unique_remaining_files {
+            // Check file is still watched and a main file
+            let shading_language = match self.files.get(&remaining_file) {
+                Some(file) => {
+                    if !file.is_main_file() {
+                        files_to_clear.insert(remaining_file.clone());
+                        continue;
+                    } else {
+                        files_to_publish.insert(remaining_file.clone());
+                        file.shading_language
+                    }
+                }
+                None => {
+                    files_to_clear.insert(remaining_file.clone());
+                    continue;
+                }
+            };
+            let language_data = language_data.get_mut(&shading_language).unwrap();
+            let removed_files = self.cache_file_data(
+                &remaining_file,
+                language_data.validator.as_mut(),
+                &mut language_data.language,
+                &mut language_data.symbol_provider,
+                &config,
+                dirty_dependencies.clone(),
+            )?;
+            files_to_clear.extend(removed_files);
+            // If file is dirty, request update for dependent files.
+            if dirty_files.contains(&remaining_file) {
+                let dependent_files = self.get_dependent_main_files(&remaining_file);
+                for dependent_file in dependent_files {
+                    if !files_updating.contains(&dependent_file) {
+                        files_updating.insert(dependent_file.clone());
+                        dependent_files_to_update.insert(dependent_file);
+                    }
+                }
+            }
+        }
+        // Update dependent files now that we did everything else.
+        for dependent_file in &dependent_files_to_update {
+            let shading_language = self.files.get(&dependent_file).unwrap().shading_language;
+            let language_data = language_data.get_mut(&shading_language).unwrap();
+            let removed_files = self.cache_file_data(
+                &dependent_file,
+                language_data.validator.as_mut(),
+                &mut language_data.language,
+                &mut language_data.symbol_provider,
+                &config,
+                dirty_dependencies.clone(),
+            )?;
+            files_to_clear.extend(removed_files);
+        }
+        // TODO:ASYNC: Diagnostics return here are unique but might be in incorrect order...
+        files_to_publish.extend(dependent_files_to_update);
         Ok((files_to_clear, files_to_publish))
     }
     pub fn cache_file_data(
@@ -1013,7 +974,11 @@ impl ServerLanguageFileCache {
     }
     pub fn remove_main_file(&mut self, uri: &Url) -> Result<Vec<Url>, ShaderError> {
         let used_as_deps = self.is_used_as_dependency(uri).is_some();
-        let mut dangling_files = self.get_all_relying_files(uri);
+        let mut dangling_files = if self.files.get(&uri).unwrap().data.is_some() {
+            self.get_all_relying_files(uri)
+        } else {
+            HashSet::new()
+        };
         match self.files.get_mut(&uri) {
             Some(cached_file) => {
                 if used_as_deps || cached_file.is_variant_file {

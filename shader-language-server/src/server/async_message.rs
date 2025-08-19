@@ -24,7 +24,7 @@ pub struct AsyncRequest<R: Request> {
 #[derive(PartialEq, Eq, Hash)]
 pub struct AsyncCacheRequest {
     pub url: Url,
-    pub lang: ShadingLanguage,
+    pub shading_language: ShadingLanguage,
     pub dirty: bool,
     //version: u32,
 }
@@ -53,10 +53,10 @@ pub enum AsyncMessage {
 }
 
 impl AsyncCacheRequest {
-    pub fn new(url: Url, lang: ShadingLanguage, dirty: bool) -> Self {
+    pub fn new(url: Url, shading_language: ShadingLanguage, dirty: bool) -> Self {
         Self {
             url,
-            lang,
+            shading_language,
             dirty,
             //version: 0,
         }
@@ -83,6 +83,71 @@ impl AsyncMessage {
             AsyncMessage::DumpDependencyRequest(async_request) => &async_request.req_id,
             AsyncMessage::DumpAstRequest(async_request) => &async_request.req_id,
             // These variants do not have a RequestId
+            AsyncMessage::None | AsyncMessage::UpdateCache(_) => {
+                unreachable!("Should not be reached. Update AsyncMessage::is_update accordingly.");
+            }
+        }
+    }
+    pub fn get_uri(&self) -> Option<&Url> {
+        match self {
+            AsyncMessage::DocumentSymbolRequest(async_request) => {
+                Some(&async_request.params.text_document.uri)
+            }
+            AsyncMessage::RangeFormatting(async_request) => {
+                Some(&async_request.params.text_document.uri)
+            }
+            AsyncMessage::Formatting(async_request) => {
+                Some(&async_request.params.text_document.uri)
+            }
+            AsyncMessage::SemanticTokensFullRequest(async_request) => {
+                Some(&async_request.params.text_document.uri)
+            }
+            AsyncMessage::FoldingRangeRequest(async_request) => {
+                Some(&async_request.params.text_document.uri)
+            }
+            AsyncMessage::InlayHintRequest(async_request) => {
+                Some(&async_request.params.text_document.uri)
+            }
+            AsyncMessage::HoverRequest(async_request) => Some(
+                &async_request
+                    .params
+                    .text_document_position_params
+                    .text_document
+                    .uri,
+            ),
+            AsyncMessage::SignatureHelpRequest(async_request) => Some(
+                &async_request
+                    .params
+                    .text_document_position_params
+                    .text_document
+                    .uri,
+            ),
+            AsyncMessage::Completion(async_request) => Some(
+                &async_request
+                    .params
+                    .text_document_position
+                    .text_document
+                    .uri,
+            ),
+            AsyncMessage::GotoDefinition(async_request) => Some(
+                &async_request
+                    .params
+                    .text_document_position_params
+                    .text_document
+                    .uri,
+            ),
+            AsyncMessage::DocumentDiagnosticRequest(async_request) => {
+                Some(&async_request.params.text_document.uri)
+            }
+            AsyncMessage::DumpDependencyRequest(async_request) => {
+                Some(&async_request.params.text_document.uri)
+            }
+            AsyncMessage::DumpAstRequest(async_request) => {
+                Some(&async_request.params.text_document.uri)
+            }
+            // These variants do not have a uri
+            AsyncMessage::WorkspaceSymbolRequest(_) => None,
+            // These variants should not have a uri
             AsyncMessage::None | AsyncMessage::UpdateCache(_) => {
                 unreachable!("Should not be reached. Update AsyncMessage::is_update accordingly.");
             }

@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::str::FromStr;
 
@@ -200,23 +200,6 @@ impl ServerLanguage {
         self.request_configuration();
 
         return Ok(());
-    }
-    fn update_main_file_cache(
-        &mut self,
-        requests: HashSet<AsyncCacheRequest>,
-    ) -> Result<(), ShaderError> {
-        let (files_to_clear, files_to_publish) = self.watched_files.cache_batched_file_data(
-            requests,
-            &mut self.language_data,
-            &self.config,
-        )?;
-        for file_to_clear in files_to_clear {
-            self.clear_diagnostic(&file_to_clear);
-        }
-        for file_to_publish in files_to_publish {
-            self.publish_diagnostic(&file_to_publish, None);
-        }
-        Ok(())
     }
     fn resolve_async_request(&mut self, request: AsyncMessage) -> Result<(), ShaderError> {
         // TODO:ASYNC: Discard all messages which version is too old.
@@ -500,47 +483,70 @@ impl ServerLanguage {
                 },
                 Err(err) => match err {
                     TryRecvError::Empty => {
-                        // Now that we do not have messages in queue, batch them.
-                        let mut async_queue: Vec<AsyncMessage> =
-                            async_messages_queue.drain(..).collect();
-                        let async_update_queue: Vec<AsyncMessage> =
-                            async_queue.extract_if(.., |m| m.is_update()).collect();
-                        let async_request_queue = async_queue;
-                        // First we list all unique file to update.
-                        let mut files_to_update = HashSet::new();
-                        for async_update in async_update_queue {
-                            match async_update {
-                                AsyncMessage::None => {}
-                                AsyncMessage::UpdateCache(async_cache_request) => {
-                                    // Simply store update for batching.
-                                    for update in async_cache_request {
-                                        files_to_update.insert(update);
+                        async_messages_queue.retain(|m| !matches!(m, AsyncMessage::None));
+                        if async_messages_queue.len() > 0 {
+                            profile_scope!(
+                                "Processing queue with {} message(s)",
+                                async_messages_queue.len()
+                            );
+                            // Now that we do not have messages in queue, batch them.
+                            let mut async_queue: Vec<AsyncMessage> =
+                                async_messages_queue.drain(..).collect();
+                            let async_update_queue: Vec<AsyncMessage> =
+                                async_queue.extract_if(.., |m| m.is_update()).collect();
+                            let async_request_queue = async_queue;
+                            // First we list all unique file to update.
+                            let mut files_to_update = Vec::new();
+                            for async_update in async_update_queue {
+                                match async_update {
+                                    AsyncMessage::UpdateCache(async_cache_request) => {
+                                        // Simply store update for batching.
+                                        files_to_update.extend(async_cache_request);
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            }
+                            // Update files for all requested updates.
+                            if files_to_update.len() > 0 {
+                                profile_scope!(
+                                    "Updating {} batched file(s).",
+                                    files_to_update.len()
+                                );
+                                match self.watched_files.cache_batched_file_data(
+                                    files_to_update,
+                                    &mut self.language_data,
+                                    &self.config,
+                                ) {
+                                    Ok((files_to_clear, files_to_publish)) => {
+                                        for file_to_clear in files_to_clear {
+                                            self.clear_diagnostic(&file_to_clear);
+                                        }
+                                        for file_to_publish in files_to_publish {
+                                            self.publish_diagnostic(&file_to_publish, None);
+                                        }
+                                    }
+                                    Err(err) => self.connection.send_notification_error(format!(
+                                        "Failed to update cache: {}",
+                                        err
+                                    )),
+                                }
+                            }
+                            // Solve all pending request.
+                            if async_request_queue.len() > 0 {
+                                profile_scope!("Solving {} request", async_request_queue.len());
+                                for request in async_request_queue {
+                                    let req_id = request.get_request_id().clone();
+                                    match self.resolve_async_request(request) {
+                                        Ok(_) => {}
+                                        Err(err) => self.connection.send_response_error(
+                                            req_id,
+                                            shader_error_to_lsp_error(&err),
+                                            err.to_string(),
+                                        ),
                                     }
                                 }
-                                _ => unreachable!(),
                             }
                         }
-                        // Update files for all requested updates.
-                        match self.update_main_file_cache(files_to_update) {
-                            Ok(_) => {}
-                            Err(err) => self.connection.send_notification_error(format!(
-                                "Failed to update cache: {}",
-                                err
-                            )),
-                        }
-                        // Solve all pending request.
-                        for request in async_request_queue {
-                            let req_id = request.get_request_id().clone();
-                            match self.resolve_async_request(request) {
-                                Ok(_) => {}
-                                Err(err) => self.connection.send_response_error(
-                                    req_id,
-                                    shader_error_to_lsp_error(&err),
-                                    err.to_string(),
-                                ),
-                            }
-                        }
-
                         // TODO:ASYNC: should have condvar & co instead to restart queue ideally
                         std::thread::sleep(std::time::Duration::from_millis(100));
                     }
@@ -568,62 +574,69 @@ impl ServerLanguage {
     }
     fn on_request(&mut self, req: lsp_server::Request) -> Result<AsyncMessage, ShaderError> {
         // Simply parse the request and delay them.
-        match req.method.as_str() {
-            DocumentDiagnosticRequest::METHOD => Ok(AsyncMessage::DocumentDiagnosticRequest(
-                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
-            )),
-            GotoDefinition::METHOD => Ok(AsyncMessage::GotoDefinition(AsyncRequest::new(
-                req.id,
-                serde_json::from_value(req.params)?,
-            ))),
-            Completion::METHOD => Ok(AsyncMessage::Completion(AsyncRequest::new(
-                req.id,
-                serde_json::from_value(req.params)?,
-            ))),
-            SignatureHelpRequest::METHOD => Ok(AsyncMessage::SignatureHelpRequest(
-                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
-            )),
-            HoverRequest::METHOD => Ok(AsyncMessage::HoverRequest(AsyncRequest::new(
-                req.id,
-                serde_json::from_value(req.params)?,
-            ))),
-            InlayHintRequest::METHOD => Ok(AsyncMessage::InlayHintRequest(AsyncRequest::new(
-                req.id,
-                serde_json::from_value(req.params)?,
-            ))),
-            FoldingRangeRequest::METHOD => Ok(AsyncMessage::FoldingRangeRequest(
-                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
-            )),
-            WorkspaceSymbolRequest::METHOD => Ok(AsyncMessage::WorkspaceSymbolRequest(
-                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
-            )),
-            DocumentSymbolRequest::METHOD => Ok(AsyncMessage::DocumentSymbolRequest(
-                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
-            )),
-            SemanticTokensFullRequest::METHOD => Ok(AsyncMessage::SemanticTokensFullRequest(
-                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
-            )),
-            Formatting::METHOD => Ok(AsyncMessage::Formatting(AsyncRequest::new(
-                req.id,
-                serde_json::from_value(req.params)?,
-            ))),
-            RangeFormatting::METHOD => Ok(AsyncMessage::RangeFormatting(AsyncRequest::new(
-                req.id,
-                serde_json::from_value(req.params)?,
-            ))),
-            // Debug request
-            DumpAstRequest::METHOD => Ok(AsyncMessage::DumpAstRequest(AsyncRequest::new(
-                req.id,
-                serde_json::from_value(req.params)?,
-            ))),
-            DumpDependencyRequest::METHOD => Ok(AsyncMessage::DumpDependencyRequest(
-                AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
-            )),
-            _ => {
-                warn!("Received unhandled request: {:#?}", req);
-                Ok(AsyncMessage::None)
-            }
+        let async_request =
+            match req.method.as_str() {
+                DocumentDiagnosticRequest::METHOD => AsyncMessage::DocumentDiagnosticRequest(
+                    AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+                ),
+                GotoDefinition::METHOD => AsyncMessage::GotoDefinition(AsyncRequest::new(
+                    req.id,
+                    serde_json::from_value(req.params)?,
+                )),
+                Completion::METHOD => AsyncMessage::Completion(AsyncRequest::new(
+                    req.id,
+                    serde_json::from_value(req.params)?,
+                )),
+                SignatureHelpRequest::METHOD => AsyncMessage::SignatureHelpRequest(
+                    AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+                ),
+                HoverRequest::METHOD => AsyncMessage::HoverRequest(AsyncRequest::new(
+                    req.id,
+                    serde_json::from_value(req.params)?,
+                )),
+                InlayHintRequest::METHOD => AsyncMessage::InlayHintRequest(AsyncRequest::new(
+                    req.id,
+                    serde_json::from_value(req.params)?,
+                )),
+                FoldingRangeRequest::METHOD => AsyncMessage::FoldingRangeRequest(
+                    AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+                ),
+                WorkspaceSymbolRequest::METHOD => AsyncMessage::WorkspaceSymbolRequest(
+                    AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+                ),
+                DocumentSymbolRequest::METHOD => AsyncMessage::DocumentSymbolRequest(
+                    AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+                ),
+                SemanticTokensFullRequest::METHOD => AsyncMessage::SemanticTokensFullRequest(
+                    AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+                ),
+                Formatting::METHOD => AsyncMessage::Formatting(AsyncRequest::new(
+                    req.id,
+                    serde_json::from_value(req.params)?,
+                )),
+                RangeFormatting::METHOD => AsyncMessage::RangeFormatting(AsyncRequest::new(
+                    req.id,
+                    serde_json::from_value(req.params)?,
+                )),
+                // Debug request
+                DumpAstRequest::METHOD => AsyncMessage::DumpAstRequest(AsyncRequest::new(
+                    req.id,
+                    serde_json::from_value(req.params)?,
+                )),
+                DumpDependencyRequest::METHOD => AsyncMessage::DumpDependencyRequest(
+                    AsyncRequest::new(req.id, serde_json::from_value(req.params)?),
+                ),
+                _ => {
+                    warn!("Received unhandled request: {:#?}", req);
+                    AsyncMessage::None
+                }
+            };
+        if let Some(uri) = async_request.get_uri() {
+            info!("Received request {} for file {}", req.method, uri);
+        } else {
+            info!("Received request {}", req.method);
         }
+        Ok(async_request)
     }
     fn on_response(&mut self, response: lsp_server::Response) -> Result<AsyncMessage, ShaderError> {
         // Here the callback return a delayed update
