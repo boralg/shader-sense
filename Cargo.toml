@@ -7,6 +7,7 @@ members = [
     #"shader-intrinsic-parser" # Skip it as its only a tool on windows.
 ]
 resolver = "2"
+rust-version = "1.88" # Minimal version required for HashSet::extract_if
 
 # For profiling. Build with:
 # cargo build --profile=release-with-debug
