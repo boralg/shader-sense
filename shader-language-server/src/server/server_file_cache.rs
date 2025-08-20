@@ -20,10 +20,11 @@ use shader_sense::{
     shader::ShadingLanguage,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
+        intrinsics::ShaderIntrinsics,
         shader_language::ShaderLanguage,
         symbol_provider::SymbolProvider,
         symbol_tree::{ShaderModuleHandle, ShaderSymbols},
-        symbols::{ShaderPreprocessorContext, ShaderRange, ShaderSymbolList, ShaderSymbolListRef},
+        symbols::{ShaderPreprocessorContext, ShaderRange, ShaderSymbolListRef},
     },
     validator::validator::Validator,
 };
@@ -33,8 +34,8 @@ use super::{server_config::ServerConfig, shader_variant::ShaderVariant};
 #[derive(Debug, Clone, Default)]
 pub struct ServerFileCacheData {
     pub symbol_cache: ShaderSymbols, // Store symbols to avoid computing them at every change.
-    pub intrinsics: ShaderSymbolList, // Cached intrinsics to not recompute them everytime
-    pub diagnostic_cache: ShaderDiagnosticList, // Cached diagnostic
+    pub intrinsics: ShaderSymbolListRef<'static>, // Cached intrinsics to not recompute them everytime
+    pub diagnostic_cache: ShaderDiagnosticList,   // Cached diagnostic
 }
 
 #[derive(Debug, Clone)]
@@ -370,9 +371,9 @@ impl ServerLanguageFileCache {
             .get_preprocessor_mut()
             .diagnostics
             .extend(symbol_diagnostics.diagnostics);
-        let intrinsics = shader_language
-            .get_intrinsics_symbol(&shader_params.compilation)
-            .to_owned();
+        let shading_language = self.files.get(uri).unwrap().shading_language;
+        let intrinsics = ShaderIntrinsics::get(shading_language)
+            .get_intrinsics_symbol(&shader_params.compilation);
         self.files.get_mut(uri).unwrap().data = Some(ServerFileCacheData {
             symbol_cache: symbols,
             intrinsics,
@@ -449,13 +450,14 @@ impl ServerLanguageFileCache {
                                             .cloned()
                                             .collect(),
                                     };
-                                    let intrinsics = shader_language
+                                    let shading_language =
+                                        self.files.get(uri).unwrap().shading_language;
+                                    let intrinsics = ShaderIntrinsics::get(shading_language)
                                         .get_intrinsics_symbol(
                                             &config
                                                 .into_shader_params(Some(variant.clone()))
                                                 .compilation,
-                                        )
-                                        .to_owned();
+                                        );
                                     file_to_cache.insert(
                                         include_url,
                                         ServerFileCacheData {
@@ -1125,7 +1127,7 @@ impl ServerLanguageFileCache {
             symbol_cache.macros.push(&symbol);
         }
         // Add intrinsics symbols
-        symbol_cache.append_as_reference(&data.intrinsics);
+        symbol_cache.append(data.intrinsics.clone());
         symbol_cache
     }
 }

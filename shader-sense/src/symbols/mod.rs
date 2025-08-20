@@ -1,5 +1,6 @@
 mod glsl;
 mod hlsl;
+pub mod intrinsics;
 pub mod shader_language;
 mod symbol_parser;
 pub mod symbol_provider;
@@ -24,6 +25,7 @@ mod tests {
         },
         shader_error::ShaderError,
         symbols::{
+            intrinsics::ShaderIntrinsics,
             shader_language::ShaderLanguage,
             symbols::{ShaderPosition, ShaderRange, ShaderSymbolData},
         },
@@ -76,7 +78,7 @@ mod tests {
     ) -> Result<ShaderSymbolList, ShaderError> {
         let mut include_handler = IncludeHandler::main_without_config(&file_path);
         let deps = find_dependencies(&mut include_handler, &shader_content);
-        let mut all_symbols = language
+        let mut all_symbols = ShaderIntrinsics::get(T::get_language())
             .get_intrinsics_symbol(&ShaderCompilationParams::default())
             .to_owned();
         let symbol_tree = language.create_module(file_path, shader_content).unwrap();
@@ -360,9 +362,9 @@ mod tests {
     }
     #[test]
     fn test_intrinsic_filtering() {
-        let language = ShaderLanguage::new(ShadingLanguage::Hlsl);
+        let intrinsics = ShaderIntrinsics::get(ShadingLanguage::Hlsl);
         // Check with frag stage set
-        let intrinsics_frag = language.get_intrinsics_symbol(&ShaderCompilationParams {
+        let intrinsics_frag = intrinsics.get_intrinsics_symbol(&ShaderCompilationParams {
             shader_stage: Some(ShaderStage::Fragment),
             ..Default::default()
         });
@@ -371,13 +373,14 @@ mod tests {
             "clip() should be available from fragment shader."
         );
         // Check without stage set
-        let intrinsics_common = language.get_intrinsics_symbol(&ShaderCompilationParams::default());
+        let intrinsics_common =
+            intrinsics.get_intrinsics_symbol(&ShaderCompilationParams::default());
         assert!(
             intrinsics_common.find_symbol("clip").is_some(),
             "clip() should be available if no shader given."
         );
         // Check with vert stage set
-        let intrinsics_vert = language.get_intrinsics_symbol(&ShaderCompilationParams {
+        let intrinsics_vert = intrinsics.get_intrinsics_symbol(&ShaderCompilationParams {
             shader_stage: Some(ShaderStage::Vertex),
             ..Default::default()
         });
