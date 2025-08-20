@@ -388,4 +388,19 @@ impl ValidatorImpl for Glslang {
 
         Ok(ShaderDiagnosticList::empty()) // No error detected.
     }
+    fn support(&self, shader_stage: ShaderStage) -> bool {
+        if self.hlsl {
+            match shader_stage {
+                ShaderStage::Vertex
+                | ShaderStage::Fragment
+                | ShaderStage::Compute
+                | ShaderStage::Geometry
+                | ShaderStage::TesselationControl
+                | ShaderStage::TesselationEvaluation => true,
+                _ => false,
+            }
+        } else {
+            true // All stages supported.
+        }
+    }
 }

@@ -3,7 +3,7 @@ use std::path::Path;
 #[cfg(not(target_os = "wasi"))]
 use crate::validator::dxc::Dxc;
 use crate::{
-    shader::{ShaderParams, ShadingLanguage},
+    shader::{ShaderParams, ShaderStage, ShadingLanguage},
     shader_error::{ShaderDiagnosticList, ShaderError},
     validator::{glslang::Glslang, naga::Naga},
 };
@@ -19,6 +19,8 @@ pub trait ValidatorImpl {
         params: &ShaderParams,
         include_callback: &mut dyn FnMut(&Path) -> Option<String>,
     ) -> Result<ShaderDiagnosticList, ShaderError>;
+
+    fn support(&self, shader_stage: ShaderStage) -> bool;
 
     fn get_file_name(&self, path: &Path) -> String {
         String::from(path.file_name().unwrap().to_string_lossy())

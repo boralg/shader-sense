@@ -475,4 +475,7 @@ impl ValidatorImpl for Dxc {
             }
         }
     }
+    fn support(&self, _shader_stage: ShaderStage) -> bool {
+        true // Support all shader stage
+    }
 }

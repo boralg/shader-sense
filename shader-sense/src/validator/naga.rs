@@ -5,7 +5,7 @@ use naga::{
 use std::path::Path;
 
 use crate::{
-    shader::ShaderParams,
+    shader::{ShaderParams, ShaderStage},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::symbols::{ShaderPosition, ShaderRange},
 };
@@ -91,6 +91,12 @@ impl ValidatorImpl for Naga {
             }
         } else {
             Ok(ShaderDiagnosticList::empty())
+        }
+    }
+    fn support(&self, shader_stage: ShaderStage) -> bool {
+        match shader_stage {
+            ShaderStage::Vertex | ShaderStage::Fragment | ShaderStage::Compute => true,
+            _ => false,
         }
     }
 }

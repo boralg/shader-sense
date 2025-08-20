@@ -435,49 +435,44 @@ mod tests {
             ("graphics.hlsl", "HSMain", ShaderStage::TesselationControl),
             ("graphics.hlsl", "DSMain", ShaderStage::TesselationEvaluation),
             ("compute.hlsl", "CSMain", ShaderStage::Compute),
-            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("mesh.hlsl", "ASMain", ShaderStage::Task),
-            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("mesh.hlsl", "MSMain", ShaderStage::Mesh),
-            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "RayGenMain", ShaderStage::RayGeneration),
-            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "IntersectionMain", ShaderStage::Intersect),
-            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "MissMain", ShaderStage::Miss),
-            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "AnyHitMain", ShaderStage::AnyHit),
-            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "ClosestHitMain", ShaderStage::ClosestHit),
-            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "CallableMain", ShaderStage::Callable),
         ];
         let validator = create_test_validator(ShadingLanguage::Hlsl);
         for (file_name, entry_point, shader_stage) in stages {
             let file_path = Path::new("./test/hlsl/stages/").join(file_name);
             let shader_content = std::fs::read_to_string(&file_path).unwrap();
-            match validator.validate_shader(
-                &shader_content,
-                &file_path,
-                &ShaderParams {
-                    compilation: ShaderCompilationParams {
-                        entry_point: Some(entry_point.into()),
-                        shader_stage: Some(shader_stage),
+            // Check for WASI test.
+            if validator.support(shader_stage) {
+                match validator.validate_shader(
+                    &shader_content,
+                    &file_path,
+                    &ShaderParams {
+                        compilation: ShaderCompilationParams {
+                            entry_point: Some(entry_point.into()),
+                            shader_stage: Some(shader_stage),
+                            ..Default::default()
+                        },
                         ..Default::default()
                     },
-                    ..Default::default()
-                },
-                &mut default_include_callback,
-            ) {
-                Ok(result) => {
-                    println!(
-                        "Diagnostic should be empty for stage {:?}: {:#?}",
-                        shader_stage, result
-                    );
-                    assert!(result.is_empty())
-                }
-                Err(err) => panic!("{}", err),
-            };
+                    &mut default_include_callback,
+                ) {
+                    Ok(result) => {
+                        println!(
+                            "Diagnostic should be empty for stage {:?}: {:#?}",
+                            shader_stage, result
+                        );
+                        assert!(result.is_empty())
+                    }
+                    Err(err) => panic!("{}", err),
+                };
+            }
         }
     }
 
