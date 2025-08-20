@@ -2,13 +2,16 @@ use std::path::Path;
 
 use shader_sense::{
     shader::{GlslShadingLanguageTag, ShaderParams, ShadingLanguageTag},
-    symbols::{shader_language::ShaderLanguage, symbol_provider::default_include_callback},
+    symbols::{
+        shader_language::ShaderLanguage,
+        symbol_provider::{default_include_callback, SymbolProvider},
+    },
+    validator::validator::Validator,
 };
 
 fn validate_file<T: ShadingLanguageTag>(shader_path: &Path, shader_content: &str) {
     // Validator intended to validate a file using standard API.
-    let language = ShaderLanguage::new(T::get_language());
-    let validator = language.create_validator();
+    let validator = Validator::from_shading_language(T::get_language());
     match validator.validate_shader(
         shader_content,
         shader_path,
@@ -25,8 +28,8 @@ fn validate_file<T: ShadingLanguageTag>(shader_path: &Path, shader_content: &str
 
 fn query_all_symbol<T: ShadingLanguageTag>(shader_path: &Path, shader_content: &str) {
     // SymbolProvider intended to gather file symbol at runtime by inspecting the AST.
-    let mut language = ShaderLanguage::new(T::get_language());
-    let symbol_provider = language.create_symbol_provider();
+    let mut language = ShaderLanguage::from_shading_language(T::get_language());
+    let symbol_provider = SymbolProvider::from_shading_language(T::get_language());
     match language.create_module(shader_path, shader_content) {
         Ok(shader_module) => {
             let symbols = symbol_provider

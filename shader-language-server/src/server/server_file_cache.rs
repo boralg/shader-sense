@@ -26,7 +26,7 @@ use shader_sense::{
         symbol_provider::SymbolProvider,
         symbols::{ShaderPreprocessorContext, ShaderRange, ShaderSymbolListRef},
     },
-    validator::validator::Validator,
+    validator::validator::ValidatorImpl,
 };
 
 use super::{server_config::ServerConfig, shader_variant::ShaderVariant};
@@ -169,7 +169,7 @@ impl ServerLanguageFileCache {
     fn __cache_file_data(
         &mut self,
         uri: &Url,
-        validator: &dyn Validator,
+        validator: &dyn ValidatorImpl,
         shader_language: &mut ShaderLanguage,
         symbol_provider: &SymbolProvider,
         config: &ServerConfig,
@@ -385,7 +385,7 @@ impl ServerLanguageFileCache {
     pub fn cache_file_data(
         &mut self,
         uri: &Url,
-        validator: &dyn Validator,
+        validator: &dyn ValidatorImpl,
         shader_language: &mut ShaderLanguage,
         symbol_provider: &SymbolProvider,
         config: &ServerConfig,

@@ -10,7 +10,9 @@ use glsl_word::GlslSymbolWordProvider;
 
 use super::symbol_provider::SymbolProvider;
 
-pub fn create_glsl_symbol_provider(tree_sitter_language: tree_sitter::Language) -> SymbolProvider {
+pub(super) fn create_glsl_symbol_provider(
+    tree_sitter_language: tree_sitter::Language,
+) -> SymbolProvider {
     SymbolProvider::new(
         tree_sitter_language.clone(),
         get_glsl_parsers(),

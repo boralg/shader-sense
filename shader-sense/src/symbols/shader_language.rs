@@ -2,28 +2,29 @@ use std::path::Path;
 
 use tree_sitter::InputEdit;
 
-use crate::{
-    shader::ShadingLanguage,
-    shader_error::ShaderError,
-    validator::{create_validator, validator::Validator},
-};
+use crate::{shader::ShadingLanguage, shader_error::ShaderError};
 
-use super::{
-    glsl::create_glsl_symbol_provider, hlsl::create_hlsl_symbol_provider,
-    shader_module::ShaderModule, symbol_provider::SymbolProvider, symbols::ShaderRange,
-    wgsl::create_wgsl_symbol_provider,
-};
+use super::{shader_module::ShaderModule, symbols::ShaderRange};
 pub struct ShaderLanguage {
-    shading_language: ShadingLanguage,
-    tree_sitter_language: tree_sitter::Language,
     tree_sitter_parser: tree_sitter::Parser,
 }
+// TODO:RENAME: rename ShaderModuleParser
 impl ShaderLanguage {
-    pub fn new(shading_language: ShadingLanguage) -> Self {
-        Self::from_tree_sitter_language(
-            shading_language,
-            Self::get_tree_sitter_language(shading_language),
-        )
+    pub fn glsl() -> Self {
+        Self::from_shading_language(ShadingLanguage::Glsl)
+    }
+    pub fn hlsl() -> Self {
+        Self::from_shading_language(ShadingLanguage::Hlsl)
+    }
+    pub fn wgsl() -> Self {
+        Self::from_shading_language(ShadingLanguage::Wgsl)
+    }
+    pub fn from_shading_language(shading_language: ShadingLanguage) -> Self {
+        let mut tree_sitter_parser = tree_sitter::Parser::new();
+        tree_sitter_parser
+            .set_language(Self::get_tree_sitter_language(shading_language))
+            .expect("Error loading grammar");
+        Self { tree_sitter_parser }
     }
     fn get_tree_sitter_language(shading_language: ShadingLanguage) -> tree_sitter::Language {
         match shading_language {
@@ -31,31 +32,6 @@ impl ShaderLanguage {
             ShadingLanguage::Hlsl => tree_sitter_hlsl::language(),
             ShadingLanguage::Glsl => tree_sitter_glsl::language(),
         }
-    }
-    fn from_tree_sitter_language(
-        shading_language: ShadingLanguage,
-        tree_sitter_language: tree_sitter::Language,
-    ) -> Self {
-        let mut tree_sitter_parser = tree_sitter::Parser::new();
-        tree_sitter_parser
-            .set_language(tree_sitter_language.clone())
-            .expect("Error loading grammar");
-        Self {
-            shading_language,
-            tree_sitter_language,
-            tree_sitter_parser,
-        }
-    }
-    pub fn create_symbol_provider(&self) -> SymbolProvider {
-        match self.shading_language {
-            ShadingLanguage::Wgsl => create_wgsl_symbol_provider(self.tree_sitter_language.clone()),
-            ShadingLanguage::Hlsl => create_hlsl_symbol_provider(self.tree_sitter_language.clone()),
-            ShadingLanguage::Glsl => create_glsl_symbol_provider(self.tree_sitter_language.clone()),
-        }
-    }
-    // TODO: would be nice to return a solid object (not trait) for cleaner API (which might be holding a trait.)
-    pub fn create_validator(&self) -> Box<dyn Validator> {
-        create_validator(self.shading_language)
     }
     // Create shader module from file.
     pub fn create_module(

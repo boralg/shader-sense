@@ -10,7 +10,7 @@ use crate::{
     symbols::symbols::{ShaderPosition, ShaderRange},
 };
 
-use super::validator::Validator;
+use super::validator::ValidatorImpl;
 
 pub struct Naga {}
 
@@ -42,7 +42,7 @@ impl Naga {
         }
     }
 }
-impl Validator for Naga {
+impl ValidatorImpl for Naga {
     fn validate_shader(
         &self,
         shader_content: &str,

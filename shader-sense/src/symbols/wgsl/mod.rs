@@ -23,7 +23,9 @@ impl SymbolWordProvider for WgslSymbolWordProvider {
     }
 }
 
-pub fn create_wgsl_symbol_provider(tree_sitter_language: tree_sitter::Language) -> SymbolProvider {
+pub(super) fn create_wgsl_symbol_provider(
+    tree_sitter_language: tree_sitter::Language,
+) -> SymbolProvider {
     SymbolProvider::new(
         tree_sitter_language.clone(),
         get_wgsl_parsers(),

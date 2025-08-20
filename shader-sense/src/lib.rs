@@ -16,7 +16,8 @@ mod tests {
     use crate::{
         include::{canonicalize, IncludeHandler},
         shader::{ShaderParams, ShadingLanguage},
-        symbols::shader_language::ShaderLanguage,
+        symbols::{shader_language::ShaderLanguage, symbol_provider::SymbolProvider},
+        validator::validator::Validator,
     };
 
     fn validate_include(path: &Path) -> bool {
@@ -76,8 +77,8 @@ mod tests {
     fn test_stack_overflow() {
         // Should handle include stack overflow gracefully.
         let file_path = Path::new("./test/hlsl/stack-overflow.hlsl");
-        let mut language = ShaderLanguage::new(ShadingLanguage::Hlsl);
-        let symbol_provider = language.create_symbol_provider();
+        let mut language = ShaderLanguage::from_shading_language(ShadingLanguage::Hlsl);
+        let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Hlsl);
         let shader_module = language
             .create_module(file_path, &std::fs::read_to_string(file_path).unwrap())
             .unwrap();
@@ -108,7 +109,7 @@ mod tests {
             Err(err) => panic!("Failed to query symbols: {}", err),
         }
         println!("Testing validation overflow");
-        let validator = language.create_validator();
+        let validator = Validator::from_shading_language(ShadingLanguage::Hlsl);
         match validator.validate_shader(
             &shader_module.content,
             file_path,

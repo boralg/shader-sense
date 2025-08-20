@@ -3,9 +3,13 @@ use std::{cell::RefCell, rc::Rc};
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
-    shader::{ShaderCompilationParams, ShaderParams, ShadingLanguageTag},
+    shader::{ShaderCompilationParams, ShaderParams, ShadingLanguage, ShadingLanguageTag},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
-    symbols::{symbol_parser::ShaderWordRange, symbols::ShaderPreprocessorDefine},
+    symbols::{
+        glsl::create_glsl_symbol_provider, hlsl::create_hlsl_symbol_provider,
+        symbol_parser::ShaderWordRange, symbols::ShaderPreprocessorDefine,
+        wgsl::create_wgsl_symbol_provider,
+    },
 };
 
 use super::{
@@ -37,7 +41,7 @@ pub type SymbolIncludeCallback<'a> =
 pub fn default_include_callback<T: ShadingLanguageTag>(
     include: &ShaderPreprocessorInclude,
 ) -> Result<Option<ShaderModuleHandle>, ShaderError> {
-    let mut language = ShaderLanguage::new(T::get_language());
+    let mut language = ShaderLanguage::from_shading_language(T::get_language());
     let include_module = language.create_module(
         &include.get_absolute_path(),
         std::fs::read_to_string(&include.get_absolute_path())
@@ -48,7 +52,23 @@ pub fn default_include_callback<T: ShadingLanguageTag>(
 }
 
 impl SymbolProvider {
-    pub fn new(
+    pub fn glsl() -> Self {
+        create_glsl_symbol_provider(tree_sitter_glsl::language())
+    }
+    pub fn hlsl() -> Self {
+        create_hlsl_symbol_provider(tree_sitter_hlsl::language())
+    }
+    pub fn wgsl() -> Self {
+        create_wgsl_symbol_provider(tree_sitter_wgsl_bevy::language())
+    }
+    pub fn from_shading_language(shading_language: ShadingLanguage) -> Self {
+        match shading_language {
+            ShadingLanguage::Wgsl => Self::wgsl(),
+            ShadingLanguage::Hlsl => Self::hlsl(),
+            ShadingLanguage::Glsl => Self::glsl(),
+        }
+    }
+    pub(crate) fn new(
         language: tree_sitter::Language,
         parsers: Vec<Box<dyn SymbolTreeParser>>,
         preprocessor_parsers: Vec<Box<dyn SymbolTreePreprocessorParser>>,

@@ -11,7 +11,7 @@ use crate::{
     symbols::symbols::{ShaderPosition, ShaderRange},
 };
 
-use super::validator::Validator;
+use super::validator::ValidatorImpl;
 
 pub struct Dxc {
     compiler: hassle_rs::DxcCompiler,
@@ -287,7 +287,7 @@ fn get_profile(shader_stage: Option<ShaderStage>) -> &'static str {
     }
 }
 
-impl Validator for Dxc {
+impl ValidatorImpl for Dxc {
     fn validate_shader(
         &self,
         shader_source: &str,

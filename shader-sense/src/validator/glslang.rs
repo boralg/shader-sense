@@ -1,4 +1,4 @@
-use super::validator::Validator;
+use super::validator::ValidatorImpl;
 use crate::{
     include::IncludeHandler,
     shader::{GlslSpirvVersion, GlslTargetClient, ShaderParams, ShaderStage},
@@ -249,7 +249,7 @@ impl Glslang {
         }
     }
 }
-impl Validator for Glslang {
+impl ValidatorImpl for Glslang {
     fn validate_shader(
         &self,
         content: &str,

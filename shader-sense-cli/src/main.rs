@@ -8,14 +8,15 @@ use std::{
 use colored::Colorize;
 use shader_sense::{
     shader::{
-        GlslCompilationParams, GlslShadingLanguageTag, GlslSpirvVersion, GlslTargetClient,
-        HlslCompilationParams, HlslShaderModel, HlslShadingLanguageTag, HlslVersion,
-        ShaderCompilationParams, ShaderContextParams, ShaderParams, ShaderStage, ShadingLanguage,
-        ShadingLanguageTag, WgslCompilationParams, WgslShadingLanguageTag,
+        GlslCompilationParams, GlslSpirvVersion, GlslTargetClient, HlslCompilationParams,
+        HlslShaderModel, HlslVersion, ShaderCompilationParams, ShaderContextParams, ShaderParams,
+        ShaderStage, ShadingLanguage, WgslCompilationParams,
     },
     shader_error::ShaderDiagnosticSeverity,
-    symbols::{shader_language::ShaderLanguage, symbols::ShaderSymbolType},
-    validator::create_validator,
+    symbols::{
+        shader_language::ShaderLanguage, symbol_provider::SymbolProvider, symbols::ShaderSymbolType,
+    },
+    validator::validator::Validator,
 };
 
 fn get_version() -> &'static str {
@@ -185,7 +186,7 @@ pub fn main() {
             // By default validate (if we dont parse symbols)
             if should_validate || symbol_type_to_print.is_empty() {
                 // Validator intended to validate a file using standard API.
-                let validator = create_validator(shading_language);
+                let validator = Validator::from_shading_language(shading_language);
                 match validator.validate_shader(
                     &shader_content,
                     shader_path,
@@ -234,12 +235,8 @@ pub fn main() {
             }
             if !symbol_type_to_print.is_empty() {
                 // SymbolProvider intended to gather file symbol at runtime by inspecting the AST.
-                let mut language = ShaderLanguage::new(match shading_language {
-                    ShadingLanguage::Wgsl => WgslShadingLanguageTag::get_language(),
-                    ShadingLanguage::Hlsl => HlslShadingLanguageTag::get_language(),
-                    ShadingLanguage::Glsl => GlslShadingLanguageTag::get_language(),
-                });
-                let symbol_provider = language.create_symbol_provider();
+                let mut language = ShaderLanguage::from_shading_language(shading_language);
+                let symbol_provider = SymbolProvider::from_shading_language(shading_language);
                 match language.create_module(shader_path, &shader_content) {
                     Ok(shader_module) => {
                         let symbols = symbol_provider

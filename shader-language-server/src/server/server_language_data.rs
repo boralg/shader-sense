@@ -1,22 +1,22 @@
 use shader_sense::{
     shader::ShadingLanguage,
     symbols::{shader_language::ShaderLanguage, symbol_provider::SymbolProvider},
-    validator::{glslang::Glslang, naga::Naga, validator::Validator},
+    validator::{glslang::Glslang, naga::Naga, validator::ValidatorImpl},
 };
 
 #[cfg(not(target_os = "wasi"))]
 use shader_sense::validator::dxc::Dxc;
 
 pub struct ServerLanguageData {
-    pub validator: Box<dyn Validator>,
+    pub validator: Box<dyn ValidatorImpl>,
     pub language: ShaderLanguage,
     pub symbol_provider: SymbolProvider,
 }
 
 impl ServerLanguageData {
     pub fn glsl() -> Self {
-        let language = ShaderLanguage::new(ShadingLanguage::Glsl);
-        let symbol_provider = language.create_symbol_provider();
+        let language = ShaderLanguage::from_shading_language(ShadingLanguage::Glsl);
+        let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Glsl);
         Self {
             validator: Box::new(Glslang::glsl()),
             language,
@@ -24,8 +24,8 @@ impl ServerLanguageData {
         }
     }
     pub fn hlsl() -> Self {
-        let language = ShaderLanguage::new(ShadingLanguage::Hlsl);
-        let symbol_provider = language.create_symbol_provider();
+        let language = ShaderLanguage::from_shading_language(ShadingLanguage::Hlsl);
+        let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Hlsl);
         Self {
             #[cfg(target_os = "wasi")]
             validator: {
@@ -58,8 +58,8 @@ impl ServerLanguageData {
         }
     }
     pub fn wgsl() -> Self {
-        let language = ShaderLanguage::new(ShadingLanguage::Wgsl);
-        let symbol_provider = language.create_symbol_provider();
+        let language = ShaderLanguage::from_shading_language(ShadingLanguage::Wgsl);
+        let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Wgsl);
         Self {
             validator: Box::new(Naga::new()),
             language,

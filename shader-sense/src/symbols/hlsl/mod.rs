@@ -11,7 +11,9 @@ pub use hlsl_regions::HlslSymbolRegionFinder;
 
 use super::symbol_provider::SymbolProvider;
 
-pub fn create_hlsl_symbol_provider(tree_sitter_language: tree_sitter::Language) -> SymbolProvider {
+pub(super) fn create_hlsl_symbol_provider(
+    tree_sitter_language: tree_sitter::Language,
+) -> SymbolProvider {
     SymbolProvider::new(
         tree_sitter_language.clone(),
         get_hlsl_parsers(),
@@ -39,14 +41,14 @@ mod tests {
 
     #[test]
     fn test_hlsl_regions() {
-        let language = ShaderLanguage::new(ShadingLanguage::Hlsl);
-        let symbol_provider = language.create_symbol_provider();
+        let language = ShaderLanguage::from_shading_language(ShadingLanguage::Hlsl);
+        let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Hlsl);
         test_regions::<HlslShadingLanguageTag>(language, symbol_provider);
     }
     #[test]
     fn test_glsl_regions() {
-        let language = ShaderLanguage::new(ShadingLanguage::Glsl);
-        let symbol_provider = language.create_symbol_provider();
+        let language = ShaderLanguage::from_shading_language(ShadingLanguage::Glsl);
+        let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Glsl);
         test_regions::<GlslShadingLanguageTag>(language, symbol_provider);
     }
 
