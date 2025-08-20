@@ -14,7 +14,8 @@ use shader_sense::{
     },
     shader_error::ShaderDiagnosticSeverity,
     symbols::{
-        shader_language::ShaderLanguage, symbol_provider::SymbolProvider, symbols::ShaderSymbolType,
+        shader_module_parser::ShaderModuleParser, symbol_provider::SymbolProvider,
+        symbols::ShaderSymbolType,
     },
     validator::validator::Validator,
 };
@@ -235,16 +236,17 @@ pub fn main() {
             }
             if !symbol_type_to_print.is_empty() {
                 // SymbolProvider intended to gather file symbol at runtime by inspecting the AST.
-                let mut language = ShaderLanguage::from_shading_language(shading_language);
+                let mut shader_module_parser =
+                    ShaderModuleParser::from_shading_language(shading_language);
                 let symbol_provider = SymbolProvider::from_shading_language(shading_language);
-                match language.create_module(shader_path, &shader_content) {
+                match shader_module_parser.create_module(shader_path, &shader_content) {
                     Ok(shader_module) => {
                         let symbols = symbol_provider
                             .query_symbols(
                                 &shader_module,
                                 shader_params,
                                 &mut |include| {
-                                    let include_module = language.create_module(
+                                    let include_module = shader_module_parser.create_module(
                                         &include.get_absolute_path(),
                                         std::fs::read_to_string(&include.get_absolute_path())
                                             .unwrap()

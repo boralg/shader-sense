@@ -21,8 +21,8 @@ use shader_sense::{
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
         intrinsics::ShaderIntrinsics,
-        shader_language::ShaderLanguage,
         shader_module::{ShaderModuleHandle, ShaderSymbols},
+        shader_module_parser::ShaderModuleParser,
         symbol_provider::SymbolProvider,
         symbols::{ShaderPreprocessorContext, ShaderRange, ShaderSymbolListRef},
     },
@@ -97,7 +97,8 @@ impl ServerLanguageFileCache {
             .collect()
     }
     // Get all main files relying on the given file.
-    pub fn get_relying_main_files(&self, url: &Url) -> HashSet<Url> {
+    #[allow(dead_code)]
+    pub fn get_relyicng_main_files(&self, url: &Url) -> HashSet<Url> {
         match self.files.get(url) {
             Some(file) => {
                 let mut relying_on_files = HashSet::new();
@@ -170,7 +171,7 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         validator: &dyn ValidatorImpl,
-        shader_language: &mut ShaderLanguage,
+        shader_module_parser: &mut ShaderModuleParser,
         symbol_provider: &SymbolProvider,
         config: &ServerConfig,
         dirty_deps: HashSet<PathBuf>,
@@ -221,8 +222,11 @@ impl ServerLanguageFileCache {
                 &shader_params.compilation,
                 &mut |include| {
                     let include_uri = Url::from_file_path(&include.get_absolute_path()).unwrap();
-                    let included_file =
-                        self.watch_dependency(&include_uri, shading_language, shader_language)?;
+                    let included_file = self.watch_dependency(
+                        &include_uri,
+                        shading_language,
+                        shader_module_parser,
+                    )?;
                     Ok(Some(Rc::clone(&included_file.shader_module)))
                 },
                 old_data.map(|e| e.symbol_cache),
@@ -279,7 +283,7 @@ impl ServerLanguageFileCache {
                                 match self.watch_dependency(
                                     &deps_uri,
                                     shading_language,
-                                    shader_language,
+                                    shader_module_parser,
                                 ) {
                                     Ok(deps_file) => deps_file,
                                     Err(err) => {
@@ -386,7 +390,7 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         validator: &dyn ValidatorImpl,
-        shader_language: &mut ShaderLanguage,
+        shader_module_parser: &mut ShaderModuleParser,
         symbol_provider: &SymbolProvider,
         config: &ServerConfig,
         dirty_deps: HashSet<PathBuf>,
@@ -413,7 +417,7 @@ impl ServerLanguageFileCache {
         self.__cache_file_data(
             uri,
             validator,
-            shader_language,
+            shader_module_parser,
             symbol_provider,
             config,
             dirty_deps,
@@ -611,7 +615,7 @@ impl ServerLanguageFileCache {
             let removed_files = self.cache_file_data(
                 &variant_url,
                 language_data.validator.as_mut(),
-                &mut language_data.language,
+                &mut language_data.shader_module_parser,
                 &mut language_data.symbol_provider,
                 &config,
                 dirty_dependencies.clone(),
@@ -665,7 +669,7 @@ impl ServerLanguageFileCache {
             let removed_files = self.cache_file_data(
                 &remaining_file,
                 language_data.validator.as_mut(),
-                &mut language_data.language,
+                &mut language_data.shader_module_parser,
                 &mut language_data.symbol_provider,
                 &config,
                 dirty_dependencies.clone(),
@@ -701,7 +705,7 @@ impl ServerLanguageFileCache {
             let removed_files = self.cache_file_data(
                 &dependent_file,
                 language_data.validator.as_mut(),
-                &mut language_data.language,
+                &mut language_data.shader_module_parser,
                 &mut language_data.symbol_provider,
                 &config,
                 dirty_dependencies.clone(),
@@ -727,7 +731,7 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         lang: ShadingLanguage,
-        shader_language: &mut ShaderLanguage,
+        shader_module_parser: &mut ShaderModuleParser,
     ) -> Result<(), ShaderError> {
         assert!(*uri == clean_url(&uri));
         let file_path = uri.to_file_path().unwrap();
@@ -747,7 +751,7 @@ impl ServerLanguageFileCache {
             None => {
                 let text = read_string_lossy(&file_path).unwrap();
                 let shader_module = Rc::new(RefCell::new(
-                    shader_language.create_module(&file_path, &text)?,
+                    shader_module_parser.create_module(&file_path, &text)?,
                 ));
                 let cached_file = ServerFileCache {
                     shading_language: lang,
@@ -773,7 +777,7 @@ impl ServerLanguageFileCache {
         uri: &Url,
         lang: ShadingLanguage,
         text: &str,
-        shader_language: &mut ShaderLanguage,
+        shader_module_parser: &mut ShaderModuleParser,
     ) -> Result<(), ShaderError> {
         assert!(*uri == clean_url(&uri));
         let file_path = uri.to_file_path().unwrap();
@@ -802,7 +806,7 @@ impl ServerLanguageFileCache {
             }
             None => {
                 let shader_module = Rc::new(RefCell::new(
-                    shader_language.create_module(&file_path, &text)?,
+                    shader_module_parser.create_module(&file_path, &text)?,
                 ));
                 debug_assert!(self.variant.as_ref().map(|v| v.url != *uri).unwrap_or(true));
                 let cached_file = ServerFileCache {
@@ -828,7 +832,7 @@ impl ServerLanguageFileCache {
         &mut self,
         uri: &Url,
         lang: ShadingLanguage,
-        shader_language: &mut ShaderLanguage,
+        shader_module_parser: &mut ShaderModuleParser,
     ) -> Result<&ServerFileCache, ShaderError> {
         assert!(*uri == clean_url(&uri));
         let file_path = uri.to_file_path().unwrap();
@@ -861,7 +865,7 @@ impl ServerLanguageFileCache {
             None => {
                 let text = read_string_lossy(&file_path).unwrap();
                 let shader_module = Rc::new(RefCell::new(
-                    shader_language.create_module(&file_path, &text)?,
+                    shader_module_parser.create_module(&file_path, &text)?,
                 ));
                 let cached_file = ServerFileCache {
                     shading_language: lang,
@@ -889,7 +893,7 @@ impl ServerLanguageFileCache {
     pub fn update_file(
         &mut self,
         uri: &Url,
-        shader_language: &mut ShaderLanguage,
+        shader_module_parser: &mut ShaderModuleParser,
         range: Option<lsp_types::Range>,
         partial_content: Option<&String>,
     ) -> Result<(), ShaderError> {
@@ -904,13 +908,13 @@ impl ServerLanguageFileCache {
         let file_path = uri.to_file_path().unwrap();
         if let (Some(range), Some(partial_content)) = (range, partial_content) {
             let shader_range = lsp_range_to_shader_range(&range, &file_path);
-            shader_language.update_module_partial(
+            shader_module_parser.update_module_partial(
                 &mut RefCell::borrow_mut(&cached_file.shader_module),
                 &shader_range,
                 &partial_content,
             )?;
         } else if let Some(whole_content) = partial_content {
-            shader_language.update_module(
+            shader_module_parser.update_module(
                 &mut RefCell::borrow_mut(&cached_file.shader_module),
                 &whole_content,
             )?;

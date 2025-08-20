@@ -751,7 +751,7 @@ impl ServerLanguage {
                     &uri,
                     shading_language.clone(),
                     &params.text_document.text,
-                    &mut language_data.language,
+                    &mut language_data.shader_module_parser,
                 )?;
                 Ok(AsyncMessage::UpdateCache(vec![AsyncCacheRequest::new(
                     uri,
@@ -784,7 +784,7 @@ impl ServerLanguage {
                         let language_data = self.language_data.get_mut(&shading_language).unwrap();
                         let _ = self.watched_files.update_file(
                             &uri,
-                            &mut language_data.language,
+                            &mut language_data.shader_module_parser,
                             None,
                             None,
                         )?;
@@ -831,7 +831,7 @@ impl ServerLanguage {
                 for content in &params.content_changes {
                     match self.watched_files.update_file(
                         &uri,
-                        &mut language_data.language,
+                        &mut language_data.shader_module_parser,
                         content.range,
                         Some(&content.text),
                     ) {
@@ -880,7 +880,7 @@ impl ServerLanguage {
                                 self.watched_files.watch_variant_file(
                                     &new_variant.url,
                                     new_variant.language,
-                                    &mut language_data.language,
+                                    &mut language_data.shader_module_parser,
                                 )?;
                                 // Remove old one.
                                 let removed_urls =
@@ -913,7 +913,7 @@ impl ServerLanguage {
                             self.watched_files.watch_variant_file(
                                 &new_variant.url,
                                 new_variant.language,
-                                &mut language_data.language,
+                                &mut language_data.shader_module_parser,
                             )?;
                             vec![AsyncCacheRequest::new(
                                 new_variant.url.clone(),

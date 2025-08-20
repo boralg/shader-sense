@@ -33,7 +33,7 @@ mod tests {
             ShadingLanguageTag,
         },
         symbols::{
-            shader_language::ShaderLanguage,
+            shader_module_parser::ShaderModuleParser,
             symbol_provider::{default_include_callback, SymbolProvider},
             symbols::{ShaderPosition, ShaderRange, ShaderRegion},
         },
@@ -41,24 +41,26 @@ mod tests {
 
     #[test]
     fn test_hlsl_regions() {
-        let language = ShaderLanguage::from_shading_language(ShadingLanguage::Hlsl);
+        let shader_module_parser = ShaderModuleParser::from_shading_language(ShadingLanguage::Hlsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Hlsl);
-        test_regions::<HlslShadingLanguageTag>(language, symbol_provider);
+        test_regions::<HlslShadingLanguageTag>(shader_module_parser, symbol_provider);
     }
     #[test]
     fn test_glsl_regions() {
-        let language = ShaderLanguage::from_shading_language(ShadingLanguage::Glsl);
+        let shader_module_parser = ShaderModuleParser::from_shading_language(ShadingLanguage::Glsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Glsl);
-        test_regions::<GlslShadingLanguageTag>(language, symbol_provider);
+        test_regions::<GlslShadingLanguageTag>(shader_module_parser, symbol_provider);
     }
 
     fn test_regions<T: ShadingLanguageTag>(
-        mut language: ShaderLanguage,
+        mut shader_module_parser: ShaderModuleParser,
         symbol_provider: SymbolProvider,
     ) {
         let file_path = Path::new("./test/hlsl/regions.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let shader_module = language.create_module(file_path, &shader_content).unwrap();
+        let shader_module = shader_module_parser
+            .create_module(file_path, &shader_content)
+            .unwrap();
         let symbols = symbol_provider
             .query_symbols(
                 &shader_module,

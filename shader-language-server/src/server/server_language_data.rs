@@ -1,6 +1,6 @@
 use shader_sense::{
     shader::ShadingLanguage,
-    symbols::{shader_language::ShaderLanguage, symbol_provider::SymbolProvider},
+    symbols::{shader_module_parser::ShaderModuleParser, symbol_provider::SymbolProvider},
     validator::{glslang::Glslang, naga::Naga, validator::ValidatorImpl},
 };
 
@@ -9,22 +9,22 @@ use shader_sense::validator::dxc::Dxc;
 
 pub struct ServerLanguageData {
     pub validator: Box<dyn ValidatorImpl>,
-    pub language: ShaderLanguage,
+    pub shader_module_parser: ShaderModuleParser,
     pub symbol_provider: SymbolProvider,
 }
 
 impl ServerLanguageData {
     pub fn glsl() -> Self {
-        let language = ShaderLanguage::from_shading_language(ShadingLanguage::Glsl);
+        let shader_module_parser = ShaderModuleParser::from_shading_language(ShadingLanguage::Glsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Glsl);
         Self {
             validator: Box::new(Glslang::glsl()),
-            language,
+            shader_module_parser,
             symbol_provider,
         }
     }
     pub fn hlsl() -> Self {
-        let language = ShaderLanguage::from_shading_language(ShadingLanguage::Hlsl);
+        let shader_module_parser = ShaderModuleParser::from_shading_language(ShadingLanguage::Hlsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Hlsl);
         Self {
             #[cfg(target_os = "wasi")]
@@ -53,16 +53,16 @@ impl ServerLanguageData {
                     Box::new(Glslang::hlsl())
                 }
             },
-            language,
+            shader_module_parser,
             symbol_provider,
         }
     }
     pub fn wgsl() -> Self {
-        let language = ShaderLanguage::from_shading_language(ShadingLanguage::Wgsl);
+        let shader_module_parser = ShaderModuleParser::from_shading_language(ShadingLanguage::Wgsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Wgsl);
         Self {
             validator: Box::new(Naga::new()),
-            language,
+            shader_module_parser,
             symbol_provider,
         }
     }

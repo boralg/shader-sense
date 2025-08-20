@@ -5,11 +5,11 @@ use tree_sitter::InputEdit;
 use crate::{shader::ShadingLanguage, shader_error::ShaderError};
 
 use super::{shader_module::ShaderModule, symbols::ShaderRange};
-pub struct ShaderLanguage {
+pub struct ShaderModuleParser {
     tree_sitter_parser: tree_sitter::Parser,
 }
-// TODO:RENAME: rename ShaderModuleParser
-impl ShaderLanguage {
+
+impl ShaderModuleParser {
     pub fn glsl() -> Self {
         Self::from_shading_language(ShadingLanguage::Glsl)
     }

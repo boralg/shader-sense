@@ -1,8 +1,8 @@
 mod glsl;
 mod hlsl;
 pub mod intrinsics;
-pub mod shader_language;
 pub mod shader_module;
+pub mod shader_module_parser;
 mod symbol_parser;
 pub mod symbol_provider;
 pub mod symbols;
@@ -26,7 +26,7 @@ mod tests {
         shader_error::ShaderError,
         symbols::{
             intrinsics::ShaderIntrinsics,
-            shader_language::ShaderLanguage,
+            shader_module_parser::ShaderModuleParser,
             symbols::{ShaderPosition, ShaderRange, ShaderSymbolData},
         },
     };
@@ -71,7 +71,7 @@ mod tests {
     }
 
     fn get_all_preprocessed_symbols<T: ShadingLanguageTag>(
-        language: &mut ShaderLanguage,
+        shader_module_parser: &mut ShaderModuleParser,
         symbol_provider: &SymbolProvider,
         file_path: &Path,
         shader_content: &String,
@@ -81,7 +81,9 @@ mod tests {
         let mut all_symbols = ShaderIntrinsics::get(T::get_language())
             .get_intrinsics_symbol(&ShaderCompilationParams::default())
             .to_owned();
-        let shader_module = language.create_module(file_path, shader_content).unwrap();
+        let shader_module = shader_module_parser
+            .create_module(file_path, shader_content)
+            .unwrap();
         let symbols = symbol_provider
             .query_symbols(
                 &shader_module,
@@ -93,7 +95,7 @@ mod tests {
         let symbols = symbols.get_all_symbols();
         all_symbols.append(symbols.into());
         for dep in deps {
-            let shader_module = language.create_module(&dep.1, &dep.0).unwrap();
+            let shader_module = shader_module_parser.create_module(&dep.1, &dep.0).unwrap();
             let symbols = symbol_provider
                 .query_symbols(
                     &shader_module,
@@ -134,9 +136,12 @@ mod tests {
         // Ensure parsing of symbols is OK
         let file_path = Path::new("./test/glsl/include-level.comp.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let mut language = ShaderLanguage::from_shading_language(ShadingLanguage::Glsl);
+        let mut shader_module_parser =
+            ShaderModuleParser::from_shading_language(ShadingLanguage::Glsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Glsl);
-        let shader_module = language.create_module(file_path, &shader_content).unwrap();
+        let shader_module = shader_module_parser
+            .create_module(file_path, &shader_content)
+            .unwrap();
         let symbols = symbol_provider
             .query_symbols(
                 &shader_module,
@@ -153,9 +158,12 @@ mod tests {
         // Ensure parsing of symbols is OK
         let file_path = Path::new("./test/hlsl/include-level.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let mut language = ShaderLanguage::from_shading_language(ShadingLanguage::Hlsl);
+        let mut shader_module_parser =
+            ShaderModuleParser::from_shading_language(ShadingLanguage::Hlsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Hlsl);
-        let shader_module = language.create_module(file_path, &shader_content).unwrap();
+        let shader_module = shader_module_parser
+            .create_module(file_path, &shader_content)
+            .unwrap();
         let symbols = symbol_provider
             .query_symbols(
                 &shader_module,
@@ -172,9 +180,12 @@ mod tests {
         // Ensure parsing of symbols is OK
         let file_path = Path::new("./test/wgsl/ok.wgsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let mut language = ShaderLanguage::from_shading_language(ShadingLanguage::Wgsl);
+        let mut shader_module_parser =
+            ShaderModuleParser::from_shading_language(ShadingLanguage::Wgsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Wgsl);
-        let shader_module = language.create_module(file_path, &shader_content).unwrap();
+        let shader_module = shader_module_parser
+            .create_module(file_path, &shader_content)
+            .unwrap();
         let symbols = symbol_provider
             .query_symbols(
                 &shader_module,
@@ -190,10 +201,11 @@ mod tests {
     fn symbol_scope_glsl_ok() {
         let file_path = Path::new("./test/glsl/scopes.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let mut language = ShaderLanguage::from_shading_language(ShadingLanguage::Glsl);
+        let mut shader_module_parser =
+            ShaderModuleParser::from_shading_language(ShadingLanguage::Glsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Glsl);
         let preprocessed_symbol_list = get_all_preprocessed_symbols::<GlslShadingLanguageTag>(
-            &mut language,
+            &mut shader_module_parser,
             &symbol_provider,
             file_path,
             &shader_content,
@@ -239,9 +251,12 @@ mod tests {
         // Ensure parsing of symbols is OK
         let file_path = Path::new("./test/glsl/uniforms.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let mut language = ShaderLanguage::from_shading_language(ShadingLanguage::Glsl);
+        let mut shader_module_parser =
+            ShaderModuleParser::from_shading_language(ShadingLanguage::Glsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Glsl);
-        let shader_module = language.create_module(file_path, &shader_content).unwrap();
+        let shader_module = shader_module_parser
+            .create_module(file_path, &shader_content)
+            .unwrap();
         let symbols = symbol_provider
             .query_symbols(
                 &shader_module,

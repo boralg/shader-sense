@@ -399,7 +399,7 @@ mod hlsl_parser_tests {
         shader::ShadingLanguage,
         symbols::{
             hlsl::hlsl_parser::{HlslFunctionTreeParser, HlslStructTreeParser},
-            shader_language::ShaderLanguage,
+            shader_module_parser::ShaderModuleParser,
             symbol_parser::{ShaderSymbolListBuilder, SymbolTreeParser},
             symbols::{
                 ShaderMember, ShaderMethod, ShaderParameter, ShaderPosition, ShaderRange,
@@ -417,8 +417,11 @@ mod hlsl_parser_tests {
         let mut query_cursor = QueryCursor::new();
         let query = Query::new(tree_sitter_hlsl::language(), parser.get_query().as_str()).unwrap();
 
-        let mut language = ShaderLanguage::from_shading_language(ShadingLanguage::Hlsl);
-        let module = language.create_module(file_path, shader_content).unwrap();
+        let mut shader_module_parser =
+            ShaderModuleParser::from_shading_language(ShadingLanguage::Hlsl);
+        let module = shader_module_parser
+            .create_module(file_path, shader_content)
+            .unwrap();
         for matches in
             query_cursor.matches(&query, module.tree.root_node(), module.content.as_bytes())
         {

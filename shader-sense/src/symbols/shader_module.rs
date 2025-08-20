@@ -8,11 +8,8 @@ use tree_sitter::{Tree, TreeCursor};
 
 use crate::{shader::ShaderContextParams, symbols::symbols::ShaderSymbolListRef};
 
-use super::{
-    shader_language::ShaderLanguage,
-    symbols::{
-        ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude, ShaderSymbolList,
-    },
+use super::symbols::{
+    ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude, ShaderSymbolList,
 };
 
 #[derive(Debug, Clone)]
@@ -180,9 +177,6 @@ impl ShaderSymbols {
 }
 
 impl ShaderModule {
-    pub fn new(language: &mut ShaderLanguage, path: &Path, content: &str) -> Self {
-        language.create_module(path, &content).unwrap()
-    }
     // Dump AST from tree
     pub fn dump_ast(&self) -> String {
         Self::dump_ast_node(self.tree.root_node())

@@ -13,8 +13,8 @@ use crate::{
 };
 
 use super::{
-    shader_language::ShaderLanguage,
     shader_module::{ShaderModule, ShaderModuleHandle, ShaderSymbols},
+    shader_module_parser::ShaderModuleParser,
     symbol_parser::{
         ShaderSymbolListBuilder, SymbolRegionFinder, SymbolTreeParser,
         SymbolTreePreprocessorParser, SymbolWordProvider,
@@ -41,8 +41,8 @@ pub type SymbolIncludeCallback<'a> =
 pub fn default_include_callback<T: ShadingLanguageTag>(
     include: &ShaderPreprocessorInclude,
 ) -> Result<Option<ShaderModuleHandle>, ShaderError> {
-    let mut language = ShaderLanguage::from_shading_language(T::get_language());
-    let include_module = language.create_module(
+    let mut shader_module_parser = ShaderModuleParser::from_shading_language(T::get_language());
+    let include_module = shader_module_parser.create_module(
         &include.get_absolute_path(),
         std::fs::read_to_string(&include.get_absolute_path())
             .unwrap()
