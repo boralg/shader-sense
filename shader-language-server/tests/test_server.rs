@@ -1,16 +1,18 @@
 use core::panic;
 use std::{
+    collections::HashMap,
     env,
-    io::{BufReader, Read},
+    io::{self, BufReader, Read},
     path::Path,
     process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio},
 };
 
 use lsp_types::{
     notification::{Exit, Initialized},
-    request::{Initialize, Shutdown, WorkspaceConfiguration},
+    request::{Initialize, Request, Shutdown, WorkDoneProgressCreate, WorkspaceConfiguration},
     InitializeParams, InitializedParams, TextDocumentIdentifier, TextDocumentItem, Url,
 };
+use serde_json::Value;
 use shader_sense::{include::canonicalize, shader::ShadingLanguage};
 
 pub struct TestFile {
@@ -50,6 +52,7 @@ pub struct TestServer {
     reader: BufReader<ChildStdout>,
     err_reader: BufReader<ChildStderr>,
     request_id: i32,
+    notification_handler: HashMap<&'static str, Box<dyn FnMut(Value)>>,
 }
 impl TestServer {
     pub fn wasi() -> Option<TestServer> {
@@ -111,6 +114,7 @@ impl TestServer {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
+            .env("RUST_BACKTRACE", "full")
             .env("RUST_LOG", "shader_language_server=trace")
             .spawn()
             .unwrap();
@@ -128,6 +132,7 @@ impl TestServer {
             reader,
             err_reader,
             stdin,
+            notification_handler: HashMap::new(),
         };
         // Send an LSP initialize request
         server.initialize();
@@ -139,6 +144,11 @@ impl TestServer {
         self.send_notification::<Initialized>(&InitializedParams {});
         self.expect_request::<WorkspaceConfiguration>();
     }
+    fn get_server_stderr(&mut self) -> io::Result<String> {
+        let mut errors = String::new();
+        self.err_reader.read_to_string(&mut errors)?;
+        Ok(errors)
+    }
     fn exit(&mut self) {
         self.send_request::<Shutdown>(&(), |_| {});
         self.send_notification::<Exit>(&());
@@ -147,9 +157,15 @@ impl TestServer {
         // Process seems to hang while joining threads. Kill it instead of waiting.
         self.child.kill().unwrap();
         // Print logs
-        let mut errors = String::new();
-        self.err_reader.read_to_string(&mut errors).unwrap();
-        println!("stderr:\n{}", errors);
+        println!("stderr:\n{}", self.get_server_stderr().unwrap());
+    }
+    fn kill(&mut self) {
+        // Avoid crashing here as we might be panicking
+        match self.get_server_stderr() {
+            Ok(logs) => println!("Panic stderr:\n{}", logs),
+            Err(err) => println!("Failed to get server log while unwinding panic: {}", err),
+        }
+        self.child.kill().unwrap();
     }
     pub fn send_request<T: lsp_types::request::Request>(
         &mut self,
@@ -238,22 +254,44 @@ impl TestServer {
             message => panic!("Expected request {}, received {:?}", T::METHOD, message),
         }
     }
-    fn on_notification(&self, notification: lsp_server::Notification) {
+    fn on_notification(&mut self, notification: lsp_server::Notification) {
         println!("Received notification {:?}", notification);
+        match self
+            .notification_handler
+            .get_mut(notification.method.as_str())
+        {
+            Some(handler) => (handler)(notification.params),
+            None => {}
+        }
     }
     fn on_request(&mut self, request: lsp_server::Request) {
         match request.method.as_str() {
-            "workspace/configuration" => self
+            WorkspaceConfiguration::METHOD => self
                 .send_response::<WorkspaceConfiguration>(request.id, vec![serde_json::Value::Null]),
+            WorkDoneProgressCreate::METHOD => {
+                self.send_response::<WorkDoneProgressCreate>(request.id, ())
+            }
             _ => {
                 panic!("Unhandled request {}", request.method);
             }
         }
     }
+    #[allow(dead_code)]
+    pub fn subsbscribe<T: lsp_types::notification::Notification, F: FnMut(Value) + 'static>(
+        &mut self,
+        callback: F,
+    ) {
+        self.notification_handler
+            .insert(T::METHOD, Box::new(callback));
+    }
 }
 
 impl Drop for TestServer {
     fn drop(&mut self) {
-        self.exit();
+        if std::thread::panicking() {
+            self.kill();
+        } else {
+            self.exit();
+        }
     }
 }

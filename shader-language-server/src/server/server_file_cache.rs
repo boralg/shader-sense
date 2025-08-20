@@ -8,8 +8,10 @@ use std::{
 use crate::{
     profile_scope,
     server::{
+        async_message::AsyncCacheRequest,
         clean_url,
         common::{lsp_range_to_shader_range, read_string_lossy},
+        server_language_data::ServerLanguageData,
     },
 };
 use log::{debug, info, warn};
@@ -18,10 +20,11 @@ use shader_sense::{
     shader::ShadingLanguage,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
+        intrinsics::ShaderIntrinsics,
         shader_language::ShaderLanguage,
         symbol_provider::SymbolProvider,
         symbol_tree::{ShaderModuleHandle, ShaderSymbols},
-        symbols::{ShaderPreprocessorContext, ShaderRange, ShaderSymbolList, ShaderSymbolListRef},
+        symbols::{ShaderPreprocessorContext, ShaderRange, ShaderSymbolListRef},
     },
     validator::validator::Validator,
 };
@@ -31,8 +34,8 @@ use super::{server_config::ServerConfig, shader_variant::ShaderVariant};
 #[derive(Debug, Clone, Default)]
 pub struct ServerFileCacheData {
     pub symbol_cache: ShaderSymbols, // Store symbols to avoid computing them at every change.
-    pub intrinsics: ShaderSymbolList, // Cached intrinsics to not recompute them everytime
-    pub diagnostic_cache: ShaderDiagnosticList, // Cached diagnostic
+    pub intrinsics: ShaderSymbolListRef<'static>, // Cached intrinsics to not recompute them everytime
+    pub diagnostic_cache: ShaderDiagnosticList,   // Cached diagnostic
 }
 
 #[derive(Debug, Clone)]
@@ -51,6 +54,9 @@ impl ServerFileCache {
     }
     pub fn is_cachable_file(&self) -> bool {
         self.is_main_file || self.is_variant_file
+    }
+    pub fn has_data(&self) -> bool {
+        self.data.is_some()
     }
     pub fn get_data(&self) -> &ServerFileCacheData {
         assert!(
@@ -73,19 +79,6 @@ impl ServerLanguageFileCache {
             files: HashMap::new(),
             variant: None,
         }
-    }
-    pub fn create_data(
-        &mut self,
-        uri: &Url,
-        symbol_cache: ShaderSymbols,
-        intrinsics: ShaderSymbolList,
-        diagnostic_cache: ShaderDiagnosticList,
-    ) {
-        self.files.get_mut(uri).unwrap().data = Some(ServerFileCacheData {
-            symbol_cache,
-            intrinsics,
-            diagnostic_cache,
-        })
     }
     // Get all main dependent files using the given file.
     pub fn get_dependent_main_files(&self, dependent_url: &Url) -> HashSet<Url> {
@@ -156,6 +149,7 @@ impl ServerLanguageFileCache {
             }
         }
     }
+    #[allow(unused)]
     pub fn get_relying_variant(&self, url: &Url) -> Option<Url> {
         let file_path = url.to_file_path().unwrap();
         match &self.variant {
@@ -179,7 +173,7 @@ impl ServerLanguageFileCache {
         shader_language: &mut ShaderLanguage,
         symbol_provider: &SymbolProvider,
         config: &ServerConfig,
-        dirty_deps: Option<&Path>,
+        dirty_deps: HashSet<PathBuf>,
     ) -> Result<(), ShaderError> {
         let file_path = uri.to_file_path().unwrap();
 
@@ -200,15 +194,15 @@ impl ServerLanguageFileCache {
                     .context
                     .is_dirty(&file_path, &context);
                 let has_cache = self.files.get_mut(&uri).unwrap().data.is_some();
-                let has_dirty = dirty_deps.is_some();
+                let has_dirty = !dirty_deps.is_empty();
                 if !is_dirty && !has_dirty && has_cache {
                     return Ok(());
                 }
             }
             None => {}
         };
-        if let Some(dirty_deps) = dirty_deps {
-            context.mark_dirty(dirty_deps);
+        for dirty_dep in dirty_deps {
+            context.mark_dirty(dirty_dep);
         }
 
         // Get old data and replace it by dummy to avoid empty data on early exit.
@@ -377,12 +371,17 @@ impl ServerLanguageFileCache {
             .get_preprocessor_mut()
             .diagnostics
             .extend(symbol_diagnostics.diagnostics);
-        let intrinsics = shader_language
-            .get_intrinsics_symbol(&shader_params.compilation)
-            .to_owned();
-        self.create_data(uri, symbols, intrinsics, diagnostics);
+        let shading_language = self.files.get(uri).unwrap().shading_language;
+        let intrinsics = ShaderIntrinsics::get(shading_language)
+            .get_intrinsics_symbol(&shader_params.compilation);
+        self.files.get_mut(uri).unwrap().data = Some(ServerFileCacheData {
+            symbol_cache: symbols,
+            intrinsics,
+            diagnostic_cache: diagnostics,
+        });
         Ok(())
     }
+
     pub fn cache_file_data(
         &mut self,
         uri: &Url,
@@ -390,7 +389,7 @@ impl ServerLanguageFileCache {
         shader_language: &mut ShaderLanguage,
         symbol_provider: &SymbolProvider,
         config: &ServerConfig,
-        dirty_deps: Option<&Path>,
+        dirty_deps: HashSet<PathBuf>,
     ) -> Result<HashSet<Url>, ShaderError> {
         profile_scope!("Caching file data for file {}", uri);
         assert!(
@@ -405,186 +404,331 @@ impl ServerLanguageFileCache {
         // Get variant if its our URL.
         let variant = self.variant.clone().filter(|v| v.url == *uri);
 
-        let relying_variant_uri = if variant.is_some() {
-            None // Not relying as its a variant.
+        info!("Caching file {} as variant: {:#?}", uri, variant);
+        let mut old_relying_files = if self.files.get(&uri).unwrap().data.is_some() {
+            self.get_all_relying_files(uri)
         } else {
-            self.get_relying_variant(uri)
+            HashSet::new() // No old relying files as no cache
         };
+        self.__cache_file_data(
+            uri,
+            validator,
+            shader_language,
+            symbol_provider,
+            config,
+            dirty_deps,
+        )?;
 
-        // Update dependent files before so that currently cached file diag are overriding them.
-        if dirty_deps.is_some() {
-            let mut dependent_files = self.get_dependent_main_files(uri);
-            // Remove variant and its dependent file as its already updated later.
-            if let Some(relying_variant_uri) = &relying_variant_uri {
-                dependent_files.remove(&relying_variant_uri);
-                for variant_dependent in self.get_dependent_main_files(relying_variant_uri) {
-                    dependent_files.remove(&variant_dependent);
-                }
-            }
-            for dependent_file in dependent_files {
-                info!("Caching file {} which depend on {}", dependent_file, uri);
-                self.__cache_file_data(
-                    &dependent_file,
-                    validator,
-                    shader_language,
-                    symbol_provider,
-                    config,
-                    Some(&file_path),
-                )?;
-            }
-        }
-        let removed_files = if let Some(relying_variant_uri) = &relying_variant_uri {
-            info!("Caching file {} from variant {}", uri, relying_variant_uri);
-            // Caching here will take care of propagating to its relying files.
-            self.cache_file_data(
-                &relying_variant_uri,
-                validator,
-                shader_language,
-                symbol_provider,
-                config,
-                dirty_deps,
-            )?
-        } else {
-            info!("Caching file {} as variant: {:#?}", uri, variant);
-            let mut old_relying_files = if self.files.get(&uri).unwrap().data.is_some() {
-                self.get_all_relying_files(uri)
-            } else {
-                HashSet::new() // No old relying files as no cache
-            };
-            self.__cache_file_data(
-                uri,
-                validator,
-                shader_language,
-                symbol_provider,
-                config,
-                dirty_deps,
-            )?;
-
-            // Copy variant deps data to all its relying data.
-            if let Some(variant) = &variant {
-                let variant_file = self.files.get(&variant.url).unwrap();
-                let mut file_to_cache = HashMap::new();
-                variant_file
-                    .get_data()
-                    .symbol_cache
-                    .visit_includes(&mut |include| {
-                        // Here, we could visit the same include twice, which will overwrite final cache.
-                        let include_url = Url::from_file_path(include.get_absolute_path()).unwrap();
-                        match self.files.get(&include_url) {
-                            Some(cached_file) => {
-                                // Ensure we did not already got cache for this file,
-                                // second include might have way less symbols (because of include guard mostly)
-                                if !file_to_cache.contains_key(&include_url) {
-                                    if cached_file.is_main_file() {
-                                        let symbol_cache = include.cache.clone().unwrap();
-                                        let diagnostic_cache = ShaderDiagnosticList {
-                                            diagnostics: variant_file
-                                                .get_data()
-                                                .diagnostic_cache
-                                                .diagnostics
-                                                .iter()
-                                                .filter(|d| {
-                                                    let deps_file_path = &d.range.start.file_path;
-                                                    *deps_file_path == include.get_absolute_path()
-                                                        || symbol_cache
-                                                            .has_dependency(deps_file_path)
-                                                })
-                                                .cloned()
-                                                .collect(),
-                                        };
-                                        let intrinsics = shader_language
-                                            .get_intrinsics_symbol(
-                                                &config
-                                                    .into_shader_params(Some(variant.clone()))
-                                                    .compilation,
-                                            )
-                                            .to_owned();
-                                        file_to_cache.insert(
-                                            include_url,
-                                            ServerFileCacheData {
-                                                symbol_cache,
-                                                intrinsics,
-                                                diagnostic_cache,
-                                            },
+        // Copy variant deps data to all its relying data.
+        if let Some(variant) = &variant {
+            let variant_file = self.files.get(&variant.url).unwrap();
+            let mut file_to_cache = HashMap::new();
+            variant_file
+                .get_data()
+                .symbol_cache
+                .visit_includes(&mut |include| {
+                    // Here, we could visit the same include twice, which will overwrite final cache.
+                    let include_url = Url::from_file_path(include.get_absolute_path()).unwrap();
+                    match self.files.get(&include_url) {
+                        Some(cached_file) => {
+                            // Ensure we did not already got cache for this file,
+                            // second include might have way less symbols (because of include guard mostly)
+                            if !file_to_cache.contains_key(&include_url) {
+                                if cached_file.is_main_file() {
+                                    let symbol_cache = include.cache.clone().unwrap();
+                                    let diagnostic_cache = ShaderDiagnosticList {
+                                        diagnostics: variant_file
+                                            .get_data()
+                                            .diagnostic_cache
+                                            .diagnostics
+                                            .iter()
+                                            .filter(|d| {
+                                                let deps_file_path = &d.range.start.file_path;
+                                                *deps_file_path == include.get_absolute_path()
+                                                    || symbol_cache.has_dependency(deps_file_path)
+                                            })
+                                            .cloned()
+                                            .collect(),
+                                    };
+                                    let shading_language =
+                                        self.files.get(uri).unwrap().shading_language;
+                                    let intrinsics = ShaderIntrinsics::get(shading_language)
+                                        .get_intrinsics_symbol(
+                                            &config
+                                                .into_shader_params(Some(variant.clone()))
+                                                .compilation,
                                         );
-                                    }
+                                    file_to_cache.insert(
+                                        include_url,
+                                        ServerFileCacheData {
+                                            symbol_cache,
+                                            intrinsics,
+                                            diagnostic_cache,
+                                        },
+                                    );
                                 }
                             }
-                            None => {}
+                        }
+                        None => {}
+                    }
+                });
+            for (include_url, mut include_data) in file_to_cache {
+                // When copying variant cache, some file in tree might be at their second include,
+                // which remove most of their symbols due to include guard.
+                // To workaround this, try to find their first occurence in variant and copy it.
+                let mut first_include: HashSet<PathBuf> = HashSet::new();
+                let mut reached_include = false;
+                let variant_file = self.files.get(&variant.url).unwrap();
+                include_data
+                    .symbol_cache
+                    .visit_includes_mut(&mut |include| {
+                        // We only need previously declared element. Stop once we reach it.
+                        if !reached_include {
+                            reached_include = include.get_absolute_path() == file_path;
+                            match variant_file.get_data().symbol_cache.find_include(
+                                &mut |variant_include| {
+                                    include.get_absolute_path()
+                                        == variant_include.get_absolute_path()
+                                },
+                            ) {
+                                Some(variant_include) => {
+                                    if first_include.insert(include.get_absolute_path().into()) {
+                                        include.cache = variant_include.cache.clone();
+                                    }
+                                }
+                                None => {} // Not found
+                            }
                         }
                     });
-                for (include_url, mut include_data) in file_to_cache {
-                    // When copying variant cache, some file in tree might be at their second include,
-                    // which remove most of their symbols due to include guard.
-                    // To workaround this, try to find their first occurence in variant and copy it.
-                    let mut first_include: HashSet<PathBuf> = HashSet::new();
-                    let mut reached_include = false;
-                    let variant_file = self.files.get(&variant.url).unwrap();
-                    include_data
-                        .symbol_cache
-                        .visit_includes_mut(&mut |include| {
-                            // We only need previously declared element. Stop once we reach it.
-                            if !reached_include {
-                                reached_include = include.get_absolute_path() == file_path;
-                                match variant_file.get_data().symbol_cache.find_include(
-                                    &mut |variant_include| {
-                                        include.get_absolute_path()
-                                            == variant_include.get_absolute_path()
-                                    },
-                                ) {
-                                    Some(variant_include) => {
-                                        if first_include.insert(include.get_absolute_path().into())
-                                        {
-                                            include.cache = variant_include.cache.clone();
-                                        }
-                                    }
-                                    None => {} // Not found
-                                }
-                            }
-                        });
-                    self.files.get_mut(&include_url).unwrap().data = Some(include_data);
-                    // Mark them for publishing diagnostics.
-                }
+                self.files.get_mut(&include_url).unwrap().data = Some(include_data);
+                // Mark them for publishing diagnostics.
             }
-            // Get dangling dependencies that need to be removed.
-            let new_relying_files = self.get_all_relying_files(uri);
-            old_relying_files.retain(|f| {
-                if f != uri {
-                    // Check if file was removed from include tree.
-                    if new_relying_files.iter().find(|n| *n == f).is_none() {
-                        self.is_dangling_file(f)
-                    } else {
-                        false // Keep it by removing it from update.
-                    }
+        }
+        // Get dangling dependencies that need to be removed.
+        let new_relying_files = self.get_all_relying_files(uri);
+        old_relying_files.retain(|f| {
+            if f != uri {
+                // Check if file was removed from include tree.
+                if new_relying_files.iter().find(|n| *n == f).is_none() {
+                    self.is_dangling_file(f)
                 } else {
-                    false // Avoid removing main file twice.
+                    false // Keep it by removing it from update.
                 }
-            });
-            // Remove these deps from cache.
-            for old_relying_file in &old_relying_files {
-                info!("Removing dangling deps {}", old_relying_file);
-                self.files.remove(old_relying_file);
+            } else {
+                false // Avoid removing main file twice.
             }
-            // For clearing diagnostics.
-            old_relying_files
-        };
+        });
+        // Remove these deps from cache.
+        for old_relying_file in &old_relying_files {
+            info!("Removing dangling deps {}", old_relying_file);
+            self.files.remove(old_relying_file);
+        }
 
         debug_assert!(
             self.get_file(uri).unwrap().data.is_some(),
             "Failed to cache data for file {}",
             uri
         );
-        Ok(removed_files)
+        Ok(old_relying_files)
+    }
+    pub fn cache_batched_file_data<F: Fn(&str, u32, u32)>(
+        &mut self,
+        async_cache_requests: Vec<AsyncCacheRequest>,
+        language_data: &mut HashMap<ShadingLanguage, ServerLanguageData>,
+        config: &ServerConfig,
+        progress_callback: F,
+    ) -> Result<(HashSet<Url>, HashSet<Url>), ShaderError> {
+        fn get_file_name(uri: &Url) -> String {
+            uri.to_file_path()
+                .unwrap()
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned()
+        }
+        // Get unique files to update in batch aswell as dirty ones.
+        let dirty_files: HashSet<Url> = async_cache_requests
+            .iter()
+            .filter(|r| r.dirty)
+            .map(|r| r.url.clone())
+            .collect();
+        let dirty_dependencies: HashSet<PathBuf> = dirty_files
+            .iter()
+            .map(|url| url.to_file_path().unwrap())
+            .collect();
+
+        let variant_url = self.variant.clone().map(|v| v.url);
+
+        let need_to_recompute_variant = if let Some(variant_url) = &variant_url {
+            let has_variant_in_request = async_cache_requests
+                .iter()
+                .find(|r| r.url == *variant_url)
+                .is_some();
+            let has_variant_relying_files_in_request =
+                if let Some(variant_data) = &self.files.get(&variant_url).unwrap().data {
+                    async_cache_requests
+                        .iter()
+                        .find(|r| {
+                            let file_path = r.url.to_file_path().unwrap();
+                            variant_data
+                                .symbol_cache
+                                .find_include(&mut |include| {
+                                    include.get_absolute_path().as_os_str() == file_path.as_os_str()
+                                })
+                                .is_some()
+                        })
+                        .is_some()
+                } else {
+                    false
+                };
+            has_variant_in_request || has_variant_relying_files_in_request
+        } else {
+            false // no variant.
+        };
+        let mut files_to_clear = HashSet::new();
+        let mut dependent_files_to_update = HashSet::new();
+        let mut files_updating: HashSet<Url> =
+            async_cache_requests.iter().map(|r| r.url.clone()).collect();
+        let mut unique_remaining_files = files_updating.clone();
+        let mut files_to_publish = HashSet::new();
+        let mut file_progress_index = 0;
+        if need_to_recompute_variant {
+            // Recompute variant.
+            let variant = self.variant.as_ref().unwrap();
+            let variant_url = variant.url.clone();
+            let variant_shading_language = variant.language; // TODO:ASYNC: rename for compat.
+            let language_data = language_data.get_mut(&variant_shading_language).unwrap();
+            unique_remaining_files.remove(&variant_url);
+            files_to_publish.insert(variant_url.clone());
+            files_updating.insert(variant_url.clone());
+            let file_name = get_file_name(&variant_url);
+            file_progress_index += 1;
+            progress_callback(
+                &file_name,
+                file_progress_index,
+                unique_remaining_files.len() as u32 + 1,
+            );
+            let removed_files = self.cache_file_data(
+                &variant_url,
+                language_data.validator.as_mut(),
+                &mut language_data.language,
+                &mut language_data.symbol_provider,
+                &config,
+                dirty_dependencies.clone(),
+            )?;
+            files_to_clear.extend(removed_files);
+            // Remove request for relying files as they are already updated by variant.
+            let relying_files = self.get_all_relying_files(&variant_url);
+            unique_remaining_files.retain(|f| !relying_files.contains(f));
+            files_updating.extend(relying_files);
+            // If file is dirty, request update for dependent files.
+            if dirty_files.contains(&variant_url) {
+                let dependent_files = self.get_dependent_main_files(&variant_url);
+                for dependent_file in dependent_files {
+                    if !files_updating.contains(&dependent_file) {
+                        info!(
+                            "File {} is being updated as its relying on {}",
+                            dependent_file, variant_url
+                        );
+                        files_updating.insert(dependent_file.clone());
+                        dependent_files_to_update.insert(dependent_file);
+                    }
+                }
+            }
+        }
+        for remaining_file in &unique_remaining_files {
+            let file_name = get_file_name(&remaining_file);
+            file_progress_index += 1;
+            progress_callback(
+                &file_name,
+                file_progress_index,
+                (unique_remaining_files.len() + dependent_files_to_update.len()) as u32
+                    + need_to_recompute_variant as u32,
+            );
+            // Check file is still watched and a main file
+            let shading_language = match self.files.get(&remaining_file) {
+                Some(file) => {
+                    if !file.is_main_file() {
+                        files_to_clear.insert(remaining_file.clone());
+                        continue;
+                    } else {
+                        files_to_publish.insert(remaining_file.clone());
+                        file.shading_language
+                    }
+                }
+                None => {
+                    files_to_clear.insert(remaining_file.clone());
+                    continue;
+                }
+            };
+            let language_data = language_data.get_mut(&shading_language).unwrap();
+            let removed_files = self.cache_file_data(
+                &remaining_file,
+                language_data.validator.as_mut(),
+                &mut language_data.language,
+                &mut language_data.symbol_provider,
+                &config,
+                dirty_dependencies.clone(),
+            )?;
+            files_to_clear.extend(removed_files);
+            // If file is dirty, request update for dependent files.
+            if dirty_files.contains(&remaining_file) {
+                let dependent_files = self.get_dependent_main_files(&remaining_file);
+                for dependent_file in dependent_files {
+                    if !files_updating.contains(&dependent_file) {
+                        info!(
+                            "File {} is being updated as its relying on {}",
+                            dependent_file, remaining_file
+                        );
+                        files_updating.insert(dependent_file.clone());
+                        dependent_files_to_update.insert(dependent_file);
+                    }
+                }
+            }
+        }
+        // Update dependent files now that we did everything else.
+        for dependent_file in &dependent_files_to_update {
+            let shading_language = self.files.get(&dependent_file).unwrap().shading_language;
+            let language_data = language_data.get_mut(&shading_language).unwrap();
+            let file_name = get_file_name(&dependent_file);
+            file_progress_index += 1;
+            progress_callback(
+                &file_name,
+                file_progress_index,
+                (unique_remaining_files.len() + dependent_files_to_update.len()) as u32
+                    + need_to_recompute_variant as u32,
+            );
+            let removed_files = self.cache_file_data(
+                &dependent_file,
+                language_data.validator.as_mut(),
+                &mut language_data.language,
+                &mut language_data.symbol_provider,
+                &config,
+                dirty_dependencies.clone(),
+            )?;
+            files_to_clear.extend(removed_files);
+        }
+        debug_assert!(
+            (unique_remaining_files.len()
+                + dependent_files_to_update.len()
+                + need_to_recompute_variant as usize)
+                == file_progress_index as usize,
+            "Invalid count for progress report ({} unique files, {} dependent, {} variant, expecting a total of {})",
+            unique_remaining_files.len(),
+            dependent_files_to_update.len(),
+            need_to_recompute_variant as u32,
+            file_progress_index
+        );
+        // TODO:ASYNC: Diagnostics return here are unique but might be in incorrect order...
+        files_to_publish.extend(dependent_files_to_update);
+        Ok((files_to_clear, files_to_publish))
     }
     pub fn watch_variant_file(
         &mut self,
         uri: &Url,
         lang: ShadingLanguage,
         shader_language: &mut ShaderLanguage,
-        symbol_provider: &SymbolProvider,
-        validator: &mut dyn Validator,
-        config: &ServerConfig,
-    ) -> Result<HashSet<Url>, ShaderError> {
+    ) -> Result<(), ShaderError> {
         assert!(*uri == clean_url(&uri));
         let file_path = uri.to_file_path().unwrap();
         // Check if watched file already watched as deps or variant.
@@ -622,17 +766,7 @@ impl ServerLanguageFileCache {
                 );
             }
         };
-        // Cache file data from new context.
-        // We dont update content here, so we can ignore removed_files.
-        let removed_files = self.cache_file_data(
-            uri,
-            validator,
-            shader_language,
-            symbol_provider,
-            config,
-            None, // We simply open the file. No change detected.
-        )?;
-        Ok(removed_files)
+        Ok(())
     }
     pub fn watch_main_file(
         &mut self,
@@ -640,10 +774,7 @@ impl ServerLanguageFileCache {
         lang: ShadingLanguage,
         text: &str,
         shader_language: &mut ShaderLanguage,
-        symbol_provider: &SymbolProvider,
-        validator: &mut dyn Validator,
-        config: &ServerConfig,
-    ) -> Result<&ServerFileCache, ShaderError> {
+    ) -> Result<(), ShaderError> {
         assert!(*uri == clean_url(&uri));
         let file_path = uri.to_file_path().unwrap();
 
@@ -691,17 +822,7 @@ impl ServerLanguageFileCache {
                 );
             }
         };
-        // Cache file data from new context.
-        // We dont update content here, so we can ignore removed_files.
-        let _removed_files = self.cache_file_data(
-            uri,
-            validator,
-            shader_language,
-            symbol_provider,
-            config,
-            None, // We simply open the file. No change detected.
-        )?;
-        Ok(self.files.get(&uri).unwrap())
+        Ok(())
     }
     pub fn watch_dependency(
         &mut self,
@@ -810,7 +931,7 @@ impl ServerLanguageFileCache {
         let file_path = uri.to_file_path().unwrap();
         self.files.iter().find(|(file_url, file_cache)| {
             if *file_url != uri {
-                file_cache.is_cachable_file()
+                file_cache.has_data()
                     && file_cache
                         .get_data()
                         .symbol_cache
@@ -917,7 +1038,11 @@ impl ServerLanguageFileCache {
     }
     pub fn remove_main_file(&mut self, uri: &Url) -> Result<Vec<Url>, ShaderError> {
         let used_as_deps = self.is_used_as_dependency(uri).is_some();
-        let mut dangling_files = self.get_all_relying_files(uri);
+        let mut dangling_files = if self.files.get(&uri).unwrap().data.is_some() {
+            self.get_all_relying_files(uri)
+        } else {
+            HashSet::new()
+        };
         match self.files.get_mut(&uri) {
             Some(cached_file) => {
                 if used_as_deps || cached_file.is_variant_file {
@@ -944,10 +1069,6 @@ impl ServerLanguageFileCache {
                     match self.files.remove(uri) {
                         Some(mut cached_file) => {
                             let shading_language = cached_file.shading_language;
-                            assert!(
-                                cached_file.data.is_some(),
-                                "Removing main file without data"
-                            );
                             // Get dangling dependencies that need to be removed.
                             dangling_files.retain(|f| {
                                 if uri != f {
@@ -957,8 +1078,9 @@ impl ServerLanguageFileCache {
                                 }
                             });
                             // Remove main file before deps & drop cache for ref.
-                            let data = cached_file.data.unwrap();
-                            drop(data);
+                            if let Some(data) = cached_file.data {
+                                drop(data);
+                            }
                             cached_file.is_main_file = false; // Just to be sure.
                             info!(
                                 "Removed {:#?} main file at {}. {} files in cache.",
@@ -1005,7 +1127,7 @@ impl ServerLanguageFileCache {
             symbol_cache.macros.push(&symbol);
         }
         // Add intrinsics symbols
-        symbol_cache.append_as_reference(&data.intrinsics);
+        symbol_cache.append(data.intrinsics.clone());
         symbol_cache
     }
 }

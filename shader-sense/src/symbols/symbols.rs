@@ -356,8 +356,8 @@ impl ShaderPreprocessorContext {
             depth: 0,
         }
     }
-    pub fn mark_dirty(&mut self, file_path: &Path) {
-        self.dirty_files.insert(file_path.into());
+    pub fn mark_dirty(&mut self, file_path: PathBuf) {
+        self.dirty_files.insert(file_path);
     }
     pub fn search_path_in_includes(&mut self, path: &Path) -> Option<PathBuf> {
         self.include_handler.search_path_in_includes(path)
@@ -896,7 +896,7 @@ impl ShaderSymbolList {
         self.macros.append(&mut shader_symbol_list_mut.macros);
         self.includes.append(&mut shader_symbol_list_mut.includes);
     }
-    pub fn as_ref(&self) -> ShaderSymbolListRef {
+    pub fn as_ref<'a>(&'a self) -> ShaderSymbolListRef<'a> {
         ShaderSymbolListRef {
             types: self.types.iter().collect(),
             constants: self.constants.iter().collect(),
@@ -1105,7 +1105,7 @@ impl<'a> ShaderSymbolListRef<'a> {
                 .collect(),
         }
     }
-    pub fn iter(&self) -> ShaderSymbolListIterator {
+    pub fn iter(&'a self) -> ShaderSymbolListIterator<'a> {
         ShaderSymbolListIterator::new(&self)
     }
     pub fn append_as_reference(&mut self, shader_symbol_list: &'a ShaderSymbolList) {

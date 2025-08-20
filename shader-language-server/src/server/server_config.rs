@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use log::info;
-use lsp_types::{request::WorkspaceConfiguration, ConfigurationParams, Url};
+use lsp_types::{request::WorkspaceConfiguration, ConfigurationParams};
 use serde::{Deserialize, Serialize};
 
 use serde_json::Value;
@@ -9,12 +9,18 @@ use shader_sense::{
     shader::{
         GlslCompilationParams, GlslSpirvVersion, GlslTargetClient, HlslCompilationParams,
         HlslShaderModel, HlslVersion, ShaderCompilationParams, ShaderContextParams, ShaderParams,
-        ShadingLanguage, WgslCompilationParams,
+        WgslCompilationParams,
     },
     shader_error::ShaderDiagnosticSeverity,
 };
 
-use crate::{profile_scope, server::ServerLanguage};
+use crate::{
+    profile_scope,
+    server::{
+        async_message::{AsyncCacheRequest, AsyncMessage},
+        ServerLanguage,
+    },
+};
 
 use super::shader_variant::ShaderVariant;
 
@@ -194,52 +200,21 @@ impl ServerLanguage {
                     profile_scope!("Updating server config: {:#?}", config);
                     server.config = config.clone();
                     // Republish all diagnostics
-                    let mut files_to_republish = HashSet::new();
-                    let mut files_to_clear = HashSet::new();
-                    let watched_urls: Vec<(Url, ShadingLanguage)> = server
+                    let async_updates: Vec<AsyncCacheRequest> = server
                         .watched_files
                         .files
                         .iter()
                         .filter(|(_, file)| file.is_cachable_file())
-                        .map(|(url, file)| (url.clone(), file.shading_language))
+                        .map(|(url, cached_file)| {
+                            // Only context changed.
+                            AsyncCacheRequest::new(url.clone(), cached_file.shading_language, false)
+                        })
                         .collect();
-                    for (url, shading_language) in watched_urls {
-                        profile_scope!("Updating server config for file: {}", url);
-                        let language_data =
-                            server.language_data.get_mut(&shading_language).unwrap();
-                        // Update symbols & republish diags.
-                        match server.watched_files.cache_file_data(
-                            &url,
-                            language_data.validator.as_mut(),
-                            &mut language_data.language,
-                            &language_data.symbol_provider,
-                            &server.config,
-                            Some(&url.to_file_path().unwrap()),
-                        ) {
-                            Ok(removed_files) => {
-                                let url_to_republish = server
-                                    .watched_files
-                                    .get_relying_variant(&url)
-                                    .unwrap_or(url.clone());
-                                files_to_republish.insert(url_to_republish);
-                                files_to_clear.extend(removed_files);
-                            }
-                            Err(err) => server
-                                .connection
-                                .send_notification_error(format!("{}", err)),
-                        }
-                    }
-                    // Republish all diagnostics with new settings.
-                    for url in &files_to_clear {
-                        server.clear_diagnostic(url);
-                    }
-                    for url in &files_to_republish {
-                        server.publish_diagnostic(url, None);
-                    }
+                    Ok(AsyncMessage::UpdateCache(async_updates))
                 } else {
                     info!("Requested configuration has not changed.");
+                    Ok(AsyncMessage::None)
                 }
-                Ok(())
             },
         );
     }
