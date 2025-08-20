@@ -42,7 +42,6 @@ void MSMain(
     Meshlet m = Meshlets.Load(gid); 
     SetMeshOutputCounts(3, 1); 
 
-    // Output positions, normals, uvs
     [unroll]
     for (uint iVert = 0; iVert < 32; ++iVert)
     {
@@ -50,7 +49,6 @@ void MSMain(
         vertex[iVert].normal = m.normals[iVert];
         vertex[iVert].uv = m.uvs[iVert];
     }
-    // Output triangle indices
     for (uint iTri = 0; iTri < 16; ++iTri)
     {
         indices[iTri] = m.indices[iTri];

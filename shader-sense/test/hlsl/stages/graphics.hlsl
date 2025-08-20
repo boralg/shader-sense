@@ -50,7 +50,6 @@ HS_CONTROL_POINT HSMain(InputPatch<VS_OUTPUT, 3> patch, uint i : SV_OutputContro
 HS_CONSTANT_DATA_OUTPUT HSConstantFunction(InputPatch<VS_OUTPUT, 3> patch)
 {
     HS_CONSTANT_DATA_OUTPUT output;
-    // Set tessellation factors (can be dynamic)
     output.Edges[0] = 4;
     output.Edges[1] = 4;
     output.Edges[2] = 4;
@@ -81,7 +80,6 @@ DS_OUTPUT DSMain(HS_CONSTANT_DATA_OUTPUT input, const OutputPatch<HS_CONTROL_POI
     return output;
 }
 
-// Geometry shader
 [maxvertexcount(3)]
 void GSMain(triangle DS_OUTPUT input[3], inout TriangleStream<DS_OUTPUT> triStream) {
     for (int i = 0; i < 3; ++i) {
@@ -89,7 +87,6 @@ void GSMain(triangle DS_OUTPUT input[3], inout TriangleStream<DS_OUTPUT> triStre
     }
 }
 
-// Pixel shader
 float4 PSMain(VS_OUTPUT input) : SV_TARGET {
     return input.color;
 }

@@ -489,7 +489,11 @@ mod tests {
 
     #[test]
     fn wgsl_stages() {
-        // Wgsl only support three stages.
+        // Wgsl only support three main stages.
+        // Mesh shader stage: https://github.com/gfx-rs/wgpu/issues/7197
+        // Raytracing shader stage: https://github.com/gfx-rs/wgpu/issues/6762
+        // Geometry shader deprecated
+        // Tesselation shader deprecated ?
         #[rustfmt::skip] // Keep them inline
         let stages = vec![
             ("graphics.wgsl", "VSMain", ShaderStage::Vertex),
