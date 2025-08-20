@@ -6,9 +6,9 @@ use crate::{
     shader::ShaderCompilationParams,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
+        shader_module::{ShaderModule, ShaderSymbols},
         symbol_parser::{get_name, SymbolRegionFinder},
         symbol_provider::{SymbolIncludeCallback, SymbolProvider},
-        symbol_tree::{ShaderSymbols, SymbolTree},
         symbols::{
             ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext,
             ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderRange, ShaderRegion,
@@ -172,7 +172,7 @@ impl HlslSymbolRegionFinder {
     }
     fn resolve_condition(
         cursor: tree_sitter::TreeCursor,
-        symbol_tree: &SymbolTree,
+        shader_module: &ShaderModule,
         context: &ShaderPreprocessorContext,
     ) -> Result<i32, ShaderError> {
         let mut cursor = cursor;
@@ -185,40 +185,40 @@ impl HlslSymbolRegionFinder {
                     (identifier) @identifier
                     ")"?
                 )"#;
-                assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
-                assert_node_kind!(symbol_tree.file_path, cursor, "defined");
-                assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
+                assert_tree_sitter!(shader_module.file_path, cursor.goto_first_child());
+                assert_node_kind!(shader_module.file_path, cursor, "defined");
+                assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
                 // paranthesis not mandatory...
                 if cursor.node().kind() == "(" {
-                    assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
+                    assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
                 }
-                assert_node_kind!(symbol_tree.file_path, cursor, "identifier");
-                let condition_macro = get_name(&symbol_tree.content, cursor.node());
+                assert_node_kind!(shader_module.file_path, cursor, "identifier");
+                let condition_macro = get_name(&shader_module.content, cursor.node());
                 Ok(Self::is_define_defined(context, condition_macro))
             }
             "number_literal" => {
                 // As simple as it is, but need to be warry of hexa or octal values.
                 let _ = r#"condition: (number_literal)"#;
-                let number_str = get_name(&symbol_tree.content, cursor.node());
+                let number_str = get_name(&shader_module.content, cursor.node());
                 let parsed_number = Self::parse_number(number_str);
                 match parsed_number {
                     Ok(value) => Ok(value),
                     Err(_) => Err(ShaderError::SymbolQueryError(
                         format!("Failed to parse number_literal {}", number_str),
-                        ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
+                        ShaderRange::from_range(cursor.node().range(), &shader_module.file_path),
                     )),
                 }
             }
             "identifier" => {
                 // An identifier is simply a macro.
                 let _ = r#"condition: (identifier)"#;
-                let condition_macro = get_name(&symbol_tree.content, cursor.node());
+                let condition_macro = get_name(&shader_module.content, cursor.node());
                 let value = Self::get_define_as_i32(
                     context,
                     condition_macro,
                     &ShaderPosition::from_tree_sitter_point(
                         cursor.node().start_position(),
-                        &symbol_tree.file_path,
+                        &shader_module.file_path,
                     ),
                 )?;
                 Ok(value)
@@ -230,16 +230,17 @@ impl HlslSymbolRegionFinder {
                     operator:(_) @binary.operator
                     right(_)  @identifier.or.expression
                 )"#;
-                assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
-                assert_field_name!(symbol_tree.file_path, cursor, "left");
-                let left_condition = Self::resolve_condition(cursor.clone(), symbol_tree, context)?;
-                assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                assert_field_name!(symbol_tree.file_path, cursor, "operator");
+                assert_tree_sitter!(shader_module.file_path, cursor.goto_first_child());
+                assert_field_name!(shader_module.file_path, cursor, "left");
+                let left_condition =
+                    Self::resolve_condition(cursor.clone(), shader_module, context)?;
+                assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
+                assert_field_name!(shader_module.file_path, cursor, "operator");
                 let operator = cursor.node().kind();
-                assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                assert_field_name!(symbol_tree.file_path, cursor, "right");
+                assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
+                assert_field_name!(shader_module.file_path, cursor, "right");
                 let right_condition =
-                    Self::resolve_condition(cursor.clone(), symbol_tree, context)?;
+                    Self::resolve_condition(cursor.clone(), shader_module, context)?;
                 match operator {
                     "&&" => Ok(((left_condition != 0) && (right_condition != 0)) as i32),
                     "||" => Ok(((left_condition != 0) || (right_condition != 0)) as i32),
@@ -261,7 +262,7 @@ impl HlslSymbolRegionFinder {
                     "%" => Ok(left_condition % right_condition),
                     value => Err(ShaderError::SymbolQueryError(
                         format!("Binary operator unhandled for {}", value),
-                        ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
+                        ShaderRange::from_range(cursor.node().range(), &shader_module.file_path),
                     )),
                 }
             }
@@ -271,13 +272,13 @@ impl HlslSymbolRegionFinder {
                     argument: (identifier) @identifier
                 )"#;
                 // Operator = !~-+
-                assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
-                assert_field_name!(symbol_tree.file_path, cursor, "operator");
+                assert_tree_sitter!(shader_module.file_path, cursor.goto_first_child());
+                assert_field_name!(shader_module.file_path, cursor, "operator");
                 let operator = cursor.node().kind();
-                assert_node_kind!(symbol_tree.file_path, cursor, "!");
-                assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                assert_field_name!(symbol_tree.file_path, cursor, "argument");
-                let value = Self::resolve_condition(cursor.clone(), symbol_tree, context)?;
+                assert_node_kind!(shader_module.file_path, cursor, "!");
+                assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
+                assert_field_name!(shader_module.file_path, cursor, "argument");
+                let value = Self::resolve_condition(cursor.clone(), shader_module, context)?;
                 match operator {
                     "!" => Ok(!(value != 0) as i32), // Comparing as bool
                     "+" => Ok(value),
@@ -285,7 +286,7 @@ impl HlslSymbolRegionFinder {
                     "~" => Ok(!value),
                     value => Err(ShaderError::SymbolQueryError(
                         format!("Unary operator unhandled for {}", value),
-                        ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
+                        ShaderRange::from_range(cursor.node().range(), &shader_module.file_path),
                     )),
                 }
             }
@@ -296,9 +297,9 @@ impl HlslSymbolRegionFinder {
                     (_) @anykindofexpression
                     ")"
                 )"#;
-                assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
-                assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                Self::resolve_condition(cursor, symbol_tree, context)
+                assert_tree_sitter!(shader_module.file_path, cursor.goto_first_child());
+                assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
+                Self::resolve_condition(cursor, shader_module, context)
             }
             "call_expression" => {
                 // This expression is a function call
@@ -317,14 +318,14 @@ impl HlslSymbolRegionFinder {
                 Err(ShaderError::SymbolQueryError(
                     format!(
                         "Call expression solving not implemented ({}).",
-                        get_name(&symbol_tree.content, cursor.node())
+                        get_name(&shader_module.content, cursor.node())
                     ),
-                    ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
+                    ShaderRange::from_range(cursor.node().range(), &shader_module.file_path),
                 ))
             }
             value => Err(ShaderError::SymbolQueryError(
                 format!("Condition unhandled for {}", value),
-                ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
+                ShaderRange::from_range(cursor.node().range(), &shader_module.file_path),
             )),
         }
     }
@@ -332,7 +333,7 @@ impl HlslSymbolRegionFinder {
 impl SymbolRegionFinder for HlslSymbolRegionFinder {
     fn query_regions_in_node<'a>(
         &self,
-        symbol_tree: &SymbolTree,
+        shader_module: &ShaderModule,
         symbol_provider: &SymbolProvider,
         shader_params: &ShaderCompilationParams,
         node: tree_sitter::Node,
@@ -359,12 +360,12 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         // Query regions
         let mut query_cursor = QueryCursor::new();
         let mut regions = Vec::new();
-        let mut last_processed_position = ShaderPosition::zero(symbol_tree.file_path.clone());
+        let mut last_processed_position = ShaderPosition::zero(shader_module.file_path.clone());
         for region_match in
-            query_cursor.matches(&self.query_if, node, symbol_tree.content.as_bytes())
+            query_cursor.matches(&self.query_if, node, shader_module.content.as_bytes())
         {
             fn parse_region<'a>(
-                symbol_tree: &SymbolTree,
+                shader_module: &ShaderModule,
                 symbol_provider: &SymbolProvider,
                 shader_params: &ShaderCompilationParams,
                 preprocessor: &mut ShaderPreprocessor,
@@ -375,11 +376,11 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 mut old_symbols: &mut Option<ShaderSymbols>,
                 last_processed_position: &mut ShaderPosition,
             ) -> Result<Vec<ShaderRegion>, ShaderError> {
-                assert_tree_sitter!(symbol_tree.file_path, cursor.goto_first_child());
+                assert_tree_sitter!(shader_module.file_path, cursor.goto_first_child());
                 // Process includes here as they will impact defines which impact regions.
                 let region_start = ShaderPosition::from_tree_sitter_point(
                     cursor.node().range().start_point,
-                    &symbol_tree.file_path,
+                    &shader_module.file_path,
                 );
                 // Find include before this region that defines its context.
                 // Need to filter already processed includes.
@@ -443,12 +444,12 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 // Process regions
                 let (is_active_region, region_start) = match cursor.node().kind() {
                     "#ifdef" => {
-                        assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                        assert_field_name!(symbol_tree.file_path, cursor, "name");
-                        let condition_macro = get_name(&symbol_tree.content, cursor.node());
+                        assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
+                        assert_field_name!(shader_module.file_path, cursor, "name");
+                        let condition_macro = get_name(&shader_module.content, cursor.node());
                         let position = ShaderPosition::from_tree_sitter_point(
                             cursor.node().range().end_point,
-                            &symbol_tree.file_path,
+                            &shader_module.file_path,
                         );
                         (
                             HlslSymbolRegionFinder::is_define_defined(context, condition_macro),
@@ -456,12 +457,12 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         )
                     }
                     "#ifndef" => {
-                        assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                        assert_field_name!(symbol_tree.file_path, cursor, "name");
-                        let condition_macro = get_name(&symbol_tree.content, cursor.node());
+                        assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
+                        assert_field_name!(shader_module.file_path, cursor, "name");
+                        let condition_macro = get_name(&shader_module.content, cursor.node());
                         let position = ShaderPosition::from_tree_sitter_point(
                             cursor.node().range().end_point,
-                            &symbol_tree.file_path,
+                            &shader_module.file_path,
                         );
                         (
                             1 - HlslSymbolRegionFinder::is_define_defined(context, condition_macro),
@@ -469,16 +470,16 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         )
                     }
                     "#if" => {
-                        assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                        assert_field_name!(symbol_tree.file_path, cursor, "condition");
+                        assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
+                        assert_field_name!(shader_module.file_path, cursor, "condition");
                         let position = ShaderPosition::from_tree_sitter_point(
                             cursor.node().range().end_point,
-                            &symbol_tree.file_path,
+                            &shader_module.file_path,
                         );
                         (
                             match HlslSymbolRegionFinder::resolve_condition(
                                 cursor.clone(),
-                                symbol_tree,
+                                shader_module,
                                 context,
                             ) {
                                 Ok(value) => value,
@@ -499,15 +500,15 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         if found_active_region { 0 } else { 1 },
                         ShaderPosition::from_tree_sitter_point(
                             cursor.node().range().end_point,
-                            &symbol_tree.file_path,
+                            &shader_module.file_path,
                         ),
                     ),
                     "#elif" => {
-                        assert_tree_sitter!(symbol_tree.file_path, cursor.goto_next_sibling());
-                        assert_field_name!(symbol_tree.file_path, cursor, "condition");
+                        assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
+                        assert_field_name!(shader_module.file_path, cursor, "condition");
                         let position = ShaderPosition::from_tree_sitter_point(
                             cursor.node().range().end_point,
-                            &symbol_tree.file_path,
+                            &shader_module.file_path,
                         );
                         (
                             if found_active_region {
@@ -515,7 +516,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             } else {
                                 match HlslSymbolRegionFinder::resolve_condition(
                                     cursor.clone(),
-                                    symbol_tree,
+                                    shader_module,
                                     context,
                                 ) {
                                     Ok(value) => value,
@@ -537,7 +538,10 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     child => {
                         return Err(ShaderError::SymbolQueryError(
                             format!("preproc operator not implemented: {}", child),
-                            ShaderRange::from_range(cursor.node().range(), &symbol_tree.file_path),
+                            ShaderRange::from_range(
+                                cursor.node().range(),
+                                &shader_module.file_path,
+                            ),
                         ));
                     }
                 };
@@ -550,7 +554,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             if field_name == "alternative" {
                                 let region_end = ShaderPosition::from_tree_sitter_point(
                                     previous_node.range().end_point,
-                                    &symbol_tree.file_path,
+                                    &shader_module.file_path,
                                 );
                                 let region_range = ShaderRange::new(region_start, region_end);
                                 regions.push(ShaderRegion::new(
@@ -575,7 +579,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                 });
 
                                 let mut next_region = parse_region(
-                                    symbol_tree,
+                                    shader_module,
                                     symbol_provider,
                                     shader_params,
                                     preprocessor,
@@ -615,7 +619,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                 }
                 let end_position = ShaderPosition::from_tree_sitter_point(
                     previous_node.range().end_point,
-                    &symbol_tree.file_path,
+                    &shader_module.file_path,
                 );
                 let region_range = ShaderRange::new(region_start, end_position);
                 regions.push(ShaderRegion::new(
@@ -642,7 +646,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             let node = region_match.captures[0].node;
             let mut cursor = node.walk();
             regions.append(&mut parse_region(
-                symbol_tree,
+                shader_module,
                 symbol_provider,
                 shader_params,
                 preprocessor,

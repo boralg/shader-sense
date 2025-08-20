@@ -2,9 +2,9 @@ mod glsl;
 mod hlsl;
 pub mod intrinsics;
 pub mod shader_language;
+pub mod shader_module;
 mod symbol_parser;
 pub mod symbol_provider;
-pub mod symbol_tree;
 pub mod symbols;
 mod wgsl;
 
@@ -81,10 +81,10 @@ mod tests {
         let mut all_symbols = ShaderIntrinsics::get(T::get_language())
             .get_intrinsics_symbol(&ShaderCompilationParams::default())
             .to_owned();
-        let symbol_tree = language.create_module(file_path, shader_content).unwrap();
+        let shader_module = language.create_module(file_path, shader_content).unwrap();
         let symbols = symbol_provider
             .query_symbols(
-                &symbol_tree,
+                &shader_module,
                 ShaderParams::default(),
                 &mut default_include_callback::<T>,
                 None,
@@ -93,10 +93,10 @@ mod tests {
         let symbols = symbols.get_all_symbols();
         all_symbols.append(symbols.into());
         for dep in deps {
-            let symbol_tree = language.create_module(&dep.1, &dep.0).unwrap();
+            let shader_module = language.create_module(&dep.1, &dep.0).unwrap();
             let symbols = symbol_provider
                 .query_symbols(
-                    &symbol_tree,
+                    &shader_module,
                     ShaderParams::default(),
                     &mut default_include_callback::<T>,
                     None,
@@ -136,10 +136,10 @@ mod tests {
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         let mut language = ShaderLanguage::new(ShadingLanguage::Glsl);
         let symbol_provider = language.create_symbol_provider();
-        let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
+        let shader_module = language.create_module(file_path, &shader_content).unwrap();
         let symbols = symbol_provider
             .query_symbols(
-                &symbol_tree,
+                &shader_module,
                 ShaderParams::default(),
                 &mut default_include_callback::<GlslShadingLanguageTag>,
                 None,
@@ -155,10 +155,10 @@ mod tests {
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         let mut language = ShaderLanguage::new(ShadingLanguage::Hlsl);
         let symbol_provider = language.create_symbol_provider();
-        let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
+        let shader_module = language.create_module(file_path, &shader_content).unwrap();
         let symbols = symbol_provider
             .query_symbols(
-                &symbol_tree,
+                &shader_module,
                 ShaderParams::default(),
                 &mut default_include_callback::<HlslShadingLanguageTag>,
                 None,
@@ -174,10 +174,10 @@ mod tests {
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         let mut language = ShaderLanguage::new(ShadingLanguage::Wgsl);
         let symbol_provider = language.create_symbol_provider();
-        let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
+        let shader_module = language.create_module(file_path, &shader_content).unwrap();
         let symbols = symbol_provider
             .query_symbols(
-                &symbol_tree,
+                &shader_module,
                 ShaderParams::default(),
                 &mut default_include_callback::<WgslShadingLanguageTag>,
                 None,
@@ -241,10 +241,10 @@ mod tests {
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         let mut language = ShaderLanguage::new(ShadingLanguage::Glsl);
         let symbol_provider = language.create_symbol_provider();
-        let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
+        let shader_module = language.create_module(file_path, &shader_content).unwrap();
         let symbols = symbol_provider
             .query_symbols(
-                &symbol_tree,
+                &shader_module,
                 ShaderParams::default(),
                 &mut default_include_callback::<GlslShadingLanguageTag>,
                 None,

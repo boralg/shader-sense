@@ -10,11 +10,11 @@ use crate::{
 
 use super::{
     shader_language::ShaderLanguage,
+    shader_module::{ShaderModule, ShaderModuleHandle, ShaderSymbols},
     symbol_parser::{
         ShaderSymbolListBuilder, SymbolRegionFinder, SymbolTreeParser,
         SymbolTreePreprocessorParser, SymbolWordProvider,
     },
-    symbol_tree::{ShaderModule, ShaderModuleHandle, ShaderSymbols, SymbolTree},
     symbols::{
         ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude,
         ShaderPreprocessorMode, ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolList,
@@ -83,30 +83,31 @@ impl SymbolProvider {
             word_provider,
         }
     }
-    pub fn query_file_scopes(&self, symbol_tree: &SymbolTree) -> Vec<ShaderScope> {
+    pub fn query_file_scopes(&self, shader_module: &ShaderModule) -> Vec<ShaderScope> {
         // TODO: look for namespace aswell.
         // Should be per lang instead.
         let mut query_cursor = QueryCursor::new();
         let mut scopes = Vec::new();
         for matche in query_cursor.matches(
             &self.scope_query,
-            symbol_tree.tree.root_node(),
-            symbol_tree.content.as_bytes(),
+            shader_module.tree.root_node(),
+            shader_module.content.as_bytes(),
         ) {
             scopes.push(match matche.captures.len() {
                 // one body
-                1 => {
-                    ShaderScope::from_range(matche.captures[0].node.range(), &symbol_tree.file_path)
-                }
+                1 => ShaderScope::from_range(
+                    matche.captures[0].node.range(),
+                    &shader_module.file_path,
+                ),
                 // a bit weird, a body and single curly brace ? mergin them to be safe.
                 2 => ShaderScope::join(
                     ShaderScope::from_range(
                         matche.captures[0].node.range(),
-                        &symbol_tree.file_path,
+                        &shader_module.file_path,
                     ),
                     ShaderScope::from_range(
                         matche.captures[1].node.range(),
-                        &symbol_tree.file_path,
+                        &shader_module.file_path,
                     ),
                 ),
                 // Remove curly braces from scope.
@@ -120,7 +121,7 @@ impl SymbolProvider {
                             start_point: curly_start.end_point,
                             end_point: curly_end.start_point,
                         },
-                        &symbol_tree.file_path,
+                        &shader_module.file_path,
                     )
                 }
                 _ => unreachable!("Query should not return more than 3 match."),
@@ -233,7 +234,7 @@ impl SymbolProvider {
     }
     fn query_preprocessor<'a>(
         &self,
-        symbol_tree: &SymbolTree,
+        shader_module: &ShaderModule,
         context: &'a mut ShaderPreprocessorContext,
         shader_params: &ShaderCompilationParams,
         include_callback: &'a mut SymbolIncludeCallback<'a>,
@@ -247,7 +248,7 @@ impl SymbolProvider {
             Some(old_symbol) => old_symbol
                 .get_preprocessor()
                 .context
-                .is_dirty(&symbol_tree.file_path, &context),
+                .is_dirty(&shader_module.file_path, &context),
             None => true, // No old_symbol.
         };
         if is_dirty {
@@ -256,13 +257,13 @@ impl SymbolProvider {
                 let mut query_cursor = QueryCursor::new();
                 for matches in query_cursor.matches(
                     &parser.1,
-                    symbol_tree.tree.root_node(),
-                    symbol_tree.content.as_bytes(),
+                    shader_module.tree.root_node(),
+                    shader_module.content.as_bytes(),
                 ) {
                     parser.0.process_match(
                         matches,
-                        &symbol_tree.file_path,
-                        &symbol_tree.content,
+                        &shader_module.file_path,
+                        &shader_module.content,
                         &mut preprocessor,
                         context,
                     );
@@ -278,10 +279,10 @@ impl SymbolProvider {
             // Query regions.
             // Will filter includes & defines in inactive regions
             preprocessor.regions = self.region_finder.query_regions_in_node(
-                symbol_tree,
+                shader_module,
                 self,
                 shader_params,
-                symbol_tree.tree.root_node(),
+                shader_module.tree.root_node(),
                 &mut preprocessor,
                 context,
                 include_callback,
@@ -291,8 +292,8 @@ impl SymbolProvider {
             let mut query_error_cursor = QueryCursor::new();
             for matches in query_error_cursor.matches(
                 &self.error_query,
-                symbol_tree.tree.root_node(),
-                symbol_tree.content.as_bytes(),
+                shader_module.tree.root_node(),
+                shader_module.content.as_bytes(),
             ) {
                 preprocessor.diagnostics.push(ShaderDiagnostic {
                     severity: ShaderDiagnosticSeverity::Warning,
@@ -301,7 +302,7 @@ impl SymbolProvider {
                             .into(),
                     range: ShaderRange::from_range(
                         matches.captures[0].node.range(),
-                        &symbol_tree.file_path,
+                        &shader_module.file_path,
                     ),
                 });
             }
@@ -312,7 +313,7 @@ impl SymbolProvider {
             let included_preprocessor = old_symbols.get_preprocessor_mut();
             let included_includes: Vec<&mut ShaderPreprocessorInclude> =
                 included_preprocessor.includes.iter_mut().collect();
-            let mut last_position = ShaderPosition::zero(symbol_tree.file_path.clone());
+            let mut last_position = ShaderPosition::zero(shader_module.file_path.clone());
             for included_include in included_includes {
                 // Append directory stack and defines.
                 context.push_directory_stack(included_include.get_absolute_path());
@@ -357,7 +358,7 @@ impl SymbolProvider {
     }
     fn query_file_symbols(
         &self,
-        symbol_tree: &SymbolTree,
+        shader_module: &ShaderModule,
         shader_compilation_params: &ShaderCompilationParams,
     ) -> Result<ShaderSymbolList, ShaderError> {
         let filter_symbol = |symbol: &ShaderSymbol| -> bool {
@@ -368,18 +369,18 @@ impl SymbolProvider {
             }
         };
         let mut symbol_list_builder = ShaderSymbolListBuilder::new(&filter_symbol);
-        let scopes = self.query_file_scopes(symbol_tree);
+        let scopes = self.query_file_scopes(shader_module);
         for parser in &self.symbol_parsers {
             let mut query_cursor = QueryCursor::new();
             for matches in query_cursor.matches(
                 &parser.1,
-                symbol_tree.tree.root_node(),
-                symbol_tree.content.as_bytes(),
+                shader_module.tree.root_node(),
+                shader_module.content.as_bytes(),
             ) {
                 parser.0.process_match(
                     matches,
-                    &symbol_tree.file_path,
-                    &symbol_tree.content,
+                    &shader_module.file_path,
+                    &shader_module.content,
                     &scopes,
                     &mut symbol_list_builder,
                 );
@@ -389,12 +390,12 @@ impl SymbolProvider {
     }
     pub fn get_word_range_at_position(
         &self,
-        symbol_tree: &SymbolTree,
+        shader_module: &ShaderModule,
         position: &ShaderPosition,
     ) -> Result<ShaderWordRange, ShaderError> {
         self.word_provider.find_word_at_position_in_node(
-            symbol_tree,
-            symbol_tree.tree.root_node(),
+            shader_module,
+            shader_module.tree.root_node(),
             position,
         )
     }

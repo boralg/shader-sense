@@ -6,8 +6,8 @@ use wgsl_regions::WgslRegionFinder;
 use crate::{shader_error::ShaderError, symbols::symbol_parser::ShaderWordRange};
 
 use super::{
-    symbol_parser::SymbolWordProvider, symbol_provider::SymbolProvider, symbol_tree::SymbolTree,
-    symbols::ShaderPosition,
+    shader_module::ShaderModule, symbol_parser::SymbolWordProvider,
+    symbol_provider::SymbolProvider, symbols::ShaderPosition,
 };
 
 struct WgslSymbolWordProvider {}
@@ -15,7 +15,7 @@ struct WgslSymbolWordProvider {}
 impl SymbolWordProvider for WgslSymbolWordProvider {
     fn find_word_at_position_in_node(
         &self,
-        _symbol_tree: &SymbolTree,
+        _shader_module: &ShaderModule,
         _node: tree_sitter::Node,
         _position: &ShaderPosition,
     ) -> Result<ShaderWordRange, ShaderError> {

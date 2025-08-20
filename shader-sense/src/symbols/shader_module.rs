@@ -21,7 +21,6 @@ pub struct ShaderModule {
     pub content: String,
     pub tree: Tree,
 }
-pub type SymbolTree = ShaderModule;
 
 pub type ShaderModuleHandle = Rc<RefCell<ShaderModule>>;
 

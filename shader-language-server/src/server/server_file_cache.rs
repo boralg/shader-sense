@@ -22,8 +22,8 @@ use shader_sense::{
     symbols::{
         intrinsics::ShaderIntrinsics,
         shader_language::ShaderLanguage,
+        shader_module::{ShaderModuleHandle, ShaderSymbols},
         symbol_provider::SymbolProvider,
-        symbol_tree::{ShaderModuleHandle, ShaderSymbols},
         symbols::{ShaderPreprocessorContext, ShaderRange, ShaderSymbolListRef},
     },
     validator::validator::Validator,

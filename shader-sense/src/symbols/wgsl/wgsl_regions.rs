@@ -2,9 +2,9 @@ use crate::{
     shader::ShaderCompilationParams,
     shader_error::ShaderError,
     symbols::{
+        shader_module::{ShaderModule, ShaderSymbols},
         symbol_parser::SymbolRegionFinder,
         symbol_provider::{SymbolIncludeCallback, SymbolProvider},
-        symbol_tree::{ShaderSymbols, SymbolTree},
         symbols::{ShaderPreprocessor, ShaderPreprocessorContext, ShaderRegion},
     },
 };
@@ -14,7 +14,7 @@ pub struct WgslRegionFinder {}
 impl SymbolRegionFinder for WgslRegionFinder {
     fn query_regions_in_node<'a>(
         &self,
-        _symbol_tree: &SymbolTree,
+        _shader_module: &ShaderModule,
         _symbol_provider: &SymbolProvider,
         _shader_params: &ShaderCompilationParams,
         _node: tree_sitter::Node,

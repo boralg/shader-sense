@@ -56,10 +56,10 @@ mod tests {
     ) {
         let file_path = Path::new("./test/hlsl/regions.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let symbol_tree = language.create_module(file_path, &shader_content).unwrap();
+        let shader_module = language.create_module(file_path, &shader_content).unwrap();
         let symbols = symbol_provider
             .query_symbols(
-                &symbol_tree,
+                &shader_module,
                 ShaderParams::default(),
                 &mut default_include_callback::<T>,
                 None,

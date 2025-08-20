@@ -3,9 +3,9 @@ use crate::{
     shader_error::ShaderError,
     symbols::{
         hlsl::HlslSymbolRegionFinder,
+        shader_module::{ShaderModule, ShaderSymbols},
         symbol_parser::SymbolRegionFinder,
         symbol_provider::{SymbolIncludeCallback, SymbolProvider},
-        symbol_tree::{ShaderSymbols, SymbolTree},
         symbols::{ShaderPreprocessor, ShaderPreprocessorContext, ShaderRegion},
     },
 };
@@ -25,7 +25,7 @@ impl GlslRegionFinder {
 impl SymbolRegionFinder for GlslRegionFinder {
     fn query_regions_in_node<'a>(
         &self,
-        symbol_tree: &SymbolTree,
+        shader_module: &ShaderModule,
         symbol_provider: &SymbolProvider,
         shader_params: &ShaderCompilationParams,
         node: tree_sitter::Node,
@@ -35,7 +35,7 @@ impl SymbolRegionFinder for GlslRegionFinder {
         old_symbols: Option<ShaderSymbols>,
     ) -> Result<Vec<ShaderRegion>, ShaderError> {
         self.region_finder.query_regions_in_node(
-            symbol_tree,
+            shader_module,
             symbol_provider,
             shader_params,
             node,

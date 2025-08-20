@@ -10,7 +10,7 @@ use crate::{
 
 use super::{
     glsl::create_glsl_symbol_provider, hlsl::create_hlsl_symbol_provider,
-    symbol_provider::SymbolProvider, symbol_tree::ShaderModule, symbols::ShaderRange,
+    shader_module::ShaderModule, symbol_provider::SymbolProvider, symbols::ShaderRange,
     wgsl::create_wgsl_symbol_provider,
 };
 pub struct ShaderLanguage {

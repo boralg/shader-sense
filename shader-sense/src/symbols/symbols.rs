@@ -14,7 +14,7 @@ use crate::{
     shader_error::ShaderDiagnostic,
 };
 
-use super::symbol_tree::ShaderSymbols;
+use super::shader_module::ShaderSymbols;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderParameter {

@@ -11,8 +11,8 @@ use crate::{
 };
 
 use super::{
+    shader_module::{ShaderModule, ShaderSymbols},
     symbol_provider::{SymbolIncludeCallback, SymbolProvider},
-    symbol_tree::{ShaderSymbols, SymbolTree},
     symbols::{
         ShaderPreprocessor, ShaderPreprocessorContext, ShaderRegion, ShaderScope, ShaderSymbol,
     },
@@ -301,7 +301,7 @@ pub trait SymbolTreeParser {
 pub trait SymbolRegionFinder {
     fn query_regions_in_node<'a>(
         &self,
-        symbol_tree: &SymbolTree,
+        shader_module: &ShaderModule,
         symbol_provider: &SymbolProvider,
         shader_params: &ShaderCompilationParams,
         node: tree_sitter::Node,
@@ -329,7 +329,7 @@ pub trait SymbolTreePreprocessorParser {
 pub trait SymbolWordProvider {
     fn find_word_at_position_in_node(
         &self,
-        symbol_tree: &SymbolTree,
+        shader_module: &ShaderModule,
         node: Node,
         position: &ShaderPosition,
     ) -> Result<ShaderWordRange, ShaderError>;
