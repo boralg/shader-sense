@@ -169,10 +169,16 @@ impl Glslang {
                         }
                     }
                 };
-                let line = if offset_first_line {
-                    line.parse::<u32>().unwrap_or(2) - 2
-                } else {
-                    line.parse::<u32>().unwrap_or(1) - 1
+                let line = {
+                    // Line is indexed from 1 in glslang, so remove one line (and another one if we offset from first line).
+                    // But sometimes, it return a line of zero (probably some non initialized position) so check this aswell.
+                    let offset = 1 + offset_first_line as u32;
+                    let line = line.parse::<u32>().unwrap_or(offset);
+                    if line < offset {
+                        0
+                    } else {
+                        line - offset
+                    }
                 };
                 let pos = pos.parse::<u32>().unwrap_or(0);
                 shader_error_list.push(ShaderDiagnostic {

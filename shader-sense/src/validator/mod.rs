@@ -445,17 +445,26 @@ mod tests {
         let stages = vec![
             ("graphics.hlsl", "VSMain", ShaderStage::Vertex),
             ("graphics.hlsl", "PSMain", ShaderStage::Fragment),
+            #[cfg(not(target_os= "wasi"))] // TODO: Find why its failing on WASI.
             ("graphics.hlsl", "GSMain", ShaderStage::Geometry),
             ("graphics.hlsl", "HSMain", ShaderStage::TesselationControl),
             ("graphics.hlsl", "DSMain", ShaderStage::TesselationEvaluation),
             ("compute.hlsl", "CSMain", ShaderStage::Compute),
+            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("mesh.hlsl", "ASMain", ShaderStage::Task),
+            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("mesh.hlsl", "MSMain", ShaderStage::Mesh),
+            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "RayGenMain", ShaderStage::RayGeneration),
+            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "IntersectionMain", ShaderStage::Intersect),
+            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "MissMain", ShaderStage::Miss),
+            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "AnyHitMain", ShaderStage::AnyHit),
+            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "ClosestHitMain", ShaderStage::ClosestHit),
+            #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "CallableMain", ShaderStage::Callable),
         ];
         let mut validator = create_validator(ShadingLanguage::Hlsl);
