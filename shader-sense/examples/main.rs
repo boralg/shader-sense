@@ -8,7 +8,7 @@ use shader_sense::{
 fn validate_file<T: ShadingLanguageTag>(shader_path: &Path, shader_content: &str) {
     // Validator intended to validate a file using standard API.
     let language = ShaderLanguage::new(T::get_language());
-    let mut validator = language.create_validator();
+    let validator = language.create_validator();
     match validator.validate_shader(
         shader_content,
         shader_path,

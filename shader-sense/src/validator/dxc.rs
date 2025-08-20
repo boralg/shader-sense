@@ -289,7 +289,7 @@ fn get_profile(shader_stage: Option<ShaderStage>) -> &'static str {
 
 impl Validator for Dxc {
     fn validate_shader(
-        &mut self,
+        &self,
         shader_source: &str,
         file_path: &Path,
         params: &ShaderParams,

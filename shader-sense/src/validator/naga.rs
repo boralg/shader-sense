@@ -12,15 +12,11 @@ use crate::{
 
 use super::validator::Validator;
 
-pub struct Naga {
-    validator: naga::valid::Validator,
-}
+pub struct Naga {}
 
 impl Naga {
     pub fn new() -> Self {
-        Self {
-            validator: naga::valid::Validator::new(ValidationFlags::all(), Capabilities::all()),
-        }
+        Self {}
     }
     fn from_parse_err(err: ParseError, file_path: &Path, shader_content: &str) -> ShaderDiagnostic {
         let error = err.emit_to_string(shader_content);
@@ -48,7 +44,7 @@ impl Naga {
 }
 impl Validator for Naga {
     fn validate_shader(
-        &mut self,
+        &self,
         shader_content: &str,
         file_path: &Path,
         _params: &ShaderParams,
@@ -63,7 +59,9 @@ impl Validator for Naga {
             }
         };
 
-        if let Err(error) = self.validator.validate(&module) {
+        let mut validator =
+            naga::valid::Validator::new(ValidationFlags::all(), Capabilities::all());
+        if let Err(error) = validator.validate(&module) {
             let mut list = ShaderDiagnosticList::empty();
             for (span, _) in error.spans() {
                 let loc = span.location(shader_content);

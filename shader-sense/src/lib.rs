@@ -108,7 +108,7 @@ mod tests {
             Err(err) => panic!("Failed to query symbols: {}", err),
         }
         println!("Testing validation overflow");
-        let mut validator = language.create_validator();
+        let validator = language.create_validator();
         match validator.validate_shader(
             &shader_module.content,
             file_path,

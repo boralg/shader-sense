@@ -251,7 +251,7 @@ impl Glslang {
 }
 impl Validator for Glslang {
     fn validate_shader(
-        &mut self,
+        &self,
         content: &str,
         file_path: &Path,
         params: &ShaderParams,

@@ -185,7 +185,7 @@ pub fn main() {
             // By default validate (if we dont parse symbols)
             if should_validate || symbol_type_to_print.is_empty() {
                 // Validator intended to validate a file using standard API.
-                let mut validator = create_validator(shading_language);
+                let validator = create_validator(shading_language);
                 match validator.validate_shader(
                     &shader_content,
                     shader_path,

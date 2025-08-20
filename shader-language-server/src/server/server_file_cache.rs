@@ -169,7 +169,7 @@ impl ServerLanguageFileCache {
     fn __cache_file_data(
         &mut self,
         uri: &Url,
-        validator: &mut dyn Validator,
+        validator: &dyn Validator,
         shader_language: &mut ShaderLanguage,
         symbol_provider: &SymbolProvider,
         config: &ServerConfig,
@@ -385,7 +385,7 @@ impl ServerLanguageFileCache {
     pub fn cache_file_data(
         &mut self,
         uri: &Url,
-        validator: &mut dyn Validator,
+        validator: &dyn Validator,
         shader_language: &mut ShaderLanguage,
         symbol_provider: &SymbolProvider,
         config: &ServerConfig,

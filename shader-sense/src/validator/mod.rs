@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn glsl_ok() {
-        let mut validator = create_validator(ShadingLanguage::Glsl);
+        let validator = create_validator(ShadingLanguage::Glsl);
         let file_path = Path::new("./test/glsl/ok.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn glsl_include_config() {
-        let mut validator = create_validator(ShadingLanguage::Glsl);
+        let validator = create_validator(ShadingLanguage::Glsl);
         let file_path = Path::new("./test/glsl/include-config.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -88,7 +88,7 @@ mod tests {
 
     #[test]
     fn glsl_include_level() {
-        let mut validator = create_validator(ShadingLanguage::Glsl);
+        let validator = create_validator(ShadingLanguage::Glsl);
         let file_path = Path::new("./test/glsl/include-level.comp.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn glsl_no_stage() {
-        let mut validator = create_validator(ShadingLanguage::Glsl);
+        let validator = create_validator(ShadingLanguage::Glsl);
         let file_path = Path::new("./test/glsl/nostage.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn glsl_macro() {
-        let mut validator = create_validator(ShadingLanguage::Glsl);
+        let validator = create_validator(ShadingLanguage::Glsl);
         let file_path = Path::new("./test/glsl/macro.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn glsl_error_parsing() {
-        let mut validator = create_validator(ShadingLanguage::Glsl);
+        let validator = create_validator(ShadingLanguage::Glsl);
         let file_path = Path::new("./test/glsl/error-parsing.frag.glsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn hlsl_ok() {
-        let mut validator = create_validator(ShadingLanguage::Hlsl);
+        let validator = create_validator(ShadingLanguage::Hlsl);
         let file_path = Path::new("./test/hlsl/ok.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn hlsl_include_config() {
-        let mut validator = create_validator(ShadingLanguage::Hlsl);
+        let validator = create_validator(ShadingLanguage::Hlsl);
         let file_path = Path::new("./test/hlsl/include-config.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn hlsl_include_parent_folder() {
-        let mut validator = create_validator(ShadingLanguage::Hlsl);
+        let validator = create_validator(ShadingLanguage::Hlsl);
         let file_path = Path::new("./test/hlsl/folder/folder-file.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn hlsl_include_level() {
-        let mut validator = create_validator(ShadingLanguage::Hlsl);
+        let validator = create_validator(ShadingLanguage::Hlsl);
         let file_path = Path::new("./test/hlsl/include-level.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn hlsl_macro() {
-        let mut validator = create_validator(ShadingLanguage::Hlsl);
+        let validator = create_validator(ShadingLanguage::Hlsl);
         let file_path = Path::new("./test/hlsl/macro.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -311,7 +311,7 @@ mod tests {
     fn hlsl_16bits_types_ok() {
         use crate::shader::HlslCompilationParams;
 
-        let mut validator = create_validator(ShadingLanguage::Hlsl);
+        let validator = create_validator(ShadingLanguage::Hlsl);
         let file_path = Path::new("./test/hlsl/16bit-types.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
@@ -342,7 +342,7 @@ mod tests {
     fn hlsl_spirv_ok() {
         use crate::shader::HlslCompilationParams;
 
-        let mut validator = create_validator(ShadingLanguage::Hlsl);
+        let validator = create_validator(ShadingLanguage::Hlsl);
         let file_path = Path::new("./test/hlsl/spirv-shader.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         // Check warning
@@ -410,7 +410,7 @@ mod tests {
             ("raytracing.rchit.glsl", "ClosestHitMain", ShaderStage::ClosestHit),
             ("raytracing.rcall.glsl", "CallableMain", ShaderStage::Callable),
         ];
-        let mut validator = create_validator(ShadingLanguage::Glsl);
+        let validator = create_validator(ShadingLanguage::Glsl);
         for (file_name, entry_point, shader_stage) in stages {
             let file_path = Path::new("./test/glsl/stages/").join(file_name);
             let shader_content = std::fs::read_to_string(&file_path).unwrap();
@@ -467,7 +467,7 @@ mod tests {
             #[cfg(not(target_os= "wasi"))] // Not supported with glslang
             ("raytracing.hlsl", "CallableMain", ShaderStage::Callable),
         ];
-        let mut validator = create_validator(ShadingLanguage::Hlsl);
+        let validator = create_validator(ShadingLanguage::Hlsl);
         for (file_name, entry_point, shader_stage) in stages {
             let file_path = Path::new("./test/hlsl/stages/").join(file_name);
             let shader_content = std::fs::read_to_string(&file_path).unwrap();
@@ -509,7 +509,7 @@ mod tests {
             ("graphics.wgsl", "PSMain", ShaderStage::Fragment),
             ("compute.wgsl", "CSMain", ShaderStage::Compute),
         ];
-        let mut validator = create_validator(ShadingLanguage::Wgsl);
+        let validator = create_validator(ShadingLanguage::Wgsl);
         for (file_name, entry_point, shader_stage) in stages {
             let file_path = Path::new("./test/wgsl/stages/").join(file_name);
             let shader_content = std::fs::read_to_string(&file_path).unwrap();
@@ -540,7 +540,7 @@ mod tests {
 
     #[test]
     fn wgsl_ok() {
-        let mut validator = create_validator(ShadingLanguage::Wgsl);
+        let validator = create_validator(ShadingLanguage::Wgsl);
         let file_path = Path::new("./test/wgsl/ok.wgsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
         match validator.validate_shader(
