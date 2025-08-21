@@ -3,10 +3,10 @@ use crate::{
     shader_error::ShaderError,
     symbols::{
         hlsl::HlslSymbolRegionFinder,
+        prepocessor::{ShaderPreprocessor, ShaderPreprocessorContext, ShaderRegion},
         shader_module::{ShaderModule, ShaderSymbols},
         symbol_parser::SymbolRegionFinder,
         symbol_provider::{SymbolIncludeCallback, SymbolProvider},
-        symbols::{ShaderPreprocessor, ShaderPreprocessorContext, ShaderRegion},
     },
 };
 

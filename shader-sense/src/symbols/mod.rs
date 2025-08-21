@@ -1,8 +1,10 @@
 mod glsl;
 mod hlsl;
 pub mod intrinsics;
+pub mod prepocessor;
 pub mod shader_module;
 pub mod shader_module_parser;
+pub mod symbol_list;
 mod symbol_parser;
 pub mod symbol_provider;
 pub mod symbols;
@@ -27,14 +29,11 @@ mod tests {
         shader_error::ShaderError,
         symbols::{
             intrinsics::ShaderIntrinsics, shader_module_parser::ShaderModuleParser,
-            symbols::ShaderSymbolData,
+            symbol_list::ShaderSymbolList, symbols::ShaderSymbolData,
         },
     };
 
-    use super::{
-        symbol_provider::{default_include_callback, SymbolProvider},
-        symbols::ShaderSymbolList,
-    };
+    use super::symbol_provider::{default_include_callback, SymbolProvider};
 
     pub fn find_file_dependencies(
         include_handler: &mut IncludeHandler,

@@ -2,9 +2,8 @@ use std::cell::RefCell;
 
 use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensResult, Url};
 use shader_sense::{
-    position::ShaderPosition,
-    shader_error::ShaderError,
-    symbols::symbols::{ShaderSymbolData, ShaderSymbolListRef},
+    position::ShaderPosition, shader_error::ShaderError, symbols::symbol_list::ShaderSymbolListRef,
+    symbols::symbols::ShaderSymbolData,
 };
 
 use crate::server::server_file_cache::ServerFileCache;

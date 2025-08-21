@@ -3,11 +3,11 @@ use std::path::Path;
 use crate::{
     position::{ShaderFileRange, ShaderRange},
     symbols::{
-        symbol_parser::{get_name, SymbolTreePreprocessorParser},
-        symbols::{
+        prepocessor::{
             ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine,
             ShaderPreprocessorInclude,
         },
+        symbol_parser::{get_name, SymbolTreePreprocessorParser},
     },
 };
 

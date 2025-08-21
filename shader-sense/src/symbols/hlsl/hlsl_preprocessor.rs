@@ -4,11 +4,11 @@ use crate::{
     position::{ShaderFileRange, ShaderRange},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity},
     symbols::{
-        symbol_parser::{get_name, SymbolTreePreprocessorParser},
-        symbols::{
+        prepocessor::{
             ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine,
             ShaderPreprocessorInclude, ShaderPreprocessorMode,
         },
+        symbol_parser::{get_name, SymbolTreePreprocessorParser},
     },
 };
 

@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::LazyLock};
 
 use crate::{
     shader::{ShaderCompilationParams, ShadingLanguage},
-    symbols::symbols::{ShaderSymbolList, ShaderSymbolListRef},
+    symbols::symbol_list::{ShaderSymbolList, ShaderSymbolListRef},
 };
 
 static INTRINSICS: LazyLock<HashMap<ShadingLanguage, ShaderIntrinsics>> = LazyLock::new(|| {

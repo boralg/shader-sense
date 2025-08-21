@@ -8,22 +8,23 @@ use crate::{
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
         glsl::create_glsl_symbol_provider, hlsl::create_hlsl_symbol_provider,
-        symbol_parser::ShaderWordRange, symbols::ShaderPreprocessorDefine,
-        wgsl::create_wgsl_symbol_provider,
+        symbol_parser::ShaderWordRange, wgsl::create_wgsl_symbol_provider,
     },
 };
 
 use super::{
+    prepocessor::{
+        ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine,
+        ShaderPreprocessorInclude, ShaderPreprocessorMode,
+    },
     shader_module::{ShaderModule, ShaderModuleHandle, ShaderSymbols},
     shader_module_parser::ShaderModuleParser,
+    symbol_list::ShaderSymbolList,
     symbol_parser::{
         ShaderSymbolListBuilder, SymbolRegionFinder, SymbolTreeParser,
         SymbolTreePreprocessorParser, SymbolWordProvider,
     },
-    symbols::{
-        ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude,
-        ShaderPreprocessorMode, ShaderScope, ShaderSymbol, ShaderSymbolList,
-    },
+    symbols::{ShaderScope, ShaderSymbol},
 };
 
 pub struct SymbolProvider {

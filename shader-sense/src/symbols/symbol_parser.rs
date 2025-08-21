@@ -6,15 +6,15 @@ use crate::{
     position::{ShaderFilePosition, ShaderPosition, ShaderRange},
     shader::ShaderCompilationParams,
     shader_error::ShaderError,
-    symbols::symbols::{ShaderSymbolData, ShaderSymbolList, ShaderSymbolListRef},
+    symbols::symbol_list::{ShaderSymbolList, ShaderSymbolListRef},
+    symbols::symbols::ShaderSymbolData,
 };
 
 use super::{
+    prepocessor::{ShaderPreprocessor, ShaderPreprocessorContext, ShaderRegion},
     shader_module::{ShaderModule, ShaderSymbols},
     symbol_provider::{SymbolIncludeCallback, SymbolProvider},
-    symbols::{
-        ShaderPreprocessor, ShaderPreprocessorContext, ShaderRegion, ShaderScope, ShaderSymbol,
-    },
+    symbols::{ShaderScope, ShaderSymbol},
 };
 
 pub(super) fn get_name<'a>(shader_content: &'a str, node: Node) -> &'a str {

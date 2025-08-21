@@ -2,10 +2,10 @@ use crate::{
     shader::ShaderCompilationParams,
     shader_error::ShaderError,
     symbols::{
+        prepocessor::{ShaderPreprocessor, ShaderPreprocessorContext, ShaderRegion},
         shader_module::{ShaderModule, ShaderSymbols},
         symbol_parser::SymbolRegionFinder,
         symbol_provider::{SymbolIncludeCallback, SymbolProvider},
-        symbols::{ShaderPreprocessor, ShaderPreprocessorContext, ShaderRegion},
     },
 };
 

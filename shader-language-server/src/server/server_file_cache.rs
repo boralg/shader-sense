@@ -22,10 +22,11 @@ use shader_sense::{
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
         intrinsics::ShaderIntrinsics,
+        prepocessor::ShaderPreprocessorContext,
         shader_module::{ShaderModuleHandle, ShaderSymbols},
         shader_module_parser::ShaderModuleParser,
+        symbol_list::ShaderSymbolListRef,
         symbol_provider::SymbolProvider,
-        symbols::{ShaderPreprocessorContext, ShaderSymbolListRef},
     },
     validator::validator::ValidatorImpl,
 };

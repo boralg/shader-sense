@@ -7,13 +7,13 @@ use crate::{
     shader::ShaderCompilationParams,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
-        shader_module::{ShaderModule, ShaderSymbols},
-        symbol_parser::{get_name, SymbolRegionFinder},
-        symbol_provider::{SymbolIncludeCallback, SymbolProvider},
-        symbols::{
+        prepocessor::{
             ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine,
             ShaderPreprocessorInclude, ShaderRegion,
         },
+        shader_module::{ShaderModule, ShaderSymbols},
+        symbol_parser::{get_name, SymbolRegionFinder},
+        symbol_provider::{SymbolIncludeCallback, SymbolProvider},
     },
 };
 

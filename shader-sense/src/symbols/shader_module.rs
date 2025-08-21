@@ -6,10 +6,13 @@ use std::{
 
 use tree_sitter::{Tree, TreeCursor};
 
-use crate::{shader::ShaderContextParams, symbols::symbols::ShaderSymbolListRef};
+use crate::{
+    shader::ShaderContextParams,
+    symbols::symbol_list::{ShaderSymbolList, ShaderSymbolListRef},
+};
 
-use super::symbols::{
-    ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude, ShaderSymbolList,
+use super::prepocessor::{
+    ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude,
 };
 
 #[derive(Debug, Clone)]

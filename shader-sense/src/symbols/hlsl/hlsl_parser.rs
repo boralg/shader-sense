@@ -415,10 +415,11 @@ mod hlsl_parser_tests {
         symbols::{
             hlsl::hlsl_parser::{HlslFunctionTreeParser, HlslStructTreeParser},
             shader_module_parser::ShaderModuleParser,
+            symbol_list::ShaderSymbolList,
             symbol_parser::{ShaderSymbolListBuilder, SymbolTreeParser},
             symbols::{
                 ShaderMember, ShaderMethod, ShaderParameter, ShaderSignature, ShaderSymbol,
-                ShaderSymbolData, ShaderSymbolList,
+                ShaderSymbolData,
             },
         },
     };

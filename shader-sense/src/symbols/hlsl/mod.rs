@@ -34,9 +34,9 @@ mod tests {
             ShadingLanguageTag,
         },
         symbols::{
+            prepocessor::ShaderRegion,
             shader_module_parser::ShaderModuleParser,
             symbol_provider::{default_include_callback, SymbolProvider},
-            symbols::ShaderRegion,
         },
     };
 
