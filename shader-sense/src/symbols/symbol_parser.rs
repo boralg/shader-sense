@@ -233,12 +233,16 @@ impl ShaderWordRange {
                         let member_symbols: Vec<ShaderSymbol> = members
                             .iter()
                             .filter(|m| m.parameters.label == next_item.word)
-                            .map(|m| m.as_symbol(None))
+                            .map(|m| {
+                                m.as_symbol(symbol_ty.runtime.as_ref().map(|s| s.file_path.clone()))
+                            })
                             .collect();
                         let method_symbols: Vec<ShaderSymbol> = methods
                             .iter()
                             .filter(|m| m.label == next_item.word)
-                            .map(|m| m.as_symbol(None))
+                            .map(|m| {
+                                m.as_symbol(symbol_ty.runtime.as_ref().map(|s| s.file_path.clone()))
+                            })
                             .collect();
                         [member_symbols, method_symbols].concat()
                     }
@@ -273,7 +277,7 @@ pub trait SymbolTreeParser {
     fn compute_scope_stack(
         &self,
         scopes: &Vec<ShaderScope>,
-        range: &ShaderFileRange,
+        range: &ShaderRange,
     ) -> Vec<ShaderScope> {
         scopes
             .iter()

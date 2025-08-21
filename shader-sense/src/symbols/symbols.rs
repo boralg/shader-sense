@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     include::IncludeHandler,
-    position::{ShaderFilePosition, ShaderFileRange},
+    position::{ShaderFilePosition, ShaderFileRange, ShaderRange},
     shader::{
         HlslShaderModel, HlslVersion, ShaderCompilationParams, ShaderContextParams, ShaderStage,
     },
@@ -23,7 +23,7 @@ pub struct ShaderParameter {
     pub count: Option<u32>,
     pub description: String,
     #[serde(skip)] // Runtime only
-    pub range: Option<ShaderFileRange>,
+    pub range: Option<ShaderRange>,
 }
 
 #[allow(non_snake_case)] // for JSON
@@ -66,17 +66,17 @@ impl ShaderSignature {
     }
 }
 
-pub type ShaderScope = ShaderFileRange;
+pub type ShaderScope = ShaderRange;
 
 #[derive(Debug, Default, Clone)]
 pub struct ShaderRegion {
-    pub range: ShaderFileRange,
+    pub range: ShaderRange,
     // Could add some ShaderRegionType::Condition / ShaderRegionType::User...
     pub is_active: bool, // Is this region passing preprocess
 }
 
 impl ShaderRegion {
-    pub fn new(range: ShaderFileRange, is_active: bool) -> Self {
+    pub fn new(range: ShaderRange, is_active: bool) -> Self {
         Self { range, is_active }
     }
 }
@@ -103,9 +103,7 @@ impl ShaderPreprocessorContext {
                     data: ShaderSymbolData::Macro {
                         value: value.clone(),
                     },
-                    range: None,
-                    scope: None,
-                    scope_stack: None,
+                    runtime: None,
                 })
                 .collect(),
             include_handler: IncludeHandler::main(
@@ -138,9 +136,7 @@ impl ShaderPreprocessorContext {
             data: ShaderSymbolData::Macro {
                 value: value.into(),
             },
-            range: None,
-            scope: None,
-            scope_stack: None,
+            runtime: None,
         });
     }
     pub fn append_defines(&mut self, defines: Vec<ShaderPreprocessorDefine>) {
@@ -274,14 +270,15 @@ impl ShaderPreprocessorDefine {
                         None => "".into(),
                     },
                 },
-                range: Some(range.clone()),
-                scope: None,
-                scope_stack: None, // No scope for define
+                runtime: Some(ShaderSymbolRuntime::global(range.file_path, range.range)),
             },
         }
     }
-    pub fn get_range(&self) -> Option<&ShaderFileRange> {
-        self.symbol.range.as_ref()
+    pub fn get_file_path(&self) -> Option<&Path> {
+        self.symbol.runtime.as_ref().map(|r| r.file_path.as_path())
+    }
+    pub fn get_range(&self) -> Option<&ShaderRange> {
+        self.symbol.runtime.as_ref().map(|r| &r.range)
     }
     pub fn get_name(&self) -> &String {
         &self.symbol.label
@@ -305,16 +302,22 @@ impl ShaderPreprocessorInclude {
                 data: ShaderSymbolData::Link {
                     target: ShaderFilePosition::new(absolute_path, 0, 0),
                 },
-                range: Some(range),
-                scope: None,
-                scope_stack: None, // No scope for include
+                runtime: Some(ShaderSymbolRuntime::global(range.file_path, range.range)),
             },
         }
     }
-    pub fn get_range(&self) -> &ShaderFileRange {
+    pub fn get_range(&self) -> &ShaderRange {
         self.symbol
-            .range
+            .runtime
             .as_ref()
+            .map(|r| &r.range)
+            .expect("Include symbol should have range.")
+    }
+    pub fn get_file_range(&self) -> ShaderFileRange {
+        self.symbol
+            .runtime
+            .as_ref()
+            .map(|r| r.range.clone().into_file(r.file_path.clone()))
             .expect("Include symbol should have range.")
     }
     pub fn get_relative_path(&self) -> &String {
@@ -353,10 +356,10 @@ impl ShaderPreprocessor {
         let inactive_regions: Vec<&ShaderRegion> =
             self.regions.iter().filter(|r| !r.is_active).collect();
         let mut preprocessed_symbols =
-            shader_symbols.filter(move |_symbol_type, symbol| match &symbol.range {
-                Some(range) => inactive_regions
+            shader_symbols.filter(move |_symbol_type, symbol| match &symbol.runtime {
+                Some(runtime) => inactive_regions
                     .iter()
-                    .find(|r| r.range.contain_bounds(&range))
+                    .find(|r| r.range.contain_bounds(&runtime.range))
                     .is_none(),
                 None => true, // Global range
             });
@@ -387,11 +390,11 @@ pub struct ShaderMethod {
     pub context: String,
     pub signature: ShaderSignature,
     #[serde(skip)] // Runtime only
-    pub range: Option<ShaderFileRange>,
+    pub range: Option<ShaderRange>,
 }
 
 impl ShaderMember {
-    pub fn as_symbol(&self, scope: Option<ShaderScope>) -> ShaderSymbol {
+    pub fn as_symbol(&self, file_path: Option<PathBuf>) -> ShaderSymbol {
         ShaderSymbol {
             label: self.parameters.label.clone(),
             description: self.parameters.description.clone(),
@@ -402,15 +405,21 @@ impl ShaderMember {
                 ty: self.parameters.ty.clone(),
                 count: self.parameters.count.clone(),
             },
-            range: self.parameters.range.clone(),
-            scope: scope,
-            scope_stack: None,
+            runtime: match file_path {
+                // We assume it as range if it has path.
+                // TODO: This should not be a global.
+                Some(file_path) => Some(ShaderSymbolRuntime::global(
+                    file_path,
+                    self.parameters.range.clone().unwrap(),
+                )),
+                None => None,
+            },
         }
     }
 }
 
 impl ShaderMethod {
-    pub fn as_symbol(&self, scope: Option<ShaderScope>) -> ShaderSymbol {
+    pub fn as_symbol(&self, file_path: Option<PathBuf>) -> ShaderSymbol {
         ShaderSymbol {
             label: self.label.clone(),
             description: self.signature.description.clone(),
@@ -420,9 +429,13 @@ impl ShaderMethod {
                 context: self.context.clone(),
                 signatures: vec![self.signature.clone()],
             },
-            range: self.range.clone(),
-            scope: scope,
-            scope_stack: None,
+            runtime: match file_path {
+                Some(file_path) => Some(ShaderSymbolRuntime::global(
+                    file_path,
+                    self.range.clone().unwrap(),
+                )),
+                None => None,
+            },
         }
     }
 }
@@ -464,8 +477,8 @@ pub enum ShaderSymbolData {
     #[serde(skip)] // This is runtime only. No serialization.
     CallExpression {
         label: String,
-        range: ShaderFileRange, // label range.
-        parameters: Vec<(String, ShaderFileRange)>,
+        range: ShaderRange, // label range.
+        parameters: Vec<(String, ShaderRange)>,
     },
     #[serde(skip)] // This is runtime only. No serialization.
     Link {
@@ -585,21 +598,51 @@ impl RequirementParameter {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ShaderSymbolRuntime {
+    pub file_path: PathBuf,            // file of the symbol.
+    pub range: ShaderRange,            // Range of symbol in shader
+    pub scope: Option<ShaderScope>,    // Owning scope
+    pub scope_stack: Vec<ShaderScope>, // Stack of declaration
+}
+
+impl ShaderSymbolRuntime {
+    pub fn new(
+        file_path: PathBuf,
+        range: ShaderRange,
+        scope: Option<ShaderScope>,
+        scope_stack: Vec<ShaderScope>,
+    ) -> Self {
+        Self {
+            file_path,
+            range,
+            scope,
+            scope_stack,
+        }
+    }
+    pub fn global(file_path: PathBuf, range: ShaderRange) -> Self {
+        Self::new(file_path, range, None, Vec::new())
+    }
+    pub fn owner(file_path: PathBuf, range: ShaderRange, scope: Option<ShaderScope>) -> Self {
+        Self::new(file_path, range, scope, Vec::new())
+    }
+    pub fn variable(file_path: PathBuf, range: ShaderRange, scope_stack: Vec<ShaderScope>) -> Self {
+        Self::new(file_path, range, None, scope_stack)
+    }
+}
+
 #[allow(non_snake_case)] // for JSON
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShaderSymbol {
-    pub label: String,                             // Label for the item
+    pub label: String, // Label for the item
+    // TODO:OPTIM: description & link are only used by intrinsics and should not take all memory.
     pub description: String,                       // Description of the item
     pub link: Option<String>,                      // Link to some external documentation
     pub requirement: Option<RequirementParameter>, // Used for filtering symbols.
     pub data: ShaderSymbolData,                    // Data for the variable
-    // Runtime info. No serialization.
-    #[serde(skip)]
-    pub range: Option<ShaderFileRange>, // Range of symbol in shader
-    #[serde(skip)]
-    pub scope: Option<ShaderScope>, // Owning scope
-    #[serde(skip)]
-    pub scope_stack: Option<Vec<ShaderScope>>, // Stack of declaration
+
+    #[serde(skip)] // Runtime info. No serialization.
+    pub runtime: Option<ShaderSymbolRuntime>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
@@ -734,39 +777,31 @@ impl<'a> ShaderSymbolListRef<'a> {
         shader_symbol: &ShaderSymbol,
         cursor_position: &ShaderFilePosition,
     ) -> bool {
-        match &shader_symbol.range {
-            Some(symbol_range) => {
-                if symbol_range.file_path.as_os_str() == cursor_position.file_path.as_os_str() {
+        match &shader_symbol.runtime {
+            Some(runtime) => {
+                if runtime.file_path.as_os_str() == cursor_position.file_path.as_os_str() {
                     // Ensure symbols are already defined at pos
                     let is_already_defined =
-                        if symbol_range.range.start.line == cursor_position.position.line {
-                            cursor_position.position.pos > symbol_range.range.start.pos
+                        if runtime.range.start.line == cursor_position.position.line {
+                            cursor_position.position.pos > runtime.range.start.pos
                         } else {
-                            cursor_position.position.line > symbol_range.range.start.line
+                            cursor_position.position.line > runtime.range.start.line
                         };
                     if is_already_defined {
                         // If we are in main file, check if scope in range.
-                        match &shader_symbol.scope_stack {
-                            Some(symbol_scope_stack) => {
-                                for symbol_scope in symbol_scope_stack {
-                                    if !symbol_scope.contain(cursor_position) {
-                                        return false; // scope not in range
-                                    }
-                                }
-                                true // scope in range
+                        for symbol_scope in &runtime.scope_stack {
+                            if !symbol_scope.contain(&cursor_position.position) {
+                                return false; // scope not in range
                             }
-                            None => true, // Global space
                         }
+                        true // scope in range
                     } else {
                         false
                     }
                 } else {
                     // If we are not in main file, only show whats in global scope.
                     // TODO: should handle include position in file aswell.
-                    match &shader_symbol.scope_stack {
-                        Some(symbol_scope_stack) => symbol_scope_stack.is_empty(), // Global scope or inaccessible
-                        None => true,                                              // Global space
-                    }
+                    runtime.scope_stack.is_empty() // Global scope or inaccessible
                 }
             }
             None => true, // intrinsics

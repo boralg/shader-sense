@@ -116,34 +116,22 @@ impl SymbolProvider {
         ) {
             scopes.push(match matche.captures.len() {
                 // one body
-                1 => ShaderScope::from(
-                    shader_module.file_path.clone(),
-                    ShaderRange::from(matche.captures[0].node.range()),
-                ),
+                1 => ShaderScope::from(ShaderRange::from(matche.captures[0].node.range())),
                 // a bit weird, a body and single curly brace ? mergin them to be safe.
                 2 => ShaderScope::join(
-                    ShaderScope::from(
-                        shader_module.file_path.clone(),
-                        ShaderRange::from(matche.captures[0].node.range()),
-                    ),
-                    ShaderScope::from(
-                        shader_module.file_path.clone(),
-                        ShaderRange::from(matche.captures[1].node.range()),
-                    ),
+                    ShaderScope::from(ShaderRange::from(matche.captures[0].node.range())),
+                    ShaderScope::from(ShaderRange::from(matche.captures[1].node.range())),
                 ),
                 // Remove curly braces from scope.
                 3 => {
                     let curly_start = matche.captures[1].node.range();
                     let curly_end = matche.captures[2].node.range();
-                    ShaderScope::from(
-                        shader_module.file_path.clone(),
-                        ShaderRange::from(tree_sitter::Range {
-                            start_byte: curly_start.end_byte,
-                            end_byte: curly_end.start_byte,
-                            start_point: curly_start.end_point,
-                            end_point: curly_end.start_point,
-                        }),
-                    )
+                    ShaderScope::from(ShaderRange::from(tree_sitter::Range {
+                        start_byte: curly_start.end_byte,
+                        end_byte: curly_end.start_byte,
+                        start_point: curly_start.end_point,
+                        end_point: curly_end.start_point,
+                    }))
                 }
                 _ => unreachable!("Query should not return more than 3 match."),
             });
@@ -227,7 +215,10 @@ impl SymbolProvider {
                         // Include not found.
                         Err(ShaderError::SymbolQueryError(
                             format!("Failed to find include {}", include.get_relative_path()),
-                            include.get_range().clone(),
+                            include
+                                .get_range()
+                                .clone()
+                                .into_file(include.get_absolute_path().into()),
                         ))
                     }
                 },
@@ -249,7 +240,10 @@ impl SymbolProvider {
                     "Include {} reached maximum include depth",
                     include.get_relative_path()
                 ),
-                include.get_range().clone(),
+                include
+                    .get_range()
+                    .clone()
+                    .into_file(include.get_absolute_path().into()),
             ));
         }
     }
@@ -344,8 +338,8 @@ impl SymbolProvider {
                         .iter()
                         .filter(|define| match define.get_range() {
                             Some(range) => {
-                                range.range.start >= last_position
-                                    && range.range.end <= included_include.get_range().range.start
+                                range.start >= last_position
+                                    && range.end <= included_include.get_range().start
                             }
                             None => false, // Global define, already filled ?
                         })
@@ -361,14 +355,14 @@ impl SymbolProvider {
                     include_callback,
                     old_include_cache,
                 )?;
-                last_position = included_include.get_range().range.end.clone();
+                last_position = included_include.get_range().end.clone();
             }
             // Add all defines after last include to context
             let define_left = included_preprocessor
                 .defines
                 .iter_mut()
                 .filter(|define| match define.get_range() {
-                    Some(range) => range.range.start > last_position,
+                    Some(range) => range.start > last_position,
                     None => false, // Global define
                 })
                 .map(|d| d.clone())

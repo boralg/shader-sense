@@ -159,7 +159,7 @@ impl ServerLanguage {
             .iter()
             .filter_map(|region| {
                 (!region.is_active).then_some(Diagnostic {
-                    range: shader_range_to_lsp_range(&region.range.range),
+                    range: shader_range_to_lsp_range(&region.range),
                     severity: Some(DiagnosticSeverity::HINT),
                     message: "Code disabled by currently used macros".into(),
                     source: Some("shader-validator".to_string()),
@@ -181,7 +181,7 @@ impl ServerLanguage {
                         .iter()
                         .filter_map(|region| {
                             (!region.is_active).then_some(Diagnostic {
-                                range: shader_range_to_lsp_range(&region.range.range),
+                                range: shader_range_to_lsp_range(&region.range),
                                 severity: Some(DiagnosticSeverity::HINT),
                                 message: "Code disabled by currently used macros".into(),
                                 source: Some("shader-validator".to_string()),

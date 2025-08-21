@@ -23,20 +23,20 @@ impl ServerLanguage {
             .macros
             .iter()
             .map(|symbol| {
-                let byte_offset_start = match &symbol.range {
-                    Some(range) => {
-                        if range.file_path.as_os_str() == file_path.as_os_str() {
-                            range.start().to_byte_offset(content).unwrap()
+                let byte_offset_start = match &symbol.runtime {
+                    Some(runtime) => {
+                        if runtime.file_path.as_os_str() == file_path.as_os_str() {
+                            runtime.range.start.to_byte_offset(content).unwrap()
                         } else {
                             match cached_file
                                 .data
                                 .as_ref()
                                 .unwrap()
                                 .symbol_cache
-                                .find_direct_includer(&range.file_path)
+                                .find_direct_includer(&runtime.file_path)
                             {
                                 Some(include) => {
-                                    include.get_range().start().to_byte_offset(content).unwrap()
+                                    include.get_range().start.to_byte_offset(content).unwrap()
                                 }
                                 None => 0, // Included from another file, but not found...
                             }
@@ -92,60 +92,70 @@ impl ServerLanguage {
             .map(|symbol| {
                 let mut tokens = Vec::new();
                 // If we own a scope and have a range.
-                if let (Some(scope), Some(range)) = (&symbol.scope, &symbol.range) {
-                    if range.file_path.as_os_str() == file_path.as_os_str() {
-                        let content_start = scope.start().to_byte_offset(&content).unwrap();
-                        let content_end = scope.end().to_byte_offset(&content).unwrap();
-                        match &symbol.data {
-                            ShaderSymbolData::Functions { signatures } => {
-                                assert!(signatures.len() == 1, "Should have only one signature");
-                                for parameter in &signatures[0].parameters {
-                                    match &parameter.range {
-                                        Some(range) => tokens.push(SemanticToken {
-                                            delta_line: range.start().line,
-                                            delta_start: range.start().pos,
-                                            length: parameter.label.len() as u32,
-                                            token_type: 1, // SemanticTokenType::PARAMETERS, view registration
-                                            token_modifiers_bitset: 0,
-                                        }),
-                                        None => continue, // Should not happen for local symbol, but skip it to be sure...
-                                    }
-                                    // Push occurences in scope
-                                    // TODO: NOT dot at beginning of capture (as its a field.)
-                                    let reg = regex::Regex::new(
-                                        format!("\\b({})\\b", regex::escape(&parameter.label))
-                                            .as_str(),
-                                    )
-                                    .unwrap();
-                                    let word_byte_offsets: Vec<usize> = reg
-                                        .captures_iter(&content[content_start..content_end])
-                                        .map(|e| e.get(0).unwrap().range().start + content_start)
-                                        .collect();
-                                    tokens.extend(
-                                        word_byte_offsets
-                                            .iter()
-                                            .filter_map(|byte_offset| {
-                                                match ShaderPosition::from_byte_offset(
-                                                    &content,
-                                                    *byte_offset,
-                                                ) {
-                                                    Ok(position) => {
-                                                        Some(SemanticToken {
-                                                            delta_line: position.line,
-                                                            delta_start: position.pos,
-                                                            length: parameter.label.len() as u32,
-                                                            token_type: 1, // SemanticTokenType::PARAMETERS, view registration
-                                                            token_modifiers_bitset: 0,
-                                                        })
-                                                    }
-                                                    Err(_) => None,
-                                                }
-                                            })
-                                            .collect::<Vec<SemanticToken>>(),
+                if let Some(runtime) = &symbol.runtime {
+                    if let Some(scope) = &runtime.scope {
+                        if runtime.file_path.as_os_str() == file_path.as_os_str() {
+                            let content_start = scope.start.to_byte_offset(&content).unwrap();
+                            let content_end = scope.end.to_byte_offset(&content).unwrap();
+                            match &symbol.data {
+                                ShaderSymbolData::Functions { signatures } => {
+                                    assert!(
+                                        signatures.len() == 1,
+                                        "Should have only one signature"
                                     );
+                                    for parameter in &signatures[0].parameters {
+                                        match &parameter.range {
+                                            Some(range) => tokens.push(SemanticToken {
+                                                delta_line: range.start.line,
+                                                delta_start: range.start.pos,
+                                                length: parameter.label.len() as u32,
+                                                token_type: 1, // SemanticTokenType::PARAMETERS, view registration
+                                                token_modifiers_bitset: 0,
+                                            }),
+                                            None => continue, // Should not happen for local symbol, but skip it to be sure...
+                                        }
+                                        // Push occurences in scope
+                                        // TODO: NOT dot at beginning of capture (as its a field.)
+                                        let reg = regex::Regex::new(
+                                            format!("\\b({})\\b", regex::escape(&parameter.label))
+                                                .as_str(),
+                                        )
+                                        .unwrap();
+                                        let word_byte_offsets: Vec<usize> = reg
+                                            .captures_iter(&content[content_start..content_end])
+                                            .map(|e| {
+                                                e.get(0).unwrap().range().start + content_start
+                                            })
+                                            .collect();
+                                        tokens.extend(
+                                            word_byte_offsets
+                                                .iter()
+                                                .filter_map(|byte_offset| {
+                                                    match ShaderPosition::from_byte_offset(
+                                                        &content,
+                                                        *byte_offset,
+                                                    ) {
+                                                        Ok(position) => {
+                                                            Some(SemanticToken {
+                                                                delta_line: position.line,
+                                                                delta_start: position.pos,
+                                                                length: parameter.label.len()
+                                                                    as u32,
+                                                                token_type: 1, // SemanticTokenType::PARAMETERS, view registration
+                                                                token_modifiers_bitset: 0,
+                                                            })
+                                                        }
+                                                        Err(_) => None,
+                                                    }
+                                                })
+                                                .collect::<Vec<SemanticToken>>(),
+                                        );
+                                    }
                                 }
+                                _ => {} // Nothing to push
                             }
-                            _ => {} // Nothing to push
+                        } else {
+                            // Nothing to push
                         }
                     } else {
                         // Nothing to push

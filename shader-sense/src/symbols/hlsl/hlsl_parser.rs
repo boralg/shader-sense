@@ -1,8 +1,8 @@
 use std::path::Path;
 
-use crate::position::{ShaderFileRange, ShaderRange};
+use crate::position::ShaderRange;
 use crate::symbols::symbol_parser::ShaderSymbolListBuilder;
-use crate::symbols::symbols::ShaderMember;
+use crate::symbols::symbols::{ShaderMember, ShaderSymbolRuntime};
 
 use crate::symbols::{
     symbol_parser::{get_name, SymbolTreeParser},
@@ -62,12 +62,11 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
         symbols: &mut ShaderSymbolListBuilder,
     ) {
         let label_node = matches.captures[1].node;
-        let range = ShaderFileRange::from(file_path.into(), ShaderRange::from(label_node.range()));
+        let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(scopes, &range);
         // Query internal scope
         let scope_node = matches.captures[matches.captures.len() - 1].node;
-        let scope_range =
-            ShaderFileRange::from(file_path.into(), ShaderRange::from(scope_node.range()));
+        let scope_range = ShaderRange::from(scope_node.range());
         let parameter_scope_stack = {
             let mut s = scope_stack.clone();
             s.push(scope_range.clone());
@@ -88,22 +87,19 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
                         ty: ty.clone(),
                         count: None,
                     },
-                    scope: None,
-                    range: Some(ShaderFileRange::from(
+                    runtime: Some(ShaderSymbolRuntime::new(
                         file_path.into(),
                         ShaderRange::from(w[1].node.range()),
+                        None,
+                        parameter_scope_stack.clone(),
                     )),
-                    scope_stack: Some(parameter_scope_stack.clone()),
                 });
                 ShaderParameter {
                     ty: ty,
                     label: label,
                     count: None,
                     description: "".into(),
-                    range: Some(ShaderFileRange::from(
-                        file_path.into(),
-                        ShaderRange::from(w[1].node.range()),
-                    )),
+                    range: Some(ShaderRange::from(w[1].node.range())),
                 }
             })
             .collect::<Vec<ShaderParameter>>();
@@ -119,9 +115,12 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
                     parameters: parameters,
                 }],
             },
-            scope: Some(scope_range),
-            range: Some(range),
-            scope_stack: Some(scope_stack), // In GLSL, all function are global scope.
+            runtime: Some(ShaderSymbolRuntime::new(
+                file_path.into(),
+                range,
+                Some(scope_range),
+                scope_stack,
+            )),
         });
     }
 }
@@ -166,7 +165,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
     ) {
         let label_node = matches.captures[0].node;
         let struct_name: String = get_name(shader_content, matches.captures[0].node).into();
-        let range = ShaderFileRange::from(file_path.into(), ShaderRange::from(label_node.range()));
+        let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
 
         // QUERY INNER METHODS
@@ -198,7 +197,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
                         } else {
                             panic!("Invalid function type");
                         },
-                        range: f.range,
+                        range: f.runtime.as_ref().map(|r| r.range.clone()),
                     })
                     .collect::<Vec<ShaderMethod>>()
             })
@@ -241,7 +240,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
                                 panic!("Invalid variable type");
                             },
                             description: "".into(),
-                            range: f.range,
+                            range: f.runtime.as_ref().map(|r| r.range.clone()),
                         },
                     })
                     .collect::<Vec<ShaderMember>>()
@@ -258,9 +257,13 @@ impl SymbolTreeParser for HlslStructTreeParser {
                 members: members,
                 methods: methods,
             },
-            scope: None, // TODO: compute
-            range: Some(range),
-            scope_stack: Some(scope_stack),
+            // TODO: compute scope
+            runtime: Some(ShaderSymbolRuntime::new(
+                file_path.into(),
+                range,
+                None,
+                scope_stack,
+            )),
         });
     }
 }
@@ -312,7 +315,7 @@ impl SymbolTreeParser for HlslVariableTreeParser {
         } else {
             None
         };
-        let range = ShaderFileRange::from(file_path.into(), ShaderRange::from(label_node.range()));
+        let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
         symbol_builder.add_variable(ShaderSymbol {
             label: get_name(shader_content, label_node).into(),
@@ -326,9 +329,12 @@ impl SymbolTreeParser for HlslVariableTreeParser {
                     Err(_) => 0, // TODO: Need to resolve the parameter. Could use proxy tree same as for region conditions. For now, simply return zero.
                 }),
             },
-            scope: None,
-            range: Some(range),
-            scope_stack: Some(scope_stack),
+            runtime: Some(ShaderSymbolRuntime::new(
+                file_path.into(),
+                range,
+                None,
+                scope_stack,
+            )),
         });
     }
 }
@@ -366,7 +372,7 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
         symbol_builder: &mut ShaderSymbolListBuilder,
     ) {
         let label_node = matches.captures[0].node;
-        let range = ShaderFileRange::from(file_path.into(), ShaderRange::from(label_node.range()));
+        let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
         let label = get_name(shader_content, label_node).into();
         symbol_builder.add_call_expression(ShaderSymbol {
@@ -382,19 +388,17 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
                     .enumerate()
                     .map(|(i, e)| {
                         // These name are not variable. Should find definition in symbols.
-                        (
-                            format!("param{}:", i),
-                            ShaderFileRange::from(
-                                file_path.into(),
-                                ShaderRange::from(e.node.range()),
-                            ),
-                        )
+                        (format!("param{}:", i), ShaderRange::from(e.node.range()))
                     })
                     .collect(),
             },
-            scope: None,
-            range: Some(range), // TODO: this should be range of whole expression.
-            scope_stack: Some(scope_stack),
+            // TODO: range should be range of whole expression.
+            runtime: Some(ShaderSymbolRuntime::new(
+                file_path.into(),
+                range,
+                None,
+                scope_stack,
+            )),
         });
     }
 }
@@ -406,7 +410,7 @@ mod hlsl_parser_tests {
     use tree_sitter::{Query, QueryCursor};
 
     use crate::{
-        position::{ShaderFileRange, ShaderPosition},
+        position::{ShaderPosition, ShaderRange},
         shader::ShadingLanguage,
         symbols::{
             hlsl::hlsl_parser::{HlslFunctionTreeParser, HlslStructTreeParser},
@@ -555,8 +559,7 @@ mod hlsl_parser_tests {
                                 label: "member0".into(),
                                 description: "".into(),
                                 count: None,
-                                range: Some(ShaderFileRange::new(
-                                    path.into(),
+                                range: Some(ShaderRange::new(
                                     ShaderPosition::new(1, 0),
                                     ShaderPosition::new(2, 0),
                                 )),
@@ -569,8 +572,7 @@ mod hlsl_parser_tests {
                                 label: "member1".into(),
                                 description: "".into(),
                                 count: None,
-                                range: Some(ShaderFileRange::new(
-                                    path.into(),
+                                range: Some(ShaderRange::new(
                                     ShaderPosition::new(1, 0),
                                     ShaderPosition::new(2, 0),
                                 )),
@@ -585,16 +587,13 @@ mod hlsl_parser_tests {
                             description: "".into(),
                             parameters: vec![],
                         },
-                        range: Some(ShaderFileRange::new(
-                            path.into(),
+                        range: Some(ShaderRange::new(
                             ShaderPosition::new(1, 0),
                             ShaderPosition::new(2, 0),
                         )),
                     }],
                 },
-                range: None,
-                scope: None,
-                scope_stack: None,
+                runtime: None, // assume global
             },
             &result.types[0],
         );
@@ -624,8 +623,7 @@ mod hlsl_parser_tests {
                                 label: "p0".into(),
                                 description: "".into(),
                                 count: None,
-                                range: Some(ShaderFileRange::new(
-                                    path.into(),
+                                range: Some(ShaderRange::new(
                                     ShaderPosition::new(1, 0),
                                     ShaderPosition::new(2, 0),
                                 )),
@@ -635,8 +633,7 @@ mod hlsl_parser_tests {
                                 label: "p1".into(),
                                 description: "".into(),
                                 count: None,
-                                range: Some(ShaderFileRange::new(
-                                    path.into(),
+                                range: Some(ShaderRange::new(
                                     ShaderPosition::new(1, 0),
                                     ShaderPosition::new(2, 0),
                                 )),
@@ -644,9 +641,7 @@ mod hlsl_parser_tests {
                         ],
                     }],
                 },
-                range: None,
-                scope: None,
-                scope_stack: None,
+                runtime: None, // assume global
             },
             &result.functions[0],
         );

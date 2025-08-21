@@ -340,7 +340,7 @@ impl ServerLanguageFileCache {
                                             include.get_relative_path(),
                                             diagnostic.error
                                         ),
-                                        range: include.get_range().clone(),
+                                        range: include.get_file_range(),
                                     });
                                 }
                                 match include.cache.as_ref().unwrap().find_include(&mut |i| {
@@ -354,7 +354,7 @@ impl ServerLanguageFileCache {
                                                 includer.get_relative_path(),
                                                 diagnostic.error
                                             ),
-                                            range: include.get_range().clone(),
+                                            range: include.get_file_range(),
                                         })
                                     }
                                     None => {}

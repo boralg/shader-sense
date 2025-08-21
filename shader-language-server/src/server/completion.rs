@@ -108,13 +108,25 @@ impl ServerLanguage {
                                         members_and_methods.extend(
                                             members
                                                 .iter()
-                                                .map(|m| m.as_symbol(None))
+                                                .map(|m| {
+                                                    m.as_symbol(
+                                                        ty.runtime
+                                                            .as_ref()
+                                                            .map(|s| s.file_path.clone()),
+                                                    )
+                                                })
                                                 .collect::<Vec<ShaderSymbol>>(),
                                         );
                                         members_and_methods.extend(
                                             methods
                                                 .iter()
-                                                .map(|m| m.as_symbol(None))
+                                                .map(|m| {
+                                                    m.as_symbol(
+                                                        ty.runtime
+                                                            .as_ref()
+                                                            .map(|s| s.file_path.clone()),
+                                                    )
+                                                })
                                                 .collect::<Vec<ShaderSymbol>>(),
                                         );
                                         members_and_methods
@@ -196,16 +208,16 @@ fn convert_completion_item(
     } else {
         "".to_string()
     };
-    let position = if let Some(range) = &shader_symbol.range {
+    let position = if let Some(runtime) = &shader_symbol.runtime {
         format!(
             "{}:{}:{}",
-            range
+            runtime
                 .file_path
                 .file_name()
                 .unwrap_or(OsStr::new("file"))
                 .to_string_lossy(),
-            range.start().line,
-            range.start().pos
+            runtime.range.start.line,
+            runtime.range.start.pos
         )
     } else {
         "".to_string()

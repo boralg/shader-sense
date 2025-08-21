@@ -259,12 +259,12 @@ pub fn main() {
                         let symbol_list = symbols.get_all_symbols();
                         let mut found_some_symbols = false;
                         for symbol in symbol_list.iter() {
-                            let header = match &symbol.range {
-                                Some(range) => format!(
+                            let header = match &symbol.runtime {
+                                Some(runtime) => format!(
                                     "{}:{}:{}",
-                                    range.file_path.file_name().unwrap().display(),
-                                    range.start().line,
-                                    range.start().pos
+                                    runtime.file_path.file_name().unwrap().display(),
+                                    runtime.range.start.line,
+                                    runtime.range.start.pos
                                 ),
                                 None => symbol.format(),
                             };

@@ -28,7 +28,7 @@ mod tests {
     use std::path::Path;
 
     use crate::{
-        position::{ShaderFileRange, ShaderPosition},
+        position::{ShaderPosition, ShaderRange},
         shader::{
             GlslShadingLanguageTag, HlslShadingLanguageTag, ShaderParams, ShadingLanguage,
             ShadingLanguageTag,
@@ -73,8 +73,7 @@ mod tests {
         let set_region =
             |start_line: u32, start_pos: u32, end_line: u32, end_pos: u32, active: bool| {
                 ShaderRegion {
-                    range: ShaderFileRange::new(
-                        file_path.into(),
+                    range: ShaderRange::new(
                         ShaderPosition::new(start_line, start_pos),
                         ShaderPosition::new(end_line, end_pos),
                     ),
@@ -129,14 +128,14 @@ mod tests {
                 region_index, symbols.preprocessor.regions[region_index]
             );
             assert!(
-                symbols.preprocessor.regions[region_index].range.range.start
-                    == expected_regions[region_index].range.range.start,
+                symbols.preprocessor.regions[region_index].range.start
+                    == expected_regions[region_index].range.start,
                 "Failed start assert for region {}",
                 region_index
             );
             assert!(
-                symbols.preprocessor.regions[region_index].range.range.end
-                    == expected_regions[region_index].range.range.end,
+                symbols.preprocessor.regions[region_index].range.end
+                    == expected_regions[region_index].range.end,
                 "Failed end assert for region {}",
                 region_index
             );

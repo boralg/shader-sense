@@ -39,9 +39,9 @@ impl ServerLanguage {
                         .iter()
                         .filter_map(|symbol| {
                             if let ShaderSymbolData::Link { target } = &symbol.data {
-                                match &symbol.range {
-                                    // _range here should be equal to selected_range.
-                                    Some(_range) => Some(lsp_types::LocationLink {
+                                match &symbol.runtime {
+                                    // _runtime.range here should be equal to selected_range.
+                                    Some(_runtime) => Some(lsp_types::LocationLink {
                                         origin_selection_range: Some(shader_range_to_lsp_range(
                                             &word.get_range().range,
                                         )),
@@ -60,15 +60,16 @@ impl ServerLanguage {
                                     None => None,
                                 }
                             } else {
-                                match &symbol.range {
-                                    Some(range) => Some(lsp_types::LocationLink {
+                                match &symbol.runtime {
+                                    Some(runtime) => Some(lsp_types::LocationLink {
                                         origin_selection_range: Some(shader_range_to_lsp_range(
                                             &word.get_range().range,
                                         )),
-                                        target_uri: Url::from_file_path(&range.file_path).unwrap(),
-                                        target_range: shader_range_to_lsp_range(&range.range),
+                                        target_uri: Url::from_file_path(&runtime.file_path)
+                                            .unwrap(),
+                                        target_range: shader_range_to_lsp_range(&runtime.range),
                                         target_selection_range: shader_range_to_lsp_range(
-                                            &range.range,
+                                            &runtime.range,
                                         ),
                                     }),
                                     None => None,

@@ -1,10 +1,13 @@
 use std::path::Path;
 
 use crate::{
-    position::{ShaderFileRange, ShaderRange},
+    position::ShaderRange,
     symbols::{
         symbol_parser::{get_name, ShaderSymbolListBuilder, SymbolTreeParser},
-        symbols::{ShaderMember, ShaderParameter, ShaderScope, ShaderSymbol, ShaderSymbolData},
+        symbols::{
+            ShaderMember, ShaderParameter, ShaderScope, ShaderSymbol, ShaderSymbolData,
+            ShaderSymbolRuntime,
+        },
     },
 };
 
@@ -37,7 +40,7 @@ impl SymbolTreeParser for WgslStructTreeParser {
         symbols: &mut ShaderSymbolListBuilder,
     ) {
         let label_node = matches.captures[0].node;
-        let range = ShaderFileRange::from(file_path.into(), ShaderRange::from(label_node.range()));
+        let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
         let struct_name: String = get_name(shader_content, matches.captures[0].node).into();
         symbols.add_type(ShaderSymbol {
@@ -56,18 +59,19 @@ impl SymbolTreeParser for WgslStructTreeParser {
                             label: get_name(shader_content, w[0].node).into(),
                             count: None,
                             description: "".into(),
-                            range: Some(ShaderFileRange::from(
-                                file_path.into(),
-                                ShaderRange::from(w[0].node.range()),
-                            )),
+                            range: Some(ShaderRange::from(ShaderRange::from(w[0].node.range()))),
                         },
                     })
                     .collect(),
                 methods: vec![],
             },
-            scope: None, // TODO: compute
-            range: Some(range),
-            scope_stack: Some(scope_stack),
+            // TODO: compute scope
+            runtime: Some(ShaderSymbolRuntime::new(
+                file_path.into(),
+                range,
+                None,
+                scope_stack,
+            )),
         });
     }
 }

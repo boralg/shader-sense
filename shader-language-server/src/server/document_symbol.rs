@@ -21,14 +21,14 @@ impl ServerLanguage {
                 // Dont publish keywords & transient.
                 !symbol.is_type(ShaderSymbolType::Keyword)
                     && !symbol.is_transient()
-                    && symbol.range.is_some()
+                    && symbol.runtime.is_some()
             })
             .map(|symbol| {
-                let label_range = symbol.range.clone().expect("Should be filtered out");
+                let label_runtime = symbol.runtime.clone().expect("Should be filtered out");
                 // Content expected to englobe label.
-                let content_range = match &symbol.scope {
-                    Some(scope) => ShaderScope::join(scope.clone(), label_range.clone()),
-                    None => label_range.clone(),
+                let content_range = match &label_runtime.scope {
+                    Some(scope) => ShaderScope::join(scope.clone(), label_runtime.range.clone()),
+                    None => label_runtime.range.clone(),
                 };
                 #[allow(deprecated)]
                 // https://github.com/rust-lang/rust/issues/102777
@@ -48,8 +48,16 @@ impl ServerLanguage {
                     },
                     tags: None,
                     deprecated: None,
-                    range: shader_range_to_location(&content_range).range,
-                    selection_range: shader_range_to_location(&label_range).range,
+                    range: shader_range_to_location(
+                        &content_range.into_file(label_runtime.file_path.clone()),
+                    )
+                    .range,
+                    selection_range: shader_range_to_location(
+                        &label_runtime
+                            .range
+                            .into_file(label_runtime.file_path.clone()),
+                    )
+                    .range,
                     children: None, // TODO: Should use a tree instead.
                 }
             })

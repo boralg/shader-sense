@@ -23,11 +23,13 @@ impl ServerLanguage {
                         (ty == ShaderSymbolType::Functions
                             || ty == ShaderSymbolType::Types
                             || ty == ShaderSymbolType::Macros)
-                            && symbol.range.is_some()
-                            && (symbol.scope_stack.is_none()
-                                || symbol.scope_stack.as_ref().unwrap().is_empty())
+                            && match &symbol.runtime {
+                                Some(runtime) => runtime.scope_stack.is_empty(),
+                                None => false,
+                            }
                     })
                     .map(|symbol| {
+                        let runtime = symbol.runtime.clone().unwrap();
                         #[allow(deprecated)]
                         // https://github.com/rust-lang/rust/issues/102777
                         SymbolInformation {
@@ -41,7 +43,7 @@ impl ServerLanguage {
                             tags: None,
                             deprecated: None,
                             location: shader_range_to_location(
-                                symbol.range.as_ref().expect("Should be filtered out"),
+                                &runtime.range.clone().into_file(runtime.file_path.clone()),
                             ),
                             container_name: Some(shading_language.to_string()),
                         }

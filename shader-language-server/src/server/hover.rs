@@ -41,15 +41,15 @@ impl ServerLanguage {
                         Some(link) => format!("[Online documentation]({})", link),
                         None => "".into(),
                     };
-                    let location = match &symbol.range {
-                        Some(range) => format!(
+                    let location = match &symbol.runtime {
+                        Some(runtime) => format!(
                             "Defined in {}, line {}",
-                            if range.file_path.as_os_str() == file_path.as_os_str() {
+                            if runtime.file_path.as_os_str() == file_path.as_os_str() {
                                 "this file".into()
                             } else {
-                                range.file_path.file_name().unwrap().to_string_lossy()
+                                runtime.file_path.file_name().unwrap().to_string_lossy()
                             },
-                            range.start().line + 1
+                            runtime.range.start.line + 1
                         ),
                         None => "".into(),
                     };
