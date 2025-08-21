@@ -4,7 +4,8 @@ use lsp_types::{Hover, HoverContents, MarkupContent, Position, Url};
 
 use shader_sense::{position::ShaderFilePosition, shader_error::ShaderError};
 
-use super::{common::shader_range_to_lsp_range, ServerLanguage};
+use crate::server::common::shader_range_to_lsp_range;
+use crate::server::ServerLanguage;
 
 impl ServerLanguage {
     pub fn recolt_hover(

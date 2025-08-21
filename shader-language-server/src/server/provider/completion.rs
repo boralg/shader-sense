@@ -11,7 +11,7 @@ use shader_sense::{
     symbols::symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolType},
 };
 
-use super::ServerLanguage;
+use crate::server::ServerLanguage;
 
 impl ServerLanguage {
     pub fn recolt_completion(

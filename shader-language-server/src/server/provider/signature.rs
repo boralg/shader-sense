@@ -12,7 +12,7 @@ use shader_sense::{
     symbols::symbols::ShaderSymbolData,
 };
 
-use super::ServerLanguage;
+use crate::server::ServerLanguage;
 
 impl ServerLanguage {
     pub fn recolt_signature(

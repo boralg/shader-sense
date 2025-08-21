@@ -11,7 +11,7 @@ use shader_sense::shader_error::{ShaderDiagnosticSeverity, ShaderError};
 
 use crate::server::common::shader_range_to_lsp_range;
 
-use super::ServerLanguage;
+use crate::server::ServerLanguage;
 
 impl ServerLanguage {
     pub fn publish_diagnostic(&mut self, uri: &Url, version: Option<i32>) {

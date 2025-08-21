@@ -4,7 +4,8 @@ use shader_sense::{
     symbols::symbols::{ShaderScope, ShaderSymbolType},
 };
 
-use super::{common::shader_range_to_location, ServerLanguage};
+use crate::server::common::shader_range_to_location;
+use crate::server::ServerLanguage;
 
 impl ServerLanguage {
     pub fn recolt_document_symbol(

@@ -1,0 +1,11 @@
+mod completion;
+mod diagnostic;
+mod document_symbol;
+mod folding_range;
+mod formatting;
+mod goto;
+mod hover;
+mod inlay_hint;
+mod semantic_token;
+mod signature;
+mod workspace_symbol;

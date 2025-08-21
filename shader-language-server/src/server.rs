@@ -7,19 +7,9 @@ use std::time::Duration;
 // TODO:ASYNC: move provider to specific folder and file updater in another one.
 mod async_message;
 mod common;
-mod completion;
 mod debug;
-mod diagnostic;
-mod document_symbol;
-mod folding_range;
-mod formatting;
-mod goto;
-mod hover;
-mod inlay_hint;
-mod semantic_token;
+mod provider;
 pub mod shader_variant; // pub for test.
-mod signature;
-mod workspace_symbol;
 
 mod profile;
 pub mod server_config; // pub for test.

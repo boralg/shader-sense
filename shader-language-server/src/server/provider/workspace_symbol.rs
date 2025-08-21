@@ -1,7 +1,8 @@
 use lsp_types::{SymbolInformation, SymbolKind};
 use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderSymbolType};
 
-use super::{common::shader_range_to_location, ServerLanguage};
+use crate::server::common::shader_range_to_location;
+use crate::server::ServerLanguage;
 
 impl ServerLanguage {
     pub fn recolt_workspace_symbol(&mut self) -> Result<Vec<SymbolInformation>, ShaderError> {

@@ -8,7 +8,7 @@ use shader_sense::{
 
 use crate::server::server_file_cache::ServerFileCache;
 
-use super::ServerLanguage;
+use crate::server::ServerLanguage;
 
 impl ServerLanguage {
     fn find_macros(

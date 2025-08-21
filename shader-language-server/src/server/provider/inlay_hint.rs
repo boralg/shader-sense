@@ -5,10 +5,8 @@ use shader_sense::{
     symbols::symbols::{ShaderSymbolData, ShaderSymbolType},
 };
 
-use super::{
-    common::{lsp_range_to_shader_range, shader_position_to_lsp_position},
-    ServerLanguage,
-};
+use crate::server::common::{lsp_range_to_shader_range, shader_position_to_lsp_position};
+use crate::server::ServerLanguage;
 
 impl ServerLanguage {
     pub fn recolt_inlay_hint(

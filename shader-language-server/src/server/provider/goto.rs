@@ -8,7 +8,8 @@ use shader_sense::{
 
 use lsp_types::{GotoDefinitionResponse, Position, Url};
 
-use super::{common::shader_range_to_lsp_range, ServerLanguage};
+use crate::server::common::shader_range_to_lsp_range;
+use crate::server::ServerLanguage;
 
 impl ServerLanguage {
     pub fn recolt_goto(
