@@ -1,9 +1,9 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use tree_sitter::{Node, QueryMatch};
 
 use crate::{
-    position::{ShaderFilePosition, ShaderFileRange, ShaderPosition, ShaderRange},
+    position::{ShaderFilePosition, ShaderPosition, ShaderRange},
     shader::ShaderCompilationParams,
     shader_error::ShaderError,
     symbols::symbols::{ShaderSymbolData, ShaderSymbolList, ShaderSymbolListRef},
@@ -80,11 +80,11 @@ impl<'a> ShaderSymbolListBuilder<'a> {
 pub struct ShaderWordRange {
     parent: Option<Box<ShaderWordRange>>, // Box to avoid recursive struct
     word: String,
-    range: ShaderFileRange,
+    range: ShaderRange,
 }
 
 impl ShaderWordRange {
-    pub fn new(word: String, range: ShaderFileRange, parent: Option<ShaderWordRange>) -> Self {
+    pub fn new(word: String, range: ShaderRange, parent: Option<ShaderWordRange>) -> Self {
         Self {
             parent: match parent {
                 Some(parent) => Some(Box::new(parent)),
@@ -97,7 +97,7 @@ impl ShaderWordRange {
     pub fn get_word(&self) -> &str {
         &self.word
     }
-    pub fn get_range(&self) -> &ShaderFileRange {
+    pub fn get_range(&self) -> &ShaderRange {
         &self.range
     }
     pub fn get_parent(&self) -> Option<&ShaderWordRange> {
@@ -134,11 +134,15 @@ impl ShaderWordRange {
         self.parent.is_some()
     }
     // Look for matching symbol in symbol_list
-    pub fn find_symbol_from_parent(&self, symbol_list: &ShaderSymbolListRef) -> Vec<ShaderSymbol> {
+    pub fn find_symbol_from_parent(
+        &self,
+        file_path: PathBuf,
+        symbol_list: &ShaderSymbolListRef,
+    ) -> Vec<ShaderSymbol> {
         if self.parent.is_none() {
             // Could be either a variable, a link, or a type.
             symbol_list
-                .find_symbols_at(&self.word, &self.range.end_as_file_position())
+                .find_symbols_at(&self.word, &self.range.end.clone_into_file(file_path))
                 .iter()
                 .map(|s| (*s).clone())
                 .collect()
@@ -146,7 +150,9 @@ impl ShaderWordRange {
             // Will be a variable or function (root only), method, or member if chained.
             let stack = self.get_word_stack();
             let mut rev_stack = stack.iter().rev();
-            let symbol_list = symbol_list.filter_scoped_symbol(&self.range.end_as_file_position());
+            // TODO: SHould not require file path & filter here...
+            let symbol_list =
+                symbol_list.filter_scoped_symbol(&self.range.end.clone_into_file(file_path));
             // Look for root symbol (either a function or variable)
             let root_symbol = match rev_stack.next() {
                 Some(current_word) => match symbol_list.find_symbol(&current_word.word) {

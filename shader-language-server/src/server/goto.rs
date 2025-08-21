@@ -33,7 +33,8 @@ impl ServerLanguage {
             &shader_position,
         ) {
             Ok(word) => {
-                let matching_symbols = word.find_symbol_from_parent(&symbol_list);
+                let matching_symbols =
+                    word.find_symbol_from_parent(file_path.clone(), &symbol_list);
                 Ok(Some(GotoDefinitionResponse::Link(
                     matching_symbols
                         .iter()
@@ -43,7 +44,7 @@ impl ServerLanguage {
                                     // _runtime.range here should be equal to selected_range.
                                     Some(_runtime) => Some(lsp_types::LocationLink {
                                         origin_selection_range: Some(shader_range_to_lsp_range(
-                                            &word.get_range().range,
+                                            &word.get_range(),
                                         )),
                                         target_uri: Url::from_file_path(&target.file_path).unwrap(),
                                         target_range: shader_range_to_lsp_range(&ShaderRange::new(
@@ -63,7 +64,7 @@ impl ServerLanguage {
                                 match &symbol.runtime {
                                     Some(runtime) => Some(lsp_types::LocationLink {
                                         origin_selection_range: Some(shader_range_to_lsp_range(
-                                            &word.get_range().range,
+                                            &word.get_range(),
                                         )),
                                         target_uri: Url::from_file_path(&runtime.file_path)
                                             .unwrap(),

@@ -75,7 +75,7 @@ impl ServerLanguage {
                     &shader_file_position,
                 ) {
                     Ok(word) => {
-                        let symbols = word.find_symbol_from_parent(&symbol_list);
+                        let symbols = word.find_symbol_from_parent(file_path.clone(), &symbol_list);
                         // TODO: should select right ones based on types and context
                         if symbols.is_empty() {
                             Ok(vec![])

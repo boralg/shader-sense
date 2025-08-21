@@ -30,7 +30,8 @@ impl ServerLanguage {
             // word_range should be the same as symbol range
             Ok(word) => {
                 let symbol_list = self.watched_files.get_all_symbols(uri);
-                let matching_symbols = word.find_symbol_from_parent(&symbol_list);
+                let matching_symbols =
+                    word.find_symbol_from_parent(file_path.clone(), &symbol_list);
                 if matching_symbols.len() == 0 {
                     Ok(None)
                 } else {
@@ -72,11 +73,7 @@ impl ServerLanguage {
                             ),
                         }),
                         // Range of hovered element.
-                        range: if word.get_range().file_path.as_os_str() == file_path.as_os_str() {
-                            Some(shader_range_to_lsp_range(&word.get_range().range))
-                        } else {
-                            None
-                        },
+                        range: Some(shader_range_to_lsp_range(&word.get_range())),
                     }))
                 }
             }

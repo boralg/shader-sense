@@ -37,10 +37,7 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                 "identifier" | "type_identifier" | "primitive_type" => {
                     return Ok(ShaderWordRange::new(
                         get_name(&shader_module.content, node).into(),
-                        ShaderFileRange::from(
-                            shader_module.file_path.clone(),
-                            ShaderRange::from(node.range()),
-                        ),
+                        ShaderRange::from(node.range()),
                         None,
                     ));
                 }
@@ -49,10 +46,7 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                     let path = get_name(&shader_module.content, node);
                     return Ok(ShaderWordRange::new(
                         path[1..path.len() - 1].into(),
-                        ShaderFileRange::from(
-                            shader_module.file_path.clone(),
-                            ShaderRange::from(node.range()),
-                        ),
+                        ShaderRange::from(node.range()),
                         None,
                     ));
                 }
@@ -78,10 +72,7 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                                 &mut word,
                                 ShaderWordRange::new(
                                     get_name(&shader_module.content, field).into(),
-                                    ShaderFileRange::from(
-                                        shader_module.file_path.clone(),
-                                        ShaderRange::from(field.range()),
-                                    ),
+                                    ShaderRange::from(field.range()),
                                     None,
                                 ),
                             ),
@@ -111,10 +102,7 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                                             &mut word,
                                             ShaderWordRange::new(
                                                 get_name(&shader_module.content, identifier).into(),
-                                                ShaderFileRange::from(
-                                                    shader_module.file_path.clone(),
-                                                    ShaderRange::from(identifier.range()),
-                                                ),
+                                                ShaderRange::from(identifier.range()),
                                                 None,
                                             ),
                                         );
@@ -129,10 +117,7 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                                     &mut word,
                                     ShaderWordRange::new(
                                         get_name(&shader_module.content, identifier).into(),
-                                        ShaderFileRange::from(
-                                            shader_module.file_path.clone(),
-                                            ShaderRange::from(identifier.range()),
-                                        ),
+                                        ShaderRange::from(identifier.range()),
                                         None,
                                     ),
                                 );

@@ -37,6 +37,9 @@ impl ShaderPosition {
     pub fn into_file(self, file_path: PathBuf) -> ShaderFilePosition {
         ShaderFilePosition::from(file_path, self)
     }
+    pub fn clone_into_file(&self, file_path: PathBuf) -> ShaderFilePosition {
+        ShaderFilePosition::from(file_path, self.clone())
+    }
     pub fn from_byte_offset(content: &str, byte_offset: usize) -> std::io::Result<ShaderPosition> {
         // https://en.wikipedia.org/wiki/UTF-8
         if byte_offset == 0 {
@@ -202,6 +205,9 @@ impl ShaderRange {
     }
     pub fn into_file(self, file_path: PathBuf) -> ShaderFileRange {
         ShaderFileRange::from(file_path, self)
+    }
+    pub fn clone_into_file(&self, file_path: PathBuf) -> ShaderFileRange {
+        ShaderFileRange::from(file_path, self.clone())
     }
     pub fn whole(content: &str) -> Self {
         let line_count = content.lines().count() as u32;

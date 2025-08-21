@@ -56,7 +56,8 @@ impl ServerLanguage {
             };
         match word_range {
             Ok(word) => {
-                let matching_symbols = word.find_symbol_from_parent(&symbol_list);
+                let matching_symbols =
+                    word.find_symbol_from_parent(file_path.clone(), &symbol_list);
                 if matching_symbols.len() == 0 {
                     Ok(None)
                 } else {
