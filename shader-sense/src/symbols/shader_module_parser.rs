@@ -2,9 +2,9 @@ use std::path::Path;
 
 use tree_sitter::InputEdit;
 
-use crate::{shader::ShadingLanguage, shader_error::ShaderError};
+use crate::{position::ShaderFileRange, shader::ShadingLanguage, shader_error::ShaderError};
 
-use super::{shader_module::ShaderModule, symbols::ShaderRange};
+use super::shader_module::ShaderModule;
 pub struct ShaderModuleParser {
     tree_sitter_parser: tree_sitter::Parser,
 }
@@ -59,7 +59,7 @@ impl ShaderModuleParser {
     ) -> Result<(), ShaderError> {
         self.update_module_partial(
             module,
-            &ShaderRange::whole(&module.file_path, &module.content),
+            &ShaderFileRange::whole(module.file_path.clone(), &module.content),
             new_text,
         )
     }
@@ -67,12 +67,12 @@ impl ShaderModuleParser {
     pub fn update_module_partial(
         &mut self,
         module: &mut ShaderModule,
-        old_range: &ShaderRange,
+        old_range: &ShaderFileRange,
         new_text: &String,
     ) -> Result<(), ShaderError> {
         let mut new_shader_content = module.content.clone();
-        let old_start_byte_offset = old_range.start.to_byte_offset(&module.content)?;
-        let old_end_byte_offset = old_range.end.to_byte_offset(&module.content)?;
+        let old_start_byte_offset = old_range.range.start.to_byte_offset(&module.content)?;
+        let old_end_byte_offset = old_range.range.end.to_byte_offset(&module.content)?;
         new_shader_content.replace_range(old_start_byte_offset..old_end_byte_offset, &new_text);
 
         let line_count = new_text.lines().count();
@@ -80,12 +80,12 @@ impl ShaderModuleParser {
             start_byte: old_start_byte_offset,
             end_byte: old_end_byte_offset,
             start_point: tree_sitter::Point {
-                row: old_range.start.line as usize,
-                column: old_range.start.pos as usize,
+                row: old_range.range.start.line as usize,
+                column: old_range.range.start.pos as usize,
             },
             end_point: tree_sitter::Point {
-                row: old_range.end.line as usize,
-                column: old_range.end.pos as usize,
+                row: old_range.range.end.line as usize,
+                column: old_range.range.end.pos as usize,
             },
         };
         module.tree.edit(&InputEdit {

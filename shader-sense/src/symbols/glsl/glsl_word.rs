@@ -1,11 +1,11 @@
 use tree_sitter::Node;
 
 use crate::{
+    position::{ShaderFilePosition, ShaderFileRange, ShaderRange},
     shader_error::ShaderError,
     symbols::{
         shader_module::ShaderModule,
         symbol_parser::{get_name, ShaderWordRange, SymbolWordProvider},
-        symbols::{ShaderPosition, ShaderRange},
     },
 };
 
@@ -16,10 +16,16 @@ impl SymbolWordProvider for GlslSymbolWordProvider {
         &self,
         shader_module: &ShaderModule,
         node: Node,
-        position: &ShaderPosition,
+        position: &ShaderFilePosition,
     ) -> Result<ShaderWordRange, ShaderError> {
-        fn range_contain(including_range: tree_sitter::Range, position: ShaderPosition) -> bool {
-            let including_range = ShaderRange::from_range(including_range, &position.file_path);
+        fn range_contain(
+            including_range: tree_sitter::Range,
+            position: ShaderFilePosition,
+        ) -> bool {
+            let including_range = ShaderFileRange::from(
+                position.file_path.clone(),
+                ShaderRange::from(including_range),
+            );
             including_range.contain(&position)
         }
         if range_contain(node.range(), position.clone()) {
@@ -31,7 +37,10 @@ impl SymbolWordProvider for GlslSymbolWordProvider {
                 "identifier" | "type_identifier" | "primitive_type" => {
                     return Ok(ShaderWordRange::new(
                         get_name(&shader_module.content, node).into(),
-                        ShaderRange::from_range(node.range(), &shader_module.file_path),
+                        ShaderFileRange::from(
+                            shader_module.file_path.clone(),
+                            ShaderRange::from(node.range()),
+                        ),
                         None,
                     ));
                 }
@@ -40,7 +49,10 @@ impl SymbolWordProvider for GlslSymbolWordProvider {
                     let path = get_name(&shader_module.content, node);
                     return Ok(ShaderWordRange::new(
                         path[1..path.len() - 1].into(),
-                        ShaderRange::from_range(node.range(), &shader_module.file_path),
+                        ShaderFileRange::from(
+                            shader_module.file_path.clone(),
+                            ShaderRange::from(node.range()),
+                        ),
                         None,
                     ));
                 }
@@ -66,9 +78,9 @@ impl SymbolWordProvider for GlslSymbolWordProvider {
                                 &mut word,
                                 ShaderWordRange::new(
                                     get_name(&shader_module.content, field).into(),
-                                    ShaderRange::from_range(
-                                        field.range(),
-                                        &shader_module.file_path,
+                                    ShaderFileRange::from(
+                                        shader_module.file_path.clone(),
+                                        ShaderRange::from(field.range()),
                                     ),
                                     None,
                                 ),
@@ -99,9 +111,9 @@ impl SymbolWordProvider for GlslSymbolWordProvider {
                                             &mut word,
                                             ShaderWordRange::new(
                                                 get_name(&shader_module.content, identifier).into(),
-                                                ShaderRange::from_range(
-                                                    identifier.range(),
-                                                    &shader_module.file_path,
+                                                ShaderFileRange::from(
+                                                    shader_module.file_path.clone(),
+                                                    ShaderRange::from(identifier.range()),
                                                 ),
                                                 None,
                                             ),
@@ -117,9 +129,9 @@ impl SymbolWordProvider for GlslSymbolWordProvider {
                                     &mut word,
                                     ShaderWordRange::new(
                                         get_name(&shader_module.content, identifier).into(),
-                                        ShaderRange::from_range(
-                                            identifier.range(),
-                                            &shader_module.file_path,
+                                        ShaderFileRange::from(
+                                            shader_module.file_path.clone(),
+                                            ShaderRange::from(identifier.range()),
                                         ),
                                         None,
                                     ),

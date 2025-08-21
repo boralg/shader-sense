@@ -3,6 +3,7 @@ use std::num::ParseIntError;
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
+    position::{ShaderFilePosition, ShaderFileRange, ShaderPosition, ShaderRange},
     shader::ShaderCompilationParams,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
@@ -10,8 +11,8 @@ use crate::{
         symbol_parser::{get_name, SymbolRegionFinder},
         symbol_provider::{SymbolIncludeCallback, SymbolProvider},
         symbols::{
-            ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext,
-            ShaderPreprocessorDefine, ShaderPreprocessorInclude, ShaderRange, ShaderRegion,
+            ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine,
+            ShaderPreprocessorInclude, ShaderRegion,
         },
     },
 };
@@ -49,14 +50,20 @@ macro_rules! assert_field_name {
                             file!(),
                             line!(),
                         ),
-                        ShaderRange::from_range($cursor.node().range(), &$file_path),
+                        ShaderFileRange::from(
+                            $file_path.clone(),
+                            ShaderRange::from($cursor.node().range()),
+                        ),
                     ));
                 }
             }
             None => {
                 return Err(ShaderError::SymbolQueryError(
                     format!("Missing query field name (at {}:{})", file!(), line!(),),
-                    ShaderRange::from_range($cursor.node().range(), &$file_path),
+                    ShaderFileRange::from(
+                        $file_path.clone(),
+                        ShaderRange::from($cursor.node().range()),
+                    ),
                 ));
             }
         }
@@ -72,7 +79,10 @@ macro_rules! assert_node_kind {
                     file!(),
                     line!(),
                 ),
-                ShaderRange::from_range($cursor.node().range(), &$file_path),
+                ShaderFileRange::from(
+                    $file_path.clone(),
+                    ShaderRange::from($cursor.node().range()),
+                ),
             ));
         }
     };
@@ -122,20 +132,26 @@ impl HlslSymbolRegionFinder {
     fn get_define_as_i32_depth(
         context: &ShaderPreprocessorContext,
         name: &str,
-        position: &ShaderPosition,
+        position: &ShaderFilePosition,
         depth: u32,
     ) -> Result<i32, ShaderError> {
         if depth == 0 {
             Err(ShaderError::SymbolQueryError(
                 format!("Failed to parse number_literal {}", name),
-                ShaderRange::new(position.clone(), position.clone()),
+                ShaderFileRange::from(
+                    position.file_path.clone(),
+                    ShaderRange::new(position.pos.clone(), position.pos.clone()),
+                ),
             ))
         } else if name.contains(" ") {
             // Here we try to detect expression that cannot be parsed, such as expression (#define MACRO (MACRO0 + MACRO1)).
             // TODO: We should store a proxy tree that is used to query over it for solving them.
             Err(ShaderError::SymbolQueryError(
                 format!("Macro expression solving not implemented ({}).", name),
-                ShaderRange::new(position.clone(), position.clone()),
+                ShaderFileRange::from(
+                    position.file_path.clone(),
+                    ShaderRange::new(position.pos.clone(), position.pos.clone()),
+                ),
             ))
         } else {
             // Here we recurse define value cuz a define might just be an alias for another define.
@@ -154,7 +170,7 @@ impl HlslSymbolRegionFinder {
     fn get_define_as_i32(
         context: &ShaderPreprocessorContext,
         name: &str,
-        position: &ShaderPosition,
+        position: &ShaderFilePosition,
     ) -> Result<i32, ShaderError> {
         match context.get_define_value(name) {
             Some(value) => match value.parse::<i32>() {
@@ -205,7 +221,10 @@ impl HlslSymbolRegionFinder {
                     Ok(value) => Ok(value),
                     Err(_) => Err(ShaderError::SymbolQueryError(
                         format!("Failed to parse number_literal {}", number_str),
-                        ShaderRange::from_range(cursor.node().range(), &shader_module.file_path),
+                        ShaderFileRange::from(
+                            shader_module.file_path.clone(),
+                            ShaderRange::from(cursor.node().range()),
+                        ),
                     )),
                 }
             }
@@ -216,9 +235,9 @@ impl HlslSymbolRegionFinder {
                 let value = Self::get_define_as_i32(
                     context,
                     condition_macro,
-                    &ShaderPosition::from_tree_sitter_point(
-                        cursor.node().start_position(),
-                        &shader_module.file_path,
+                    &ShaderFilePosition::from(
+                        shader_module.file_path.clone(),
+                        ShaderPosition::from(cursor.node().start_position()),
                     ),
                 )?;
                 Ok(value)
@@ -262,7 +281,10 @@ impl HlslSymbolRegionFinder {
                     "%" => Ok(left_condition % right_condition),
                     value => Err(ShaderError::SymbolQueryError(
                         format!("Binary operator unhandled for {}", value),
-                        ShaderRange::from_range(cursor.node().range(), &shader_module.file_path),
+                        ShaderFileRange::from(
+                            shader_module.file_path.clone(),
+                            ShaderRange::from(cursor.node().range()),
+                        ),
                     )),
                 }
             }
@@ -286,7 +308,10 @@ impl HlslSymbolRegionFinder {
                     "~" => Ok(!value),
                     value => Err(ShaderError::SymbolQueryError(
                         format!("Unary operator unhandled for {}", value),
-                        ShaderRange::from_range(cursor.node().range(), &shader_module.file_path),
+                        ShaderFileRange::from(
+                            shader_module.file_path.clone(),
+                            ShaderRange::from(cursor.node().range()),
+                        ),
                     )),
                 }
             }
@@ -320,12 +345,18 @@ impl HlslSymbolRegionFinder {
                         "Call expression solving not implemented ({}).",
                         get_name(&shader_module.content, cursor.node())
                     ),
-                    ShaderRange::from_range(cursor.node().range(), &shader_module.file_path),
+                    ShaderFileRange::from(
+                        shader_module.file_path.clone(),
+                        ShaderRange::from(cursor.node().range()),
+                    ),
                 ))
             }
             value => Err(ShaderError::SymbolQueryError(
                 format!("Condition unhandled for {}", value),
-                ShaderRange::from_range(cursor.node().range(), &shader_module.file_path),
+                ShaderFileRange::from(
+                    shader_module.file_path.clone(),
+                    ShaderRange::from(cursor.node().range()),
+                ),
             )),
         }
     }
@@ -351,7 +382,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             defines
                 .iter()
                 .filter(|define| match define.get_range() {
-                    Some(range) => range.start >= *last_position && range.end <= *position,
+                    Some(range) => range.start() >= last_position && range.end() <= position,
                     None => false, // Global define, already filled ?
                 })
                 .cloned()
@@ -360,7 +391,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         // Query regions
         let mut query_cursor = QueryCursor::new();
         let mut regions = Vec::new();
-        let mut last_processed_position = ShaderPosition::zero(shader_module.file_path.clone());
+        let mut last_processed_position = ShaderPosition::zero();
         for region_match in
             query_cursor.matches(&self.query_if, node, shader_module.content.as_bytes())
         {
@@ -378,18 +409,15 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             ) -> Result<Vec<ShaderRegion>, ShaderError> {
                 assert_tree_sitter!(shader_module.file_path, cursor.goto_first_child());
                 // Process includes here as they will impact defines which impact regions.
-                let region_start = ShaderPosition::from_tree_sitter_point(
-                    cursor.node().range().start_point,
-                    &shader_module.file_path,
-                );
+                let region_start = ShaderPosition::from(cursor.node().range().start_point);
                 // Find include before this region that defines its context.
                 // Need to filter already processed includes.
                 let includes_before = preprocessor
                     .includes
                     .iter_mut()
                     .filter(|include| {
-                        include.get_range().end < region_start
-                            && include.get_range().start > *last_processed_position
+                        *include.get_range().end() < region_start
+                            && include.get_range().start() > last_processed_position
                     })
                     .collect::<Vec<&mut ShaderPreprocessorInclude>>();
                 for include_before in includes_before {
@@ -397,7 +425,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     context.push_directory_stack(&include_before.get_absolute_path());
                     context.append_defines(get_defined_macros_for_position(
                         last_processed_position,
-                        &include_before.get_range().start,
+                        &include_before.get_range().start(),
                         &preprocessor.defines,
                     ));
                     // Find include and take its data.
@@ -432,7 +460,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                             err => Err(err)?, // Propagate the error.
                         },
                     }
-                    *last_processed_position = include_before.get_range().end.clone();
+                    *last_processed_position = include_before.get_range().end().clone();
                 }
                 // Include should handle adding defines, but if no include or defines after last include, need to add remaining ones.
                 context.append_defines(get_defined_macros_for_position(
@@ -447,10 +475,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
                         assert_field_name!(shader_module.file_path, cursor, "name");
                         let condition_macro = get_name(&shader_module.content, cursor.node());
-                        let position = ShaderPosition::from_tree_sitter_point(
-                            cursor.node().range().end_point,
-                            &shader_module.file_path,
-                        );
+                        let position = ShaderPosition::from(cursor.node().range().end_point);
                         (
                             HlslSymbolRegionFinder::is_define_defined(context, condition_macro),
                             position,
@@ -460,10 +485,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
                         assert_field_name!(shader_module.file_path, cursor, "name");
                         let condition_macro = get_name(&shader_module.content, cursor.node());
-                        let position = ShaderPosition::from_tree_sitter_point(
-                            cursor.node().range().end_point,
-                            &shader_module.file_path,
-                        );
+                        let position = ShaderPosition::from(cursor.node().range().end_point);
                         (
                             1 - HlslSymbolRegionFinder::is_define_defined(context, condition_macro),
                             position,
@@ -472,10 +494,7 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     "#if" => {
                         assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
                         assert_field_name!(shader_module.file_path, cursor, "condition");
-                        let position = ShaderPosition::from_tree_sitter_point(
-                            cursor.node().range().end_point,
-                            &shader_module.file_path,
-                        );
+                        let position = ShaderPosition::from(cursor.node().range().end_point);
                         (
                             match HlslSymbolRegionFinder::resolve_condition(
                                 cursor.clone(),
@@ -498,18 +517,12 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     }
                     "#else" => (
                         if found_active_region { 0 } else { 1 },
-                        ShaderPosition::from_tree_sitter_point(
-                            cursor.node().range().end_point,
-                            &shader_module.file_path,
-                        ),
+                        ShaderPosition::from(cursor.node().range().end_point),
                     ),
                     "#elif" => {
                         assert_tree_sitter!(shader_module.file_path, cursor.goto_next_sibling());
                         assert_field_name!(shader_module.file_path, cursor, "condition");
-                        let position = ShaderPosition::from_tree_sitter_point(
-                            cursor.node().range().end_point,
-                            &shader_module.file_path,
-                        );
+                        let position = ShaderPosition::from(cursor.node().range().end_point);
                         (
                             if found_active_region {
                                 0
@@ -538,9 +551,9 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     child => {
                         return Err(ShaderError::SymbolQueryError(
                             format!("preproc operator not implemented: {}", child),
-                            ShaderRange::from_range(
-                                cursor.node().range(),
-                                &shader_module.file_path,
+                            ShaderFileRange::from(
+                                shader_module.file_path.clone(),
+                                ShaderRange::from(cursor.node().range()),
                             ),
                         ));
                     }
@@ -552,11 +565,13 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     match cursor.field_name() {
                         Some(field_name) => {
                             if field_name == "alternative" {
-                                let region_end = ShaderPosition::from_tree_sitter_point(
-                                    previous_node.range().end_point,
-                                    &shader_module.file_path,
+                                let region_end =
+                                    ShaderPosition::from(previous_node.range().end_point);
+                                let region_range = ShaderFileRange::new(
+                                    shader_module.file_path.clone(),
+                                    region_start,
+                                    region_end,
                                 );
-                                let region_range = ShaderRange::new(region_start, region_end);
                                 regions.push(ShaderRegion::new(
                                     region_range.clone(),
                                     is_active_region != 0,
@@ -617,11 +632,12 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                         }
                     }
                 }
-                let end_position = ShaderPosition::from_tree_sitter_point(
-                    previous_node.range().end_point,
-                    &shader_module.file_path,
+                let end_position = ShaderPosition::from(previous_node.range().end_point);
+                let region_range = ShaderFileRange::new(
+                    shader_module.file_path.clone(),
+                    region_start,
+                    end_position,
                 );
-                let region_range = ShaderRange::new(region_start, end_position);
                 regions.push(ShaderRegion::new(
                     region_range.clone(),
                     is_active_region != 0,
@@ -662,13 +678,13 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         let include_lefts = preprocessor
             .includes
             .iter_mut()
-            .filter(|include| include.get_range().start > last_processed_position)
+            .filter(|include| *include.get_range().start() > last_processed_position)
             .collect::<Vec<&mut ShaderPreprocessorInclude>>();
         for include_left in include_lefts {
             context.push_directory_stack(&include_left.get_absolute_path());
             context.append_defines(get_defined_macros_for_position(
                 &last_processed_position,
-                &include_left.get_range().start,
+                &include_left.get_range().start(),
                 &preprocessor.defines,
             ));
             // Find include and take its data.
@@ -706,13 +722,13 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     err => Err(err)?, // Propagate the error.
                 },
             }
-            last_processed_position = include_left.get_range().end.clone();
+            last_processed_position = include_left.get_range().end().clone();
         }
         let define_after_last_include = preprocessor
             .defines
             .iter()
             .filter(|define| match &define.get_range() {
-                Some(range) => range.start > last_processed_position,
+                Some(range) => *range.start() > last_processed_position,
                 None => false, // Global, should already be added ?
             })
             .cloned()

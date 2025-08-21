@@ -17,6 +17,7 @@ use crate::{
 use log::{debug, info, warn};
 use lsp_types::Url;
 use shader_sense::{
+    position::ShaderFileRange,
     shader::ShadingLanguage,
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
@@ -24,7 +25,7 @@ use shader_sense::{
         shader_module::{ShaderModuleHandle, ShaderSymbols},
         shader_module_parser::ShaderModuleParser,
         symbol_provider::SymbolProvider,
-        symbols::{ShaderPreprocessorContext, ShaderRange, ShaderSymbolListRef},
+        symbols::{ShaderPreprocessorContext, ShaderSymbolListRef},
     },
     validator::validator::ValidatorImpl,
 };
@@ -302,7 +303,7 @@ impl ServerLanguageFileCache {
                         ShaderDiagnostic {
                             severity: ShaderDiagnosticSeverity::Error,
                             error: format!("Failed to validate shader: {:?}", err),
-                            range: ShaderRange::zero(file_path.clone())
+                            range: ShaderFileRange::zero(file_path.clone())
                         }
                     ]},
                 };
@@ -327,7 +328,7 @@ impl ServerLanguageFileCache {
                                 if diagnostic.severity != ShaderDiagnosticSeverity::Error {
                                     continue;
                                 }
-                                let diagnostic_path = &diagnostic.range.start.file_path;
+                                let diagnostic_path = &diagnostic.range.file_path;
                                 if *diagnostic_path == file_path {
                                     continue; // Main file diagnostics
                                 }
@@ -447,7 +448,7 @@ impl ServerLanguageFileCache {
                                             .diagnostics
                                             .iter()
                                             .filter(|d| {
-                                                let deps_file_path = &d.range.start.file_path;
+                                                let deps_file_path = &d.range.file_path;
                                                 *deps_file_path == include.get_absolute_path()
                                                     || symbol_cache.has_dependency(deps_file_path)
                                             })

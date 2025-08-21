@@ -1,9 +1,9 @@
 use super::validator::ValidatorImpl;
 use crate::{
     include::IncludeHandler,
+    position::{ShaderFileRange, ShaderPosition},
     shader::{GlslSpirvVersion, GlslTargetClient, ShaderParams, ShaderStage},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
-    symbols::symbols::{ShaderPosition, ShaderRange},
 };
 use glslang::{
     error::GlslangError,
@@ -190,9 +190,10 @@ impl Glslang {
                         _ => ShaderDiagnosticSeverity::Error,
                     },
                     error: String::from(msg),
-                    range: ShaderRange::new(
-                        ShaderPosition::new(file_path.clone(), line, pos),
-                        ShaderPosition::new(file_path.clone(), line, pos),
+                    range: ShaderFileRange::new(
+                        file_path.clone(),
+                        ShaderPosition::new(line, pos),
+                        ShaderPosition::new(line, pos),
                     ),
                 });
             } else {

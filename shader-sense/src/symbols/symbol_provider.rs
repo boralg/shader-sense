@@ -3,6 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use tree_sitter::{Query, QueryCursor};
 
 use crate::{
+    position::{ShaderFilePosition, ShaderFileRange, ShaderPosition, ShaderRange},
     shader::{ShaderCompilationParams, ShaderParams, ShadingLanguage, ShadingLanguageTag},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
@@ -20,8 +21,8 @@ use super::{
         SymbolTreePreprocessorParser, SymbolWordProvider,
     },
     symbols::{
-        ShaderPosition, ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude,
-        ShaderPreprocessorMode, ShaderRange, ShaderScope, ShaderSymbol, ShaderSymbolList,
+        ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorInclude,
+        ShaderPreprocessorMode, ShaderScope, ShaderSymbol, ShaderSymbolList,
     },
 };
 
@@ -115,33 +116,33 @@ impl SymbolProvider {
         ) {
             scopes.push(match matche.captures.len() {
                 // one body
-                1 => ShaderScope::from_range(
-                    matche.captures[0].node.range(),
-                    &shader_module.file_path,
+                1 => ShaderScope::from(
+                    shader_module.file_path.clone(),
+                    ShaderRange::from(matche.captures[0].node.range()),
                 ),
                 // a bit weird, a body and single curly brace ? mergin them to be safe.
                 2 => ShaderScope::join(
-                    ShaderScope::from_range(
-                        matche.captures[0].node.range(),
-                        &shader_module.file_path,
+                    ShaderScope::from(
+                        shader_module.file_path.clone(),
+                        ShaderRange::from(matche.captures[0].node.range()),
                     ),
-                    ShaderScope::from_range(
-                        matche.captures[1].node.range(),
-                        &shader_module.file_path,
+                    ShaderScope::from(
+                        shader_module.file_path.clone(),
+                        ShaderRange::from(matche.captures[1].node.range()),
                     ),
                 ),
                 // Remove curly braces from scope.
                 3 => {
                     let curly_start = matche.captures[1].node.range();
                     let curly_end = matche.captures[2].node.range();
-                    ShaderScope::from_range(
-                        tree_sitter::Range {
+                    ShaderScope::from(
+                        shader_module.file_path.clone(),
+                        ShaderRange::from(tree_sitter::Range {
                             start_byte: curly_start.end_byte,
                             end_byte: curly_end.start_byte,
                             start_point: curly_start.end_point,
                             end_point: curly_end.start_point,
-                        },
-                        &shader_module.file_path,
+                        }),
                     )
                 }
                 _ => unreachable!("Query should not return more than 3 match."),
@@ -320,9 +321,9 @@ impl SymbolProvider {
                     error:
                         "Failed to parse this code. Some symbols might be missing from providers."
                             .into(),
-                    range: ShaderRange::from_range(
-                        matches.captures[0].node.range(),
-                        &shader_module.file_path,
+                    range: ShaderFileRange::from(
+                        shader_module.file_path.clone(),
+                        ShaderRange::from(matches.captures[0].node.range()),
                     ),
                 });
             }
@@ -333,7 +334,7 @@ impl SymbolProvider {
             let included_preprocessor = old_symbols.get_preprocessor_mut();
             let included_includes: Vec<&mut ShaderPreprocessorInclude> =
                 included_preprocessor.includes.iter_mut().collect();
-            let mut last_position = ShaderPosition::zero(shader_module.file_path.clone());
+            let mut last_position = ShaderPosition::zero();
             for included_include in included_includes {
                 // Append directory stack and defines.
                 context.push_directory_stack(included_include.get_absolute_path());
@@ -343,8 +344,8 @@ impl SymbolProvider {
                         .iter()
                         .filter(|define| match define.get_range() {
                             Some(range) => {
-                                range.start >= last_position
-                                    && range.end <= included_include.get_range().start
+                                range.range.start >= last_position
+                                    && range.range.end <= included_include.get_range().range.start
                             }
                             None => false, // Global define, already filled ?
                         })
@@ -360,14 +361,14 @@ impl SymbolProvider {
                     include_callback,
                     old_include_cache,
                 )?;
-                last_position = included_include.get_range().end.clone();
+                last_position = included_include.get_range().range.end.clone();
             }
             // Add all defines after last include to context
             let define_left = included_preprocessor
                 .defines
                 .iter_mut()
                 .filter(|define| match define.get_range() {
-                    Some(range) => range.start > last_position,
+                    Some(range) => range.range.start > last_position,
                     None => false, // Global define
                 })
                 .map(|d| d.clone())
@@ -411,7 +412,7 @@ impl SymbolProvider {
     pub fn get_word_range_at_position(
         &self,
         shader_module: &ShaderModule,
-        position: &ShaderPosition,
+        position: &ShaderFilePosition,
     ) -> Result<ShaderWordRange, ShaderError> {
         self.word_provider.find_word_at_position_in_node(
             shader_module,

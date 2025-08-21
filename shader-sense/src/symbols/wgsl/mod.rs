@@ -3,11 +3,13 @@ mod wgsl_regions;
 use wgsl_parser::get_wgsl_parsers;
 use wgsl_regions::WgslRegionFinder;
 
-use crate::{shader_error::ShaderError, symbols::symbol_parser::ShaderWordRange};
+use crate::{
+    position::ShaderFilePosition, shader_error::ShaderError,
+    symbols::symbol_parser::ShaderWordRange,
+};
 
 use super::{
-    shader_module::ShaderModule, symbol_parser::SymbolWordProvider,
-    symbol_provider::SymbolProvider, symbols::ShaderPosition,
+    shader_module::ShaderModule, symbol_parser::SymbolWordProvider, symbol_provider::SymbolProvider,
 };
 
 struct WgslSymbolWordProvider {}
@@ -17,7 +19,7 @@ impl SymbolWordProvider for WgslSymbolWordProvider {
         &self,
         _shader_module: &ShaderModule,
         _node: tree_sitter::Node,
-        _position: &ShaderPosition,
+        _position: &ShaderFilePosition,
     ) -> Result<ShaderWordRange, ShaderError> {
         return Err(ShaderError::NoSymbol);
     }

@@ -5,9 +5,10 @@ use lsp_types::{
 };
 
 use shader_sense::{
+    position::{ShaderFilePosition, ShaderPosition},
     shader::ShadingLanguage,
     shader_error::ShaderError,
-    symbols::symbols::{ShaderPosition, ShaderSymbol, ShaderSymbolData, ShaderSymbolType},
+    symbols::symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolType},
 };
 
 use super::ServerLanguage;
@@ -29,7 +30,7 @@ impl ServerLanguage {
         let content = &RefCell::borrow(&cached_file.shader_module).content;
         let shader_position = {
             let position =
-                ShaderPosition::new(file_path.clone(), position.line, position.character);
+                ShaderFilePosition::new(file_path.clone(), position.line, position.character);
 
             // Get UTF8 offset of trigger character
             let trigger_offset = match &trigger_character {
@@ -37,10 +38,10 @@ impl ServerLanguage {
                 None => 0,
             };
             // Remove offset
-            let byte_offset = position.to_byte_offset(content).unwrap() - trigger_offset;
+            let byte_offset = position.pos.to_byte_offset(content).unwrap() - trigger_offset;
             assert!(content.is_char_boundary(byte_offset));
             if byte_offset == 0 {
-                ShaderPosition::from_byte_offset(content, byte_offset, &file_path).unwrap()
+                ShaderPosition::from_byte_offset(content, byte_offset).unwrap()
             } else {
                 let mut new_byte_offset = byte_offset;
                 // Check if the previous character is ')' for getting function call label position
@@ -62,15 +63,16 @@ impl ServerLanguage {
                         }
                     }
                 }
-                ShaderPosition::from_byte_offset(content, new_byte_offset, &file_path).unwrap()
+                ShaderPosition::from_byte_offset(content, new_byte_offset).unwrap()
             }
         };
-        let symbol_list = symbol_list.filter_scoped_symbol(&shader_position);
+        let shader_file_position = ShaderFilePosition::from(file_path.clone(), shader_position);
+        let symbol_list = symbol_list.filter_scoped_symbol(&shader_file_position);
         match trigger_character {
             Some(_) => {
                 match language_data.symbol_provider.get_word_range_at_position(
                     &RefCell::borrow(&cached_file.shader_module),
-                    &shader_position,
+                    &shader_file_position,
                 ) {
                     Ok(word) => {
                         let symbols = word.find_symbol_from_parent(&symbol_list);
@@ -198,13 +200,12 @@ fn convert_completion_item(
         format!(
             "{}:{}:{}",
             range
-                .start
                 .file_path
                 .file_name()
                 .unwrap_or(OsStr::new("file"))
                 .to_string_lossy(),
-            range.start.line,
-            range.start.pos
+            range.start().line,
+            range.start().pos
         )
     } else {
         "".to_string()

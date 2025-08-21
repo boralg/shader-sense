@@ -6,9 +6,9 @@ use std::{
 
 use crate::{
     include::IncludeHandler,
+    position::{ShaderFileRange, ShaderPosition},
     shader::{HlslShaderModel, HlslVersion, ShaderParams, ShaderStage},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
-    symbols::symbols::{ShaderPosition, ShaderRange},
 };
 
 use super::validator::ValidatorImpl;
@@ -185,14 +185,13 @@ impl Dxc {
                         _ => ShaderDiagnosticSeverity::Error,
                     },
                     error: String::from(msg),
-                    range: ShaderRange::new(
+                    range: ShaderFileRange::new(
+                        file_path.clone(),
                         ShaderPosition::new(
-                            file_path.clone(),
                             line.parse::<u32>().unwrap_or(1) - 1,
                             pos.parse::<u32>().unwrap_or(0),
                         ),
                         ShaderPosition::new(
-                            file_path.clone(),
                             line.parse::<u32>().unwrap_or(1) - 1,
                             pos.parse::<u32>().unwrap_or(0),
                         ),
@@ -218,7 +217,7 @@ impl Dxc {
                     severity: ShaderDiagnosticSeverity::Error,
                     error: format!("Failed to parse errors: {}", &errors),
                     // Minimize impact of error by showing it only at beginning.
-                    range: ShaderRange::zero(file_path.into()),
+                    range: ShaderFileRange::zero(file_path.into()),
                 }],
             })
         } else {
@@ -236,9 +235,10 @@ impl Dxc {
             HassleError::ValidationError(err) => Ok(ShaderDiagnosticList::from(ShaderDiagnostic {
                 severity: ShaderDiagnosticSeverity::Error,
                 error: err.to_string(),
-                range: ShaderRange::new(
-                    ShaderPosition::new(file_path.into(), 0, 0),
-                    ShaderPosition::new(file_path.into(), 0, 0),
+                range: ShaderFileRange::new(
+                    file_path.into(),
+                    ShaderPosition::new(0, 0),
+                    ShaderPosition::new(0, 0),
                 ),
             })),
             HassleError::LibLoadingError(err) => Err(ShaderError::InternalErr(err.to_string())),

@@ -1,10 +1,13 @@
 use std::path::Path;
 
-use crate::symbols::{
-    symbol_parser::{get_name, SymbolTreePreprocessorParser},
+use crate::{
+    position::{ShaderFileRange, ShaderRange},
     symbols::{
-        ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine,
-        ShaderPreprocessorInclude, ShaderRange,
+        symbol_parser::{get_name, SymbolTreePreprocessorParser},
+        symbols::{
+            ShaderPreprocessor, ShaderPreprocessorContext, ShaderPreprocessorDefine,
+            ShaderPreprocessorInclude,
+        },
     },
 };
 
@@ -41,7 +44,8 @@ impl SymbolTreePreprocessorParser for GlslIncludeTreePreprocessorParser {
         context: &mut ShaderPreprocessorContext,
     ) {
         let include_node = matches.captures[0].node;
-        let range = ShaderRange::from_range(include_node.range(), file_path.into());
+        let range =
+            ShaderFileRange::from(file_path.into(), ShaderRange::from(include_node.range()));
         let relative_path = get_name(shader_content, include_node);
         let relative_path = &relative_path[1..relative_path.len() - 1]; // TODO: use string_content instead
 
@@ -78,7 +82,8 @@ impl SymbolTreePreprocessorParser for GlslDefineTreePreprocessorParser {
         _context: &mut ShaderPreprocessorContext,
     ) {
         let identifier_node = matches.captures[0].node;
-        let range = ShaderRange::from_range(identifier_node.range(), file_path.into());
+        let range =
+            ShaderFileRange::from(file_path.into(), ShaderRange::from(identifier_node.range()));
         let name = get_name(shader_content, identifier_node).into();
         let value = if matches.captures.len() > 1 {
             Some(get_name(shader_content, matches.captures[1].node).trim())

@@ -5,9 +5,9 @@ use naga::{
 use std::path::Path;
 
 use crate::{
+    position::{ShaderFileRange, ShaderPosition},
     shader::{ShaderParams, ShaderStage},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticList, ShaderDiagnosticSeverity, ShaderError},
-    symbols::symbols::{ShaderPosition, ShaderRange},
 };
 
 use super::validator::ValidatorImpl;
@@ -25,19 +25,17 @@ impl Naga {
             ShaderDiagnostic {
                 severity: ShaderDiagnosticSeverity::Error,
                 error,
-                range: ShaderRange::new(
-                    ShaderPosition::new(file_path.into(), loc.line_number - 1, loc.line_position),
-                    ShaderPosition::new(file_path.into(), loc.line_number - 1, loc.line_position),
+                range: ShaderFileRange::new(
+                    file_path.into(),
+                    ShaderPosition::new(loc.line_number - 1, loc.line_position),
+                    ShaderPosition::new(loc.line_number - 1, loc.line_position),
                 ),
             }
         } else {
             ShaderDiagnostic {
                 severity: ShaderDiagnosticSeverity::Error,
                 error,
-                range: ShaderRange::new(
-                    ShaderPosition::new(file_path.into(), 0, 0),
-                    ShaderPosition::new(file_path.into(), 0, 0),
-                ),
+                range: ShaderFileRange::zero(file_path.into()),
             }
         }
     }
@@ -68,17 +66,10 @@ impl ValidatorImpl for Naga {
                 list.push(ShaderDiagnostic {
                     severity: ShaderDiagnosticSeverity::Error,
                     error: error.emit_to_string(""),
-                    range: ShaderRange::new(
-                        ShaderPosition::new(
-                            file_path.into(),
-                            loc.line_number - 1,
-                            loc.line_position,
-                        ),
-                        ShaderPosition::new(
-                            file_path.into(),
-                            loc.line_number - 1,
-                            loc.line_position,
-                        ),
+                    range: ShaderFileRange::new(
+                        file_path.into(),
+                        ShaderPosition::new(loc.line_number - 1, loc.line_position),
+                        ShaderPosition::new(loc.line_number - 1, loc.line_position),
                     ),
                 });
             }

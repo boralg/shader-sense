@@ -19,15 +19,15 @@ mod tests {
 
     use crate::{
         include::IncludeHandler,
+        position::{ShaderFilePosition, ShaderFileRange, ShaderPosition},
         shader::{
             GlslShadingLanguageTag, HlslShadingLanguageTag, ShaderCompilationParams, ShaderParams,
             ShaderStage, ShadingLanguage, ShadingLanguageTag, WgslShadingLanguageTag,
         },
         shader_error::ShaderError,
         symbols::{
-            intrinsics::ShaderIntrinsics,
-            shader_module_parser::ShaderModuleParser,
-            symbols::{ShaderPosition, ShaderRange, ShaderSymbolData},
+            intrinsics::ShaderIntrinsics, shader_module_parser::ShaderModuleParser,
+            symbols::ShaderSymbolData,
         },
     };
 
@@ -212,11 +212,11 @@ mod tests {
         )
         .unwrap();
         let symbol_list = preprocessed_symbol_list.as_ref();
-        let symbols = symbol_list.filter_scoped_symbol(&ShaderPosition {
-            file_path: PathBuf::from(file_path),
-            line: 16,
-            pos: 0,
-        });
+        let symbols = symbol_list.filter_scoped_symbol(&ShaderFilePosition::new(
+            PathBuf::from(file_path),
+            16,
+            0,
+        ));
         let variables_visibles: Vec<String> = vec![
             "scopeRoot".into(),
             "scope1".into(),
@@ -318,12 +318,8 @@ mod tests {
             expected_position: &ShaderPosition,
             byte_offset: usize,
         ) {
-            let converted_position = ShaderPosition::from_byte_offset(
-                &shader_content,
-                byte_offset,
-                &expected_position.file_path,
-            )
-            .unwrap();
+            let converted_position =
+                ShaderPosition::from_byte_offset(&shader_content, byte_offset).unwrap();
             let converted_byte_offset = converted_position.to_byte_offset(&shader_content).unwrap();
             assert!(converted_position == *expected_position, "Position {:#?} with byte offset {} is different from converted position: {:#?} with byte offset {}", expected_position, byte_offset, converted_position, converted_byte_offset);
         }
@@ -333,24 +329,16 @@ mod tests {
         let utf8_shader_content = std::fs::read_to_string(utf8_file_path).unwrap();
         // End of line are enforced to \n through gitattributes for hlsl / glsl / wgsl in this repo.
         let test_data = vec![
-            (
-                "\n}",
-                ShaderPosition::new(utf8_file_path.into(), 5, 0),
-                &utf8_shader_content,
-            ),
-            (
-                "",
-                ShaderPosition::new(utf8_file_path.into(), 6, 1),
-                &utf8_shader_content,
-            ),
+            ("\n}", ShaderPosition::new(5, 0), &utf8_shader_content),
+            ("", ShaderPosition::new(6, 1), &utf8_shader_content),
             (
                 "id main() {\n\n}",
-                ShaderPosition::new(utf8_file_path.into(), 4, 2),
+                ShaderPosition::new(4, 2),
                 &utf8_shader_content,
             ),
             (
                 "にちは世界!\n\nvoid main() {\n\n}",
-                ShaderPosition::new(utf8_file_path.into(), 2, 5),
+                ShaderPosition::new(2, 5),
                 &utf8_shader_content,
             ),
         ];
@@ -370,9 +358,9 @@ mod tests {
     fn test_end_range() {
         let file_path = Path::new("./test/hlsl/utf8.hlsl");
         let shader_content = std::fs::read_to_string(file_path).unwrap();
-        let range = ShaderRange::whole(file_path.into(), &shader_content);
+        let range = ShaderFileRange::whole(file_path.into(), &shader_content);
         println!("File range: {:#?}", range);
-        let end_byte_offset = range.end.to_byte_offset(&shader_content).unwrap();
+        let end_byte_offset = range.range.end.to_byte_offset(&shader_content).unwrap();
         assert!(end_byte_offset == shader_content.len());
     }
     #[test]

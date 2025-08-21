@@ -28,7 +28,7 @@ impl ServerLanguage {
                 s.is_type(ShaderSymbolType::CallExpression)
                     && match &s.range {
                         Some(range) => {
-                            if range.start.file_path.as_os_str() == file_path.as_os_str() {
+                            if range.file_path.as_os_str() == file_path.as_os_str() {
                                 valid_range.contain_bounds(&range)
                             } else {
                                 false // Skip call not in main file
@@ -46,7 +46,7 @@ impl ServerLanguage {
                     // Find label from expression.
                     // TODO: this add all includes no matter the position.
                     // Should filter them but cannot access include in SymbolsList. Need SymbolTree
-                    let symbols = symbols.find_symbols_at(&label, &range.start);
+                    let symbols = symbols.find_symbols_at(&label, &range.start_as_file_position());
                     for symbol in symbols {
                         // NOTE: inlay hints have a limit of 43 char per line in vscode, after which, they are truncated.
                         // https://github.com/microsoft/vscode/pull/201190
@@ -70,7 +70,9 @@ impl ServerLanguage {
                                     .iter()
                                     .enumerate()
                                     .map(|(i, (_, range))| InlayHint {
-                                        position: shader_position_to_lsp_position(&range.start),
+                                        position: shader_position_to_lsp_position(
+                                            &range.start_as_file_position(),
+                                        ),
                                         label: InlayHintLabel::String(format!(
                                             "{}:",
                                             signature.parameters[i].label

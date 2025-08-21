@@ -1,8 +1,9 @@
 use std::cell::RefCell;
 
 use shader_sense::{
+    position::{ShaderFilePosition, ShaderFileRange},
     shader_error::ShaderError,
-    symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolData},
+    symbols::symbols::ShaderSymbolData,
 };
 
 use lsp_types::{GotoDefinitionResponse, Position, Url};
@@ -21,11 +22,11 @@ impl ServerLanguage {
             .get(&cached_file.shading_language)
             .unwrap();
         let file_path = uri.to_file_path().unwrap();
-        let shader_position = ShaderPosition {
-            file_path: file_path.clone(),
-            line: position.line as u32,
-            pos: position.character as u32,
-        };
+        let shader_position = ShaderFilePosition::new(
+            file_path.clone(),
+            position.line as u32,
+            position.character as u32,
+        );
         let symbol_list = self.watched_files.get_all_symbols(uri);
         match language_data.symbol_provider.get_word_range_at_position(
             &RefCell::borrow(&cached_file.shader_module),
@@ -45,12 +46,19 @@ impl ServerLanguage {
                                             &word.get_range(),
                                         )),
                                         target_uri: Url::from_file_path(&target.file_path).unwrap(),
-                                        target_range: shader_range_to_lsp_range(&ShaderRange::new(
-                                            target.clone(),
-                                            target.clone(),
-                                        )),
+                                        target_range: shader_range_to_lsp_range(
+                                            &ShaderFileRange::new(
+                                                target.file_path.clone(),
+                                                target.pos.clone(),
+                                                target.pos.clone(),
+                                            ),
+                                        ),
                                         target_selection_range: shader_range_to_lsp_range(
-                                            &ShaderRange::new(target.clone(), target.clone()),
+                                            &ShaderFileRange::new(
+                                                target.file_path.clone(),
+                                                target.pos.clone(),
+                                                target.pos.clone(),
+                                            ),
                                         ),
                                     }),
                                     None => None,
@@ -61,8 +69,7 @@ impl ServerLanguage {
                                         origin_selection_range: Some(shader_range_to_lsp_range(
                                             &word.get_range(),
                                         )),
-                                        target_uri: Url::from_file_path(&range.start.file_path)
-                                            .unwrap(),
+                                        target_uri: Url::from_file_path(&range.file_path).unwrap(),
                                         target_range: shader_range_to_lsp_range(range),
                                         target_selection_range: shader_range_to_lsp_range(range),
                                     }),

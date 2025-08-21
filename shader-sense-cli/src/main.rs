@@ -203,13 +203,12 @@ pub fn main() {
                         } else {
                             // Pretty print errors
                             for diagnostic in diagnostic_list.diagnostics {
-                                let filename =
-                                    diagnostic.range.start.file_path.file_name().unwrap();
+                                let filename = diagnostic.range.file_path.file_name().unwrap();
                                 let formatted_path = format!(
                                     "{}:{}:{}",
                                     filename.display(),
-                                    diagnostic.range.start.line,
-                                    diagnostic.range.start.pos
+                                    diagnostic.range.start().line,
+                                    diagnostic.range.start().pos
                                 );
                                 let header = match diagnostic.severity {
                                     ShaderDiagnosticSeverity::Error => {
@@ -263,9 +262,9 @@ pub fn main() {
                             let header = match &symbol.range {
                                 Some(range) => format!(
                                     "{}:{}:{}",
-                                    range.start.file_path.file_name().unwrap().display(),
-                                    range.start.line,
-                                    range.start.pos
+                                    range.file_path.file_name().unwrap().display(),
+                                    range.start().line,
+                                    range.start().pos
                                 ),
                                 None => symbol.format(),
                             };

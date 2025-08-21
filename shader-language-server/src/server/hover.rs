@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, Position, Url};
 
-use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderPosition};
+use shader_sense::{position::ShaderFilePosition, shader_error::ShaderError};
 
 use super::{common::shader_range_to_lsp_range, ServerLanguage};
 
@@ -14,11 +14,11 @@ impl ServerLanguage {
     ) -> Result<Option<Hover>, ShaderError> {
         let cached_file = self.get_main_file(&uri)?;
         let file_path = uri.to_file_path().unwrap();
-        let shader_position = ShaderPosition {
-            file_path: file_path.clone(),
-            line: position.line as u32,
-            pos: position.character as u32,
-        };
+        let shader_position = ShaderFilePosition::new(
+            file_path.clone(),
+            position.line as u32,
+            position.character as u32,
+        );
         let language_data = self
             .language_data
             .get(&cached_file.shading_language)
@@ -44,12 +44,12 @@ impl ServerLanguage {
                     let location = match &symbol.range {
                         Some(range) => format!(
                             "Defined in {}, line {}",
-                            if range.start.file_path.as_os_str() == file_path.as_os_str() {
+                            if range.file_path.as_os_str() == file_path.as_os_str() {
                                 "this file".into()
                             } else {
-                                range.start.file_path.file_name().unwrap().to_string_lossy()
+                                range.file_path.file_name().unwrap().to_string_lossy()
                             },
-                            range.start.line + 1
+                            range.start().line + 1
                         ),
                         None => "".into(),
                     };
@@ -72,9 +72,7 @@ impl ServerLanguage {
                             ),
                         }),
                         // Range of hovered element.
-                        range: if word.get_range().start.file_path.as_os_str()
-                            == file_path.as_os_str()
-                        {
+                        range: if word.get_range().file_path.as_os_str() == file_path.as_os_str() {
                             Some(shader_range_to_lsp_range(&word.get_range()))
                         } else {
                             None

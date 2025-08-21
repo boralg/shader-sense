@@ -1,7 +1,7 @@
 use core::fmt;
 use std::path::PathBuf;
 
-use crate::symbols::symbols::ShaderRange;
+use crate::position::ShaderFileRange;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShaderDiagnosticSeverity {
@@ -51,7 +51,7 @@ impl ShaderDiagnosticSeverity {
 pub struct ShaderDiagnostic {
     pub severity: ShaderDiagnosticSeverity,
     pub error: String,
-    pub range: ShaderRange,
+    pub range: ShaderFileRange,
 }
 #[derive(Debug, Default, Clone)]
 pub struct ShaderDiagnosticList {
@@ -63,7 +63,7 @@ pub enum ShaderError {
     ValidationError(String),
     NoSymbol,
     ParseSymbolError(String),
-    SymbolQueryError(String, ShaderRange),
+    SymbolQueryError(String, ShaderFileRange),
     IoErr(std::io::Error),
     InternalErr(String),
     InvalidParams(String),

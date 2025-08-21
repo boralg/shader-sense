@@ -1,5 +1,4 @@
 use std::{
-    cmp::Ordering,
     collections::HashSet,
     path::{Path, PathBuf},
 };
@@ -8,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     include::IncludeHandler,
+    position::{ShaderFilePosition, ShaderFileRange},
     shader::{
         HlslShaderModel, HlslVersion, ShaderCompilationParams, ShaderContextParams, ShaderStage,
     },
@@ -23,7 +23,7 @@ pub struct ShaderParameter {
     pub count: Option<u32>,
     pub description: String,
     #[serde(skip)] // Runtime only
-    pub range: Option<ShaderRange>,
+    pub range: Option<ShaderFileRange>,
 }
 
 #[allow(non_snake_case)] // for JSON
@@ -66,256 +66,17 @@ impl ShaderSignature {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct ShaderPosition {
-    pub file_path: PathBuf,
-    pub line: u32,
-    pub pos: u32,
-}
-impl Ord for ShaderPosition {
-    fn cmp(&self, other: &Self) -> Ordering {
-        assert!(
-            self.file_path == other.file_path,
-            "Cannot compare file from different path"
-        );
-        (&self.file_path, &self.line, &self.pos).cmp(&(&other.file_path, &other.line, &other.pos))
-    }
-}
-
-impl PartialOrd for ShaderPosition {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for ShaderPosition {
-    fn eq(&self, other: &Self) -> bool {
-        (&self.file_path, &self.line, &self.pos) == (&other.file_path, &other.line, &other.pos)
-    }
-}
-
-impl Eq for ShaderPosition {}
-
-impl ShaderPosition {
-    pub fn new(file_path: PathBuf, line: u32, pos: u32) -> Self {
-        Self {
-            file_path,
-            line,
-            pos,
-        }
-    }
-    pub fn zero(file_path: PathBuf) -> Self {
-        Self {
-            file_path,
-            line: 0,
-            pos: 0,
-        }
-    }
-    pub fn from_byte_offset(
-        content: &str,
-        byte_offset: usize,
-        file_path: &Path,
-    ) -> std::io::Result<ShaderPosition> {
-        // https://en.wikipedia.org/wiki/UTF-8
-        if byte_offset == 0 {
-            Ok(ShaderPosition {
-                line: 0,
-                pos: 0,
-                file_path: PathBuf::from(file_path),
-            })
-        } else if content.len() == 0 {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Content is empty.",
-            ))
-        } else if byte_offset > content.len() {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "byte_offset is out of bounds.",
-            ))
-        } else {
-            // lines iterator does the same, but skip the last empty line by relying on split_inclusive.
-            // We need it so use split instead to keep it.
-            // We only care about line start, so \r being there or not on Windows should not be an issue.
-            let line = content[..byte_offset].split('\n').count() - 1;
-            let line_start = content[..byte_offset]
-                .split('\n')
-                .rev()
-                .next()
-                .expect("No last line available.");
-            let pos_in_byte =
-                content[byte_offset..].as_ptr() as usize - line_start.as_ptr() as usize;
-            if line_start.is_char_boundary(pos_in_byte) {
-                Ok(ShaderPosition {
-                    line: line as u32,
-                    pos: line_start[..pos_in_byte].chars().count() as u32,
-                    file_path: PathBuf::from(file_path),
-                })
-            } else {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Pos in line is not at UTF8 char boundary.",
-                ))
-            }
-        }
-    }
-    pub fn to_byte_offset(&self, content: &str) -> std::io::Result<usize> {
-        // https://en.wikipedia.org/wiki/UTF-8
-        match content.lines().nth(self.line as usize) {
-            Some(line) => {
-                // This pointer operation is safe to operate because lines iterator should start at char boundary.
-                let line_byte_offset = line.as_ptr() as usize - content.as_ptr() as usize;
-                assert!(
-                    content.is_char_boundary(line_byte_offset),
-                    "Start of line is not char boundary."
-                );
-                // We have line offset, find pos offset.
-                match content[line_byte_offset..]
-                    .char_indices()
-                    .nth(self.pos as usize)
-                {
-                    Some((byte_offset, _)) => {
-                        let global_offset = line_byte_offset + byte_offset;
-                        if content.len() <= global_offset {
-                            Err(std::io::Error::new(
-                                std::io::ErrorKind::InvalidData,
-                                "Byte offset is not in content range.",
-                            ))
-                        } else if !content.is_char_boundary(global_offset) {
-                            Err(std::io::Error::new(
-                                std::io::ErrorKind::InvalidData,
-                                "Position is not at UTF8 char boundary.",
-                            ))
-                        } else {
-                            Ok(global_offset)
-                        }
-                    }
-                    None => {
-                        if self.pos as usize == line.chars().count() {
-                            assert!(content.is_char_boundary(line_byte_offset + line.len()));
-                            Ok(line_byte_offset + line.len())
-                        } else {
-                            Err(std::io::Error::new(
-                                std::io::ErrorKind::InvalidInput,
-                                format!("Position is not in range of line"),
-                            ))
-                        }
-                    }
-                }
-            }
-            // Last line in line iterator is skipped if its empty.
-            None => Ok(content.len()), // Line is out of bounds, assume its at the end.
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct ShaderRange {
-    pub start: ShaderPosition,
-    pub end: ShaderPosition,
-}
-
-pub type ShaderScope = ShaderRange;
-
-impl ShaderRange {
-    pub fn new(start: ShaderPosition, end: ShaderPosition) -> Self {
-        debug_assert!(
-            start.file_path == end.file_path,
-            "Position start & end should have same value."
-        );
-        Self { start, end }
-    }
-    pub fn zero(file_path: PathBuf) -> Self {
-        Self::new(
-            ShaderPosition::zero(file_path.clone()),
-            ShaderPosition::zero(file_path),
-        )
-    }
-    pub fn whole(file_path: &Path, content: &str) -> Self {
-        let line_count = content.lines().count() as u32;
-        let char_count = match content.lines().last() {
-            Some(last_line) => (last_line.char_indices().count()) as u32, // Last line
-            None => (content.char_indices().count()) as u32, // No last line, means no line, pick string length
-        };
-        Self {
-            start: ShaderPosition::new(file_path.into(), 0, 0),
-            end: ShaderPosition::new(file_path.into(), line_count, char_count),
-        }
-    }
-    pub fn contain_bounds(&self, range: &ShaderRange) -> bool {
-        if self.start.file_path.as_os_str() == range.start.file_path.as_os_str() {
-            debug_assert!(
-                range.start.file_path == self.start.file_path,
-                "Raw string identical but not components"
-            );
-            if range.start.line > self.start.line && range.end.line < self.end.line {
-                true
-            } else if range.start.line == self.start.line && range.end.line == self.end.line {
-                range.start.pos >= self.start.pos && range.end.pos <= self.end.pos
-            } else if range.start.line == self.start.line && range.end.line < self.end.line {
-                range.start.pos >= self.start.pos
-            } else if range.end.line == self.end.line && range.start.line > self.start.line {
-                range.end.pos <= self.end.pos
-            } else {
-                false
-            }
-        } else {
-            debug_assert!(
-                range.start.file_path != self.start.file_path,
-                "Raw string different but not components"
-            );
-            false
-        }
-    }
-    pub fn contain(&self, position: &ShaderPosition) -> bool {
-        debug_assert!(
-            self.start.file_path == self.end.file_path,
-            "Position start & end should have same value."
-        );
-        // Check same file. Comparing components is hitting perf, so just compare raw path, which should already be canonical.
-        if position.file_path.as_os_str() == self.start.file_path.as_os_str() {
-            debug_assert!(
-                position.file_path == self.start.file_path,
-                "Raw string identical but not components"
-            );
-            // Check line & position bounds.
-            if position.line > self.start.line && position.line < self.end.line {
-                true
-            } else if position.line == self.start.line && position.line == self.end.line {
-                position.pos >= self.start.pos && position.pos <= self.end.pos
-            } else if position.line == self.start.line && position.line < self.end.line {
-                position.pos >= self.start.pos
-            } else if position.line == self.end.line && position.line > self.start.line {
-                position.pos <= self.end.pos
-            } else {
-                false
-            }
-        } else {
-            debug_assert!(
-                position.file_path != self.start.file_path,
-                "Raw string different but not components"
-            );
-            false
-        }
-    }
-    pub fn join(mut lhs: ShaderRange, rhs: ShaderRange) -> ShaderScope {
-        lhs.start.line = std::cmp::min(lhs.start.line, rhs.start.line);
-        lhs.start.pos = std::cmp::min(lhs.start.pos, rhs.start.pos);
-        lhs.end.line = std::cmp::max(lhs.end.line, rhs.end.line);
-        lhs.end.pos = std::cmp::max(lhs.end.pos, rhs.end.pos);
-        lhs
-    }
-}
+pub type ShaderScope = ShaderFileRange;
 
 #[derive(Debug, Default, Clone)]
 pub struct ShaderRegion {
-    pub range: ShaderRange,
+    pub range: ShaderFileRange,
     // Could add some ShaderRegionType::Condition / ShaderRegionType::User...
     pub is_active: bool, // Is this region passing preprocess
 }
 
 impl ShaderRegion {
-    pub fn new(range: ShaderRange, is_active: bool) -> Self {
+    pub fn new(range: ShaderFileRange, is_active: bool) -> Self {
         Self { range, is_active }
     }
 }
@@ -495,7 +256,7 @@ pub struct ShaderPreprocessor {
     pub mode: ShaderPreprocessorMode,
 }
 impl ShaderPreprocessorDefine {
-    pub fn new(name: String, range: ShaderRange, value: Option<String>) -> Self {
+    pub fn new(name: String, range: ShaderFileRange, value: Option<String>) -> Self {
         Self {
             symbol: ShaderSymbol {
                 label: name.clone(),
@@ -519,7 +280,7 @@ impl ShaderPreprocessorDefine {
             },
         }
     }
-    pub fn get_range(&self) -> Option<&ShaderRange> {
+    pub fn get_range(&self) -> Option<&ShaderFileRange> {
         self.symbol.range.as_ref()
     }
     pub fn get_name(&self) -> &String {
@@ -533,7 +294,7 @@ impl ShaderPreprocessorDefine {
     }
 }
 impl ShaderPreprocessorInclude {
-    pub fn new(relative_path: String, absolute_path: PathBuf, range: ShaderRange) -> Self {
+    pub fn new(relative_path: String, absolute_path: PathBuf, range: ShaderFileRange) -> Self {
         Self {
             cache: None,
             symbol: ShaderSymbol {
@@ -542,7 +303,7 @@ impl ShaderPreprocessorInclude {
                 requirement: None,
                 link: None,
                 data: ShaderSymbolData::Link {
-                    target: ShaderPosition::new(absolute_path, 0, 0),
+                    target: ShaderFilePosition::new(absolute_path, 0, 0),
                 },
                 range: Some(range),
                 scope: None,
@@ -550,7 +311,7 @@ impl ShaderPreprocessorInclude {
             },
         }
     }
-    pub fn get_range(&self) -> &ShaderRange {
+    pub fn get_range(&self) -> &ShaderFileRange {
         self.symbol
             .range
             .as_ref()
@@ -626,7 +387,7 @@ pub struct ShaderMethod {
     pub context: String,
     pub signature: ShaderSignature,
     #[serde(skip)] // Runtime only
-    pub range: Option<ShaderRange>,
+    pub range: Option<ShaderFileRange>,
 }
 
 impl ShaderMember {
@@ -703,12 +464,12 @@ pub enum ShaderSymbolData {
     #[serde(skip)] // This is runtime only. No serialization.
     CallExpression {
         label: String,
-        range: ShaderRange, // label range.
-        parameters: Vec<(String, ShaderRange)>,
+        range: ShaderFileRange, // label range.
+        parameters: Vec<(String, ShaderFileRange)>,
     },
     #[serde(skip)] // This is runtime only. No serialization.
     Link {
-        target: ShaderPosition,
+        target: ShaderFilePosition,
     },
     Macro {
         value: String,
@@ -834,7 +595,7 @@ pub struct ShaderSymbol {
     pub data: ShaderSymbolData,                    // Data for the variable
     // Runtime info. No serialization.
     #[serde(skip)]
-    pub range: Option<ShaderRange>, // Range of symbol in shader
+    pub range: Option<ShaderFileRange>, // Range of symbol in shader
     #[serde(skip)]
     pub scope: Option<ShaderScope>, // Owning scope
     #[serde(skip)]
@@ -971,18 +732,18 @@ impl<'a> ShaderSymbolListRef<'a> {
     }
     fn is_symbol_defined_at(
         shader_symbol: &ShaderSymbol,
-        cursor_position: &ShaderPosition,
+        cursor_position: &ShaderFilePosition,
     ) -> bool {
         match &shader_symbol.range {
             Some(symbol_range) => {
-                if symbol_range.start.file_path.as_os_str() == cursor_position.file_path.as_os_str()
-                {
+                if symbol_range.file_path.as_os_str() == cursor_position.file_path.as_os_str() {
                     // Ensure symbols are already defined at pos
-                    let is_already_defined = if symbol_range.start.line == cursor_position.line {
-                        cursor_position.pos > symbol_range.start.pos
-                    } else {
-                        cursor_position.line > symbol_range.start.line
-                    };
+                    let is_already_defined =
+                        if symbol_range.range.start.line == cursor_position.pos.line {
+                            cursor_position.pos.pos > symbol_range.range.start.pos
+                        } else {
+                            cursor_position.pos.line > symbol_range.range.start.line
+                        };
                     if is_already_defined {
                         // If we are in main file, check if scope in range.
                         match &shader_symbol.scope_stack {
@@ -1014,7 +775,7 @@ impl<'a> ShaderSymbolListRef<'a> {
     pub fn find_symbols_at(
         &'a self,
         label: &str,
-        position: &ShaderPosition,
+        position: &ShaderFilePosition,
     ) -> Vec<&'a ShaderSymbol> {
         self.iter()
             .filter(|s| {
@@ -1024,7 +785,7 @@ impl<'a> ShaderSymbolListRef<'a> {
     }
     pub fn filter_scoped_symbol(
         &'a self,
-        cursor_position: &ShaderPosition,
+        cursor_position: &ShaderFilePosition,
     ) -> ShaderSymbolListRef<'a> {
         self.filter(|symbol_type, symbol| {
             !symbol_type.is_transient() && Self::is_symbol_defined_at(symbol, cursor_position)
@@ -1338,12 +1099,12 @@ impl ShaderSymbol {
             ShaderSymbolData::Functions { signatures } => signatures[0].format(&self.label), // TODO: append +1 symbol
             ShaderSymbolData::Keyword {} => format!("{}", self.label.clone()),
             ShaderSymbolData::Link { target } => {
-                if target.line == target.pos && target.line == 0 {
+                if target.pos.line == target.pos.pos && target.pos.line == 0 {
                     format!("#include \"{}\"", self.label) // No need to display it as we are at start of file.
                 } else {
                     format!(
                         "#include \"{}\" at {}:{}",
-                        self.label, target.line, target.pos
+                        self.label, target.pos.line, target.pos.pos
                     )
                 }
             }

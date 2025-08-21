@@ -7,8 +7,9 @@ use lsp_types::{
 use regex::Regex;
 
 use shader_sense::{
+    position::{ShaderFilePosition, ShaderFileRange, ShaderPosition},
     shader_error::ShaderError,
-    symbols::symbols::{ShaderPosition, ShaderRange, ShaderSymbolData},
+    symbols::symbols::ShaderSymbolData,
 };
 
 use super::ServerLanguage;
@@ -21,11 +22,11 @@ impl ServerLanguage {
     ) -> Result<Option<SignatureHelp>, ShaderError> {
         let cached_file = self.get_main_file(&uri)?;
         let file_path = uri.to_file_path().unwrap();
-        let shader_position = ShaderPosition {
-            file_path: file_path.clone(),
-            line: position.line as u32,
-            pos: position.character as u32,
-        };
+        let shader_position = ShaderFilePosition::new(
+            file_path.clone(),
+            position.line as u32,
+            position.character as u32,
+        );
         let language_data = self
             .language_data
             .get(&cached_file.shading_language)
@@ -34,27 +35,25 @@ impl ServerLanguage {
         let symbol_list = all_symbol_list.filter_scoped_symbol(&shader_position);
         let content = &RefCell::borrow(&cached_file.shader_module).content;
         let function_parameter = get_function_parameter_at_position(content, position);
-        let (word_range, parameter_index) = if let Some((function_label_range, parameter_index)) =
-            function_parameter
-        {
-            let function_label_range = ShaderRange::new(
-                ShaderPosition::from_byte_offset(content, function_label_range.start, &file_path)
-                    .unwrap(),
-                ShaderPosition::from_byte_offset(content, function_label_range.end, &file_path)
-                    .unwrap(),
-            );
-            let word_range = language_data.symbol_provider.get_word_range_at_position(
-                &RefCell::borrow(&cached_file.shader_module),
-                &function_label_range.start,
-            );
-            if let Some(parameter_index) = parameter_index {
-                (word_range, parameter_index)
+        let (word_range, parameter_index) =
+            if let Some((function_label_range, parameter_index)) = function_parameter {
+                let function_label_range = ShaderFileRange::new(
+                    file_path.clone(),
+                    ShaderPosition::from_byte_offset(content, function_label_range.start).unwrap(),
+                    ShaderPosition::from_byte_offset(content, function_label_range.end).unwrap(),
+                );
+                let word_range = language_data.symbol_provider.get_word_range_at_position(
+                    &RefCell::borrow(&cached_file.shader_module),
+                    &function_label_range.start_as_file_position(),
+                );
+                if let Some(parameter_index) = parameter_index {
+                    (word_range, parameter_index)
+                } else {
+                    (word_range, 0)
+                }
             } else {
-                (word_range, 0)
-            }
-        } else {
-            (Err(ShaderError::NoSymbol), 0)
-        };
+                (Err(ShaderError::NoSymbol), 0)
+            };
         match word_range {
             Ok(word) => {
                 let matching_symbols = word.find_symbol_from_parent(&symbol_list);

@@ -160,7 +160,7 @@ mod tests {
             Ok(result) => {
                 let diags = result.diagnostics;
                 println!("Diagnostic should not be empty: {:#?}", diags);
-                assert!(diags[0].range.start.file_path.exists());
+                assert!(diags[0].range.file_path.exists());
                 assert_eq!(diags[0].error, String::from(" '#include' : Could not process include directive for header name: ./level1.glsl\n"));
             }
             Err(err) => panic!("{}", err),

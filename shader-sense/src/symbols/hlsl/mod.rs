@@ -28,6 +28,7 @@ mod tests {
     use std::path::Path;
 
     use crate::{
+        position::{ShaderFileRange, ShaderPosition},
         shader::{
             GlslShadingLanguageTag, HlslShadingLanguageTag, ShaderParams, ShadingLanguage,
             ShadingLanguageTag,
@@ -35,7 +36,7 @@ mod tests {
         symbols::{
             shader_module_parser::ShaderModuleParser,
             symbol_provider::{default_include_callback, SymbolProvider},
-            symbols::{ShaderPosition, ShaderRange, ShaderRegion},
+            symbols::ShaderRegion,
         },
     };
 
@@ -72,9 +73,10 @@ mod tests {
         let set_region =
             |start_line: u32, start_pos: u32, end_line: u32, end_pos: u32, active: bool| {
                 ShaderRegion {
-                    range: ShaderRange::new(
-                        ShaderPosition::new(file_path.into(), start_line, start_pos),
-                        ShaderPosition::new(file_path.into(), end_line, end_pos),
+                    range: ShaderFileRange::new(
+                        file_path.into(),
+                        ShaderPosition::new(start_line, start_pos),
+                        ShaderPosition::new(end_line, end_pos),
                     ),
                     is_active: active,
                 }
@@ -127,14 +129,14 @@ mod tests {
                 region_index, symbols.preprocessor.regions[region_index]
             );
             assert!(
-                symbols.preprocessor.regions[region_index].range.start
-                    == expected_regions[region_index].range.start,
+                symbols.preprocessor.regions[region_index].range.range.start
+                    == expected_regions[region_index].range.range.start,
                 "Failed start assert for region {}",
                 region_index
             );
             assert!(
-                symbols.preprocessor.regions[region_index].range.end
-                    == expected_regions[region_index].range.end,
+                symbols.preprocessor.regions[region_index].range.range.end
+                    == expected_regions[region_index].range.range.end,
                 "Failed end assert for region {}",
                 region_index
             );

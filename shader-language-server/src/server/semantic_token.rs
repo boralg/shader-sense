@@ -2,8 +2,9 @@ use std::cell::RefCell;
 
 use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensResult, Url};
 use shader_sense::{
+    position::ShaderPosition,
     shader_error::ShaderError,
-    symbols::symbols::{ShaderPosition, ShaderSymbolData, ShaderSymbolListRef},
+    symbols::symbols::{ShaderSymbolData, ShaderSymbolListRef},
 };
 
 use crate::server::server_file_cache::ServerFileCache;
@@ -24,18 +25,18 @@ impl ServerLanguage {
             .map(|symbol| {
                 let byte_offset_start = match &symbol.range {
                     Some(range) => {
-                        if range.start.file_path.as_os_str() == file_path.as_os_str() {
-                            range.start.to_byte_offset(content).unwrap()
+                        if range.file_path.as_os_str() == file_path.as_os_str() {
+                            range.start().to_byte_offset(content).unwrap()
                         } else {
                             match cached_file
                                 .data
                                 .as_ref()
                                 .unwrap()
                                 .symbol_cache
-                                .find_direct_includer(&range.start.file_path)
+                                .find_direct_includer(&range.file_path)
                             {
                                 Some(include) => {
-                                    include.get_range().start.to_byte_offset(content).unwrap()
+                                    include.get_range().start().to_byte_offset(content).unwrap()
                                 }
                                 None => 0, // Included from another file, but not found...
                             }
@@ -56,7 +57,7 @@ impl ServerLanguage {
                 word_byte_offsets
                     .iter()
                     .filter_map(|byte_offset| {
-                        match ShaderPosition::from_byte_offset(&content, *byte_offset, &file_path) {
+                        match ShaderPosition::from_byte_offset(&content, *byte_offset) {
                             Ok(position) => {
                                 if byte_offset_start > *byte_offset {
                                     None
@@ -92,17 +93,17 @@ impl ServerLanguage {
                 let mut tokens = Vec::new();
                 // If we own a scope and have a range.
                 if let (Some(scope), Some(range)) = (&symbol.scope, &symbol.range) {
-                    if range.start.file_path.as_os_str() == file_path.as_os_str() {
-                        let content_start = scope.start.to_byte_offset(&content).unwrap();
-                        let content_end = scope.end.to_byte_offset(&content).unwrap();
+                    if range.file_path.as_os_str() == file_path.as_os_str() {
+                        let content_start = scope.start().to_byte_offset(&content).unwrap();
+                        let content_end = scope.end().to_byte_offset(&content).unwrap();
                         match &symbol.data {
                             ShaderSymbolData::Functions { signatures } => {
                                 assert!(signatures.len() == 1, "Should have only one signature");
                                 for parameter in &signatures[0].parameters {
                                     match &parameter.range {
                                         Some(range) => tokens.push(SemanticToken {
-                                            delta_line: range.start.line,
-                                            delta_start: range.start.pos,
+                                            delta_line: range.start().line,
+                                            delta_start: range.start().pos,
                                             length: parameter.label.len() as u32,
                                             token_type: 1, // SemanticTokenType::PARAMETERS, view registration
                                             token_modifiers_bitset: 0,
@@ -127,7 +128,6 @@ impl ServerLanguage {
                                                 match ShaderPosition::from_byte_offset(
                                                     &content,
                                                     *byte_offset,
-                                                    &file_path,
                                                 ) {
                                                     Ok(position) => {
                                                         Some(SemanticToken {

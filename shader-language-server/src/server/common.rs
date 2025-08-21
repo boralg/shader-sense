@@ -1,45 +1,38 @@
 use std::path::Path;
 
 use lsp_types::{Location, Url};
-use shader_sense::symbols::symbols::{ShaderPosition, ShaderRange};
+use shader_sense::position::{ShaderFilePosition, ShaderFileRange, ShaderPosition};
 
-pub fn shader_range_to_lsp_range(range: &ShaderRange) -> lsp_types::Range {
+pub fn shader_range_to_lsp_range(range: &ShaderFileRange) -> lsp_types::Range {
     lsp_types::Range {
         start: lsp_types::Position {
-            line: range.start.line,
-            character: range.start.pos,
+            line: range.start().line,
+            character: range.start().pos,
         },
         end: lsp_types::Position {
-            line: range.end.line,
-            character: range.end.pos,
+            line: range.end().line,
+            character: range.end().pos,
         },
     }
 }
 
-pub fn lsp_range_to_shader_range(range: &lsp_types::Range, file_path: &Path) -> ShaderRange {
-    ShaderRange {
-        start: ShaderPosition {
-            file_path: file_path.into(),
-            line: range.start.line,
-            pos: range.start.character,
-        },
-        end: ShaderPosition {
-            file_path: file_path.into(),
-            line: range.end.line,
-            pos: range.end.character,
-        },
-    }
+pub fn lsp_range_to_shader_range(range: &lsp_types::Range, file_path: &Path) -> ShaderFileRange {
+    ShaderFileRange::new(
+        file_path.into(),
+        ShaderPosition::new(range.start.line, range.start.character),
+        ShaderPosition::new(range.end.line, range.end.character),
+    )
 }
-pub fn shader_position_to_lsp_position(position: &ShaderPosition) -> lsp_types::Position {
+pub fn shader_position_to_lsp_position(position: &ShaderFilePosition) -> lsp_types::Position {
     lsp_types::Position {
-        line: position.line,
-        character: position.pos,
+        line: position.pos.line,
+        character: position.pos.pos,
     }
 }
 
-pub fn shader_range_to_location(range: &ShaderRange) -> Location {
+pub fn shader_range_to_location(range: &ShaderFileRange) -> Location {
     Location::new(
-        Url::from_file_path(&range.start.file_path).unwrap(),
+        Url::from_file_path(&range.file_path).unwrap(),
         shader_range_to_lsp_range(range),
     )
 }
