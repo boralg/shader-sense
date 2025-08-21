@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use shader_sense::{
-    position::{ShaderFilePosition, ShaderFileRange},
+    position::{ShaderFilePosition, ShaderRange},
     shader_error::ShaderError,
     symbols::symbols::ShaderSymbolData,
 };
@@ -43,21 +43,17 @@ impl ServerLanguage {
                                     // _range here should be equal to selected_range.
                                     Some(_range) => Some(lsp_types::LocationLink {
                                         origin_selection_range: Some(shader_range_to_lsp_range(
-                                            &word.get_range(),
+                                            &word.get_range().range,
                                         )),
                                         target_uri: Url::from_file_path(&target.file_path).unwrap(),
-                                        target_range: shader_range_to_lsp_range(
-                                            &ShaderFileRange::new(
-                                                target.file_path.clone(),
-                                                target.pos.clone(),
-                                                target.pos.clone(),
-                                            ),
-                                        ),
+                                        target_range: shader_range_to_lsp_range(&ShaderRange::new(
+                                            target.position.clone(),
+                                            target.position.clone(),
+                                        )),
                                         target_selection_range: shader_range_to_lsp_range(
-                                            &ShaderFileRange::new(
-                                                target.file_path.clone(),
-                                                target.pos.clone(),
-                                                target.pos.clone(),
+                                            &ShaderRange::new(
+                                                target.position.clone(),
+                                                target.position.clone(),
                                             ),
                                         ),
                                     }),
@@ -67,11 +63,13 @@ impl ServerLanguage {
                                 match &symbol.range {
                                     Some(range) => Some(lsp_types::LocationLink {
                                         origin_selection_range: Some(shader_range_to_lsp_range(
-                                            &word.get_range(),
+                                            &word.get_range().range,
                                         )),
                                         target_uri: Url::from_file_path(&range.file_path).unwrap(),
-                                        target_range: shader_range_to_lsp_range(range),
-                                        target_selection_range: shader_range_to_lsp_range(range),
+                                        target_range: shader_range_to_lsp_range(&range.range),
+                                        target_selection_range: shader_range_to_lsp_range(
+                                            &range.range,
+                                        ),
                                     }),
                                     None => None,
                                 }

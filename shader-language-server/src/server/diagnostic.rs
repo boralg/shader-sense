@@ -111,7 +111,7 @@ impl ServerLanguage {
                 let uri = Url::from_file_path(&diagnostic.range.file_path).unwrap();
                 if diagnostic.severity.is_required(self.config.get_severity()) {
                     let diagnostic = Diagnostic {
-                        range: shader_range_to_lsp_range(&diagnostic.range),
+                        range: shader_range_to_lsp_range(&diagnostic.range.range),
                         severity: Some(Self::get_lsp_severity(&diagnostic.severity)),
                         message: if diagnostic.error.is_empty() {
                             "No message.".into() // vscode extension send error when empty message.
@@ -159,7 +159,7 @@ impl ServerLanguage {
             .iter()
             .filter_map(|region| {
                 (!region.is_active).then_some(Diagnostic {
-                    range: shader_range_to_lsp_range(&region.range),
+                    range: shader_range_to_lsp_range(&region.range.range),
                     severity: Some(DiagnosticSeverity::HINT),
                     message: "Code disabled by currently used macros".into(),
                     source: Some("shader-validator".to_string()),
@@ -181,7 +181,7 @@ impl ServerLanguage {
                         .iter()
                         .filter_map(|region| {
                             (!region.is_active).then_some(Diagnostic {
-                                range: shader_range_to_lsp_range(&region.range),
+                                range: shader_range_to_lsp_range(&region.range.range),
                                 severity: Some(DiagnosticSeverity::HINT),
                                 message: "Code disabled by currently used macros".into(),
                                 source: Some("shader-validator".to_string()),
@@ -211,7 +211,7 @@ impl ServerLanguage {
                             .diagnostics
                             .iter()
                             .map(|d| Diagnostic {
-                                range: shader_range_to_lsp_range(&d.range),
+                                range: shader_range_to_lsp_range(&d.range.range),
                                 severity: Some(Self::get_lsp_severity(&d.severity)),
                                 message: d.error.clone(),
                                 source: Some("shader-validator".to_string()),

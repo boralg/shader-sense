@@ -906,9 +906,8 @@ impl ServerLanguageFileCache {
             range
         );
         // Update abstract syntax tree
-        let file_path = uri.to_file_path().unwrap();
         if let (Some(range), Some(partial_content)) = (range, partial_content) {
-            let shader_range = lsp_range_to_shader_range(&range, &file_path);
+            let shader_range = lsp_range_to_shader_range(&range);
             shader_module_parser.update_module_partial(
                 &mut RefCell::borrow_mut(&cached_file.shader_module),
                 &shader_range,

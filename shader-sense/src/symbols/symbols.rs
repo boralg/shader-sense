@@ -739,10 +739,10 @@ impl<'a> ShaderSymbolListRef<'a> {
                 if symbol_range.file_path.as_os_str() == cursor_position.file_path.as_os_str() {
                     // Ensure symbols are already defined at pos
                     let is_already_defined =
-                        if symbol_range.range.start.line == cursor_position.pos.line {
-                            cursor_position.pos.pos > symbol_range.range.start.pos
+                        if symbol_range.range.start.line == cursor_position.position.line {
+                            cursor_position.position.pos > symbol_range.range.start.pos
                         } else {
-                            cursor_position.pos.line > symbol_range.range.start.line
+                            cursor_position.position.line > symbol_range.range.start.line
                         };
                     if is_already_defined {
                         // If we are in main file, check if scope in range.
@@ -1099,12 +1099,12 @@ impl ShaderSymbol {
             ShaderSymbolData::Functions { signatures } => signatures[0].format(&self.label), // TODO: append +1 symbol
             ShaderSymbolData::Keyword {} => format!("{}", self.label.clone()),
             ShaderSymbolData::Link { target } => {
-                if target.pos.line == target.pos.pos && target.pos.line == 0 {
+                if target.position.line == target.position.pos && target.position.line == 0 {
                     format!("#include \"{}\"", self.label) // No need to display it as we are at start of file.
                 } else {
                     format!(
                         "#include \"{}\" at {}:{}",
-                        self.label, target.pos.line, target.pos.pos
+                        self.label, target.position.line, target.position.pos
                     )
                 }
             }

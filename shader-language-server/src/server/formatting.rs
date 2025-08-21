@@ -6,7 +6,7 @@ use std::{
 
 use log::info;
 use lsp_types::{TextEdit, Url};
-use shader_sense::position::ShaderFileRange;
+use shader_sense::position::ShaderRange;
 use shader_sense::{shader::ShadingLanguage, shader_error::ShaderError};
 
 use crate::server::common::shader_range_to_lsp_range;
@@ -56,10 +56,9 @@ impl ServerLanguage {
     pub fn recolt_formatting(
         &self,
         uri: &Url,
-        range: Option<ShaderFileRange>,
+        range: Option<ShaderRange>,
     ) -> Result<Vec<TextEdit>, ShaderError> {
         let cached_file = self.get_main_file(&uri)?;
-        let file_path = uri.to_file_path().unwrap();
         match &cached_file.shading_language {
             ShadingLanguage::Wgsl => {
                 // TODO: Find a formatter for wgsl.
@@ -73,8 +72,8 @@ impl ServerLanguage {
                 let (offset, length) = match &range {
                     Some(range) => {
                         let byte_offset_start =
-                            range.start().to_byte_offset(&shader_module.content)?;
-                        let byte_offset_end = range.end().to_byte_offset(&shader_module.content)?;
+                            range.start.to_byte_offset(&shader_module.content)?;
+                        let byte_offset_end = range.end.to_byte_offset(&shader_module.content)?;
                         let byte_length = byte_offset_end - byte_offset_start;
                         assert!(byte_length <= shader_module.content.len());
                         (byte_offset_start, byte_length)
@@ -113,8 +112,7 @@ impl ServerLanguage {
                     let formatted_code = String::from_utf8(output.stdout)
                         .map_err(|e| ShaderError::InternalErr(e.utf8_error().to_string()))?;
                     Ok(vec![TextEdit {
-                        range: shader_range_to_lsp_range(&ShaderFileRange::whole(
-                            file_path.clone(),
+                        range: shader_range_to_lsp_range(&ShaderRange::whole(
                             &shader_module.content,
                         )),
                         new_text: formatted_code,

@@ -34,6 +34,9 @@ impl ShaderPosition {
     pub fn zero() -> Self {
         Self { line: 0, pos: 0 }
     }
+    pub fn into_file(self, file_path: PathBuf) -> ShaderFilePosition {
+        ShaderFilePosition::from(file_path, self)
+    }
     pub fn from_byte_offset(content: &str, byte_offset: usize) -> std::io::Result<ShaderPosition> {
         // https://en.wikipedia.org/wiki/UTF-8
         if byte_offset == 0 {
@@ -126,7 +129,7 @@ impl ShaderPosition {
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderFilePosition {
     pub file_path: PathBuf,
-    pub pos: ShaderPosition,
+    pub position: ShaderPosition,
 }
 impl Eq for ShaderFilePosition {}
 
@@ -136,10 +139,10 @@ impl Ord for ShaderFilePosition {
             self.file_path == other.file_path,
             "Cannot compare file from different path"
         );
-        (&self.file_path, &self.pos.line, &self.pos.pos).cmp(&(
+        (&self.file_path, &self.position.line, &self.position.pos).cmp(&(
             &other.file_path,
-            &other.pos.line,
-            &other.pos.pos,
+            &other.position.line,
+            &other.position.pos,
         ))
     }
 }
@@ -152,26 +155,35 @@ impl PartialOrd for ShaderFilePosition {
 
 impl PartialEq for ShaderFilePosition {
     fn eq(&self, other: &Self) -> bool {
-        (&self.file_path, &self.pos.line, &self.pos.pos)
-            == (&other.file_path, &other.pos.line, &other.pos.pos)
+        (&self.file_path, &self.position.line, &self.position.pos)
+            == (&other.file_path, &other.position.line, &other.position.pos)
     }
 }
 
 impl ShaderFilePosition {
-    pub fn from(file_path: PathBuf, pos: ShaderPosition) -> Self {
-        Self { file_path, pos }
+    pub fn from(file_path: PathBuf, position: ShaderPosition) -> Self {
+        Self {
+            file_path,
+            position,
+        }
     }
     pub fn new(file_path: PathBuf, line: u32, pos: u32) -> Self {
         Self {
             file_path,
-            pos: ShaderPosition::new(line, pos),
+            position: ShaderPosition::new(line, pos),
         }
     }
     pub fn zero(file_path: PathBuf) -> Self {
         Self {
             file_path,
-            pos: ShaderPosition::zero(),
+            position: ShaderPosition::zero(),
         }
+    }
+    pub fn pos(&self) -> u32 {
+        self.position.pos
+    }
+    pub fn line(&self) -> u32 {
+        self.position.line
     }
 }
 
@@ -187,6 +199,9 @@ impl ShaderRange {
     }
     pub fn zero() -> Self {
         Self::new(ShaderPosition::zero(), ShaderPosition::zero())
+    }
+    pub fn into_file(self, file_path: PathBuf) -> ShaderFileRange {
+        ShaderFileRange::from(file_path, self)
     }
     pub fn whole(content: &str) -> Self {
         let line_count = content.lines().count() as u32;
@@ -291,7 +306,7 @@ impl ShaderFileRange {
                 position.file_path == self.file_path,
                 "Raw string identical but not components"
             );
-            self.range.contain(&position.pos)
+            self.range.contain(&position.position)
         } else {
             debug_assert!(
                 position.file_path != self.file_path,

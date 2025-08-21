@@ -21,7 +21,7 @@ impl ServerLanguage {
         // Get all symbols
         let symbols = self.watched_files.get_all_symbols(uri);
         let file_path = uri.to_file_path().unwrap();
-        let valid_range = lsp_range_to_shader_range(lsp_range, &file_path);
+        let valid_range = lsp_range_to_shader_range(lsp_range);
         let inlay_hints = symbols
             .iter()
             .filter(|s| {
@@ -29,7 +29,7 @@ impl ServerLanguage {
                     && match &s.range {
                         Some(range) => {
                             if range.file_path.as_os_str() == file_path.as_os_str() {
-                                valid_range.contain_bounds(&range)
+                                valid_range.contain_bounds(&range.range)
                             } else {
                                 false // Skip call not in main file
                             }
@@ -70,9 +70,7 @@ impl ServerLanguage {
                                     .iter()
                                     .enumerate()
                                     .map(|(i, (_, range))| InlayHint {
-                                        position: shader_position_to_lsp_position(
-                                            &range.start_as_file_position(),
-                                        ),
+                                        position: shader_position_to_lsp_position(&range.start()),
                                         label: InlayHintLabel::String(format!(
                                             "{}:",
                                             signature.parameters[i].label

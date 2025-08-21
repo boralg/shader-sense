@@ -38,7 +38,7 @@ impl ServerLanguage {
                 None => 0,
             };
             // Remove offset
-            let byte_offset = position.pos.to_byte_offset(content).unwrap() - trigger_offset;
+            let byte_offset = position.position.to_byte_offset(content).unwrap() - trigger_offset;
             assert!(content.is_char_boundary(byte_offset));
             if byte_offset == 0 {
                 ShaderPosition::from_byte_offset(content, byte_offset).unwrap()

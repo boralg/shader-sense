@@ -140,7 +140,7 @@ impl HlslSymbolRegionFinder {
                 format!("Failed to parse number_literal {}", name),
                 ShaderFileRange::from(
                     position.file_path.clone(),
-                    ShaderRange::new(position.pos.clone(), position.pos.clone()),
+                    ShaderRange::new(position.position.clone(), position.position.clone()),
                 ),
             ))
         } else if name.contains(" ") {
@@ -150,7 +150,7 @@ impl HlslSymbolRegionFinder {
                 format!("Macro expression solving not implemented ({}).", name),
                 ShaderFileRange::from(
                     position.file_path.clone(),
-                    ShaderRange::new(position.pos.clone(), position.pos.clone()),
+                    ShaderRange::new(position.position.clone(), position.position.clone()),
                 ),
             ))
         } else {

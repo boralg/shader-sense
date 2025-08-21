@@ -73,7 +73,7 @@ impl ServerLanguage {
                         }),
                         // Range of hovered element.
                         range: if word.get_range().file_path.as_os_str() == file_path.as_os_str() {
-                            Some(shader_range_to_lsp_range(&word.get_range()))
+                            Some(shader_range_to_lsp_range(&word.get_range().range))
                         } else {
                             None
                         },

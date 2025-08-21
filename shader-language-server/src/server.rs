@@ -244,15 +244,7 @@ impl ServerLanguage {
                 );
                 let formatting = self.recolt_formatting(
                     &async_request.params.text_document.uri,
-                    Some(lsp_range_to_shader_range(
-                        &async_request.params.range,
-                        &async_request
-                            .params
-                            .text_document
-                            .uri
-                            .to_file_path()
-                            .unwrap(),
-                    )),
+                    Some(lsp_range_to_shader_range(&async_request.params.range)),
                 )?;
                 self.connection
                     .send_response::<Formatting>(async_request.req_id, Some(formatting));
