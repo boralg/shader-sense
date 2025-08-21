@@ -37,9 +37,7 @@ pub fn new_hlsl_scalar(
                 }],
             }],
         },
-        scope: None,
-        range: None,
-        scope_stack: None,
+        runtime: None,
     }
 }
 
@@ -473,9 +471,7 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture1D".into(),
@@ -493,9 +489,7 @@ impl HlslIntrinsicParser {
                 members: vec![],
                 methods: get_texture_object_methods("Texture1D"),
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture1DArray".into(),
@@ -510,9 +504,7 @@ impl HlslIntrinsicParser {
                 members: vec![],
                 methods: get_texture_object_methods("Texture1DArray"),
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture2D".into(),
@@ -530,9 +522,7 @@ impl HlslIntrinsicParser {
                 members: vec![],
                 methods: get_texture_object_methods("Texture2D"),
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture2DArray".into(),
@@ -547,9 +537,7 @@ impl HlslIntrinsicParser {
                 members: vec![],
                 methods: get_texture_object_methods("Texture2DArray"),
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture3D".into(),
@@ -567,9 +555,7 @@ impl HlslIntrinsicParser {
                 members: vec![],
                 methods: get_texture_object_methods("Texture3D"),
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.types.push(ShaderSymbol {
             label: "TextureCube".into(),
@@ -584,9 +570,7 @@ impl HlslIntrinsicParser {
                 members: vec![],
                 methods: get_texture_object_methods("TextureCube"),
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "TextureCubeArray".into(),
@@ -601,9 +585,7 @@ impl HlslIntrinsicParser {
                 members: vec![],
                 methods: get_texture_object_methods("TextureCubeArray"),
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture2DMS".into(),
@@ -618,9 +600,7 @@ impl HlslIntrinsicParser {
                 members: vec![],
                 methods: get_texture_object_methods("Texture2DMS"),
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture2DMSArray".into(),
@@ -635,9 +615,7 @@ impl HlslIntrinsicParser {
                 members: vec![],
                 methods: get_texture_object_methods("Texture2DMSArray"),
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         // sm 5.0 : Object<Type, Samples> name
         // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/d3d11-graphics-reference-sm5-objects
@@ -693,9 +671,7 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "ByteAddressBuffer".into(),
@@ -791,9 +767,7 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "ConsumeStructuredBuffer".into(),
@@ -841,9 +815,7 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "InputPatch".into(),
@@ -859,9 +831,7 @@ impl HlslIntrinsicParser {
                 members: vec![],
                 methods: vec![], // Only [] operator
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "OutputPatch".into(),
@@ -877,9 +847,7 @@ impl HlslIntrinsicParser {
                 members: vec![],
                 methods: vec![], // Only [] operator
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWBuffer".into(),
@@ -930,9 +898,7 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWByteAddressBuffer".into(),
@@ -1396,9 +1362,7 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWStructuredBuffer".into(),
@@ -1472,9 +1436,7 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWTexture1D".into(),
@@ -1521,9 +1483,7 @@ impl HlslIntrinsicParser {
                         range: None,
                     }],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWTexture1DArray".into(),
@@ -1577,9 +1537,7 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWTexture2D".into(),
@@ -1633,9 +1591,7 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWTexture2DArray".into(),
@@ -1694,9 +1650,7 @@ impl HlslIntrinsicParser {
                         range: None,
                     }],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWTexture3D".into(),
@@ -1756,9 +1710,7 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         // sm 5.1
         symbols.types.push(ShaderSymbol {
@@ -1813,9 +1765,7 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         // The following types are alias, so copy existing types.
         // RasterizerOrderedBuffer
@@ -2042,9 +1992,7 @@ impl HlslIntrinsicParser {
                         }
                     ]},
                     requirement: None,
-                    range: None,
-                    scope: None,
-                    scope_stack:None,
+                    runtime:None,
                 });
                 /*symbols.types.push(ShaderSymbol {
                     label: format!("vector<{},{}>", scalar.label, component_col),
@@ -2087,9 +2035,7 @@ impl HlslIntrinsicParser {
                             }
                         ] },
                         requirement: None,
-                        range: None,
-                        scope: None,
-                        scope_stack:None,
+                        runtime:None,
                     });
                     /*symbols.types.push(ShaderSymbol{
                         label: format!("matrix<{},{},{}>", scalar.label, component_row, component_col),

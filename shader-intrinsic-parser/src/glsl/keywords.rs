@@ -11,9 +11,7 @@ impl GlslIntrinsicParser {
                 requirement: None,
                 link: Some("https://www.khronos.org/opengl/wiki/Type_Qualifier_(GLSL)".into()),
                 data: ShaderSymbolData::Keyword {},
-                range: None,
-                scope_stack: None,
-                scope: None,
+                runtime: None,
             }
         }
         symbols

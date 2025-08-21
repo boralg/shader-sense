@@ -52,9 +52,7 @@ impl HlslIntrinsicParser {
                 data: ShaderSymbolData::Macro {
                     value: value.into(),
                 },
-                range: None,
-                scope: None,
-                scope_stack: None,
+                runtime:None,
             });
         }
         fn add_macro_with_req(
@@ -74,9 +72,7 @@ impl HlslIntrinsicParser {
                 data: ShaderSymbolData::Macro {
                     value: value.into(),
                 },
-                range: None,
-                scope: None,
-                scope_stack: None,
+                runtime:None,
             });
         }
 

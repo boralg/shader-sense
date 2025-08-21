@@ -29,9 +29,7 @@ impl GlslIntrinsicParser {
                         }],
                     }],
                 },
-                range: None,
-                scope: None,
-                scope_stack: None,
+                runtime: None,
             }
         }
         fn get_vector_component_label(index: u32) -> String {
@@ -89,9 +87,7 @@ impl GlslIntrinsicParser {
                         },
                     ],
                 },
-                scope: None,
-                range: None,
-                scope_stack: None,
+                runtime: None,
             }
         }
         pub fn new_glsl_mat_type(
@@ -143,9 +139,7 @@ impl GlslIntrinsicParser {
                         },
                     ],
                 },
-                scope: None,
-                range: None,
-                scope_stack: None,
+                runtime: None,
             }
         }
         // Manually push types as they are not in documentation

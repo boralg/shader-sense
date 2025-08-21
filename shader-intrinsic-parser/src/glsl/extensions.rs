@@ -19,9 +19,7 @@ impl GlslIntrinsicParser {
             })),
             link: todo!(),
             data: todo!(),
-            range: None,
-            scope: None,
-            scope_stack: None,
+            runtime: None,
         });
         list
     }

@@ -46,9 +46,7 @@ impl HlslIntrinsicParser {
                         requirement: None,
                         link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-semantics".into()),
                         data: ShaderSymbolData::Variables { ty, count: None },
-                        range: None,
-                        scope: None,
-                        scope_stack:None,
+                        runtime:None,
                     });
                 }
             }

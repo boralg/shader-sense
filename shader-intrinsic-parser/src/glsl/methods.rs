@@ -98,9 +98,7 @@ impl GlslIntrinsicParser {
                         data: ShaderSymbolData::Functions {
                             signatures: signature.1,
                         },
-                        range: None,
-                        scope_stack: None,
-                        scope: None,
+                        runtime: None,
                     });
                 }
             } else {
@@ -174,9 +172,7 @@ impl GlslIntrinsicParser {
                         ty: ty.into(),
                         count: None,
                     },
-                    range: None,
-                    scope: None,
-                    scope_stack: None,
+                    runtime: None,
                 });
             }
             let refsect = get_childs(&elements, "refsect1");

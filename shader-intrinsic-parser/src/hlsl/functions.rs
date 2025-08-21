@@ -23,9 +23,7 @@ impl HlslIntrinsicParser {
                 description: "".into(),
                 parameters: vec![],
             }]},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "abs".into(),
@@ -54,9 +52,7 @@ impl HlslIntrinsicParser {
                     })
                     .collect(),
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "acos".into(),
@@ -77,9 +73,7 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "all".into(),
@@ -100,9 +94,7 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "any".into(),
@@ -123,9 +115,7 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "AllMemoryBarrier".into(),
@@ -140,9 +130,7 @@ impl HlslIntrinsicParser {
                 description: "".into(),
                 parameters: vec![],
             }]},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "AllMemoryBarrierWithGroupSync".into(),
@@ -157,9 +145,7 @@ impl HlslIntrinsicParser {
                 description: "".into(),
                 parameters: vec![],
             }]},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "asdouble".into(),
@@ -193,9 +179,7 @@ impl HlslIntrinsicParser {
                     ],
                 }],
             },
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "asfloat".into(),
@@ -216,9 +200,7 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "asint".into(),
@@ -239,9 +221,7 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "asuint".into(),
@@ -262,9 +242,7 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "asin".into(),
@@ -285,9 +263,7 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "atan".into(),
@@ -308,9 +284,7 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "atan2".into(),
@@ -338,9 +312,7 @@ impl HlslIntrinsicParser {
                     range:None,
                 }],
             }).collect()},
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ceil".into(),
@@ -361,9 +333,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "CheckAccessFullyMapped".into(),
@@ -385,9 +355,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "clamp".into(),
@@ -422,9 +390,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "clip".into(),
@@ -446,9 +412,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "cos".into(),
@@ -477,9 +441,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "cosh".into(),
@@ -508,9 +470,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "countbits".into(),
@@ -539,9 +499,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "cross".into(),
@@ -569,9 +527,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ddx".into(),
@@ -593,9 +549,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ddx_coarse".into(),
@@ -617,9 +571,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ddx_fine".into(),
@@ -641,9 +593,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ddy".into(),
@@ -665,9 +615,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ddy_coarse".into(),
@@ -689,9 +637,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ddy_fine".into(),
@@ -713,9 +659,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "degrees".into(),
@@ -736,9 +680,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "determinant".into(),
@@ -759,9 +701,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "DeviceMemoryBarrier".into(),
@@ -776,9 +716,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "DeviceMemoryBarrierWithGroupSync".into(),
@@ -793,9 +731,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "distance".into(),
@@ -823,9 +759,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "dot".into(),
@@ -864,9 +798,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "dst".into(),
@@ -904,9 +836,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "errorf".into(),
@@ -940,9 +870,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "EvaluateAttributeCentroid".into(),
@@ -964,9 +892,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "EvaluateAttributeAtSample".into(),
@@ -995,9 +921,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "EvaluateAttributeSnapped".into(),
@@ -1026,9 +950,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "exp".into(),
@@ -1057,9 +979,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "exp2".into(),
@@ -1080,9 +1000,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "f16tof32".into(),
@@ -1111,9 +1029,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "f32tof16".into(),
@@ -1141,9 +1057,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "faceforward".into(),
@@ -1176,9 +1090,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "firstbithigh".into(),
@@ -1199,9 +1111,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "firstbitlow".into(),
@@ -1222,9 +1132,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "floor".into(),
@@ -1245,9 +1153,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "fma".into(),
@@ -1282,9 +1188,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "fmod".into(),
@@ -1312,9 +1216,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "frac".into(),
@@ -1335,9 +1237,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "frexp".into(),
@@ -1366,9 +1266,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "fwidth".into(),
@@ -1389,9 +1287,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel2),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "GetRenderTargetSampleCount".into(),
@@ -1406,9 +1302,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "GetRenderTargetSamplePosition".into(),
@@ -1429,9 +1323,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "GroupMemoryBarrier".into(),
@@ -1446,9 +1338,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "GroupMemoryBarrierWithGroupSync".into(),
@@ -1463,9 +1353,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "InterlockedAdd".into(),
@@ -1508,9 +1396,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "InterlockedAnd".into(),
@@ -1552,9 +1438,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "InterlockedCompareExchange".into(),
@@ -1596,9 +1480,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "InterlockedCompareStore".into(),
@@ -1633,9 +1515,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "InterlockedExchange".into(),
@@ -1677,9 +1557,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "InterlockedMax".into(),
@@ -1721,9 +1599,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "InterlockedMin".into(),
@@ -1765,9 +1641,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "InterlockedOr".into(),
@@ -1808,9 +1682,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "InterlockedXor".into(),
@@ -1852,9 +1724,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "isfinite".into(),
@@ -1875,9 +1745,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "isinf".into(),
@@ -1898,9 +1766,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "isnan".into(),
@@ -1921,9 +1787,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ldexp".into(),
@@ -1951,9 +1815,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "length".into(),
@@ -1974,9 +1836,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "lerp".into(),
@@ -2011,9 +1871,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "lit".into(),
@@ -2048,9 +1906,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "log".into(),
@@ -2071,9 +1927,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "log10".into(),
@@ -2094,9 +1948,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "log2".into(),
@@ -2117,9 +1969,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "mad".into(),
@@ -2161,9 +2011,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "max".into(),
@@ -2201,9 +2049,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "min".into(),
@@ -2242,9 +2088,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "modf".into(),
@@ -2272,9 +2116,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "msad4".into(),
@@ -2309,9 +2151,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "mul".into(),
@@ -2340,9 +2180,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "noise".into(),
@@ -2363,9 +2201,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "normalize".into(),
@@ -2386,9 +2222,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "pow".into(),
@@ -2427,9 +2261,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "printf".into(),
@@ -2463,9 +2295,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "Process2DQuadTessFactorsAvg".into(),
@@ -2515,9 +2345,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "Process2DQuadTessFactorsMax".into(),
@@ -2567,9 +2395,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "Process2DQuadTessFactorsMin".into(),
@@ -2619,9 +2445,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ProcessIsolineTessFactors".into(),
@@ -2664,9 +2488,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ProcessQuadTessFactorsAvg".into(),
@@ -2716,9 +2538,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ProcessQuadTessFactorsMax".into(),
@@ -2768,9 +2588,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ProcessQuadTessFactorsMin".into(),
@@ -2820,9 +2638,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ProcessTriTessFactorsAvg".into(),
@@ -2872,9 +2688,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ProcessTriTessFactorsMax".into(),
@@ -2924,9 +2738,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "ProcessTriTessFactorsMin".into(),
@@ -2976,9 +2788,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "radians".into(),
@@ -2999,9 +2809,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "rcp".into(),
@@ -3027,9 +2835,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "reflect".into(),
@@ -3057,9 +2863,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "refract".into(),
@@ -3094,9 +2898,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "reversebits".into(),
@@ -3124,9 +2926,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "round".into(),
@@ -3147,9 +2947,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "rsqrt".into(),
@@ -3170,9 +2968,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "saturate".into(),
@@ -3193,9 +2989,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "sign".into(),
@@ -3216,9 +3010,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "sin".into(),
@@ -3247,9 +3039,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "sincos".into(),
@@ -3284,9 +3074,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "sinh".into(),
@@ -3307,9 +3095,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "smoothstep".into(),
@@ -3344,9 +3130,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "sqrt".into(),
@@ -3367,9 +3151,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "step".into(),
@@ -3397,9 +3179,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "tan".into(),
@@ -3428,9 +3208,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "tanh".into(),
@@ -3451,9 +3229,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         for dim in 1..=4 {
             let dim_text = if dim == 4 {
@@ -3489,9 +3265,7 @@ impl HlslIntrinsicParser {
                     stages: Some(vec![ShaderStage::Fragment]),
                     ..Default::default()
                 })),
-                scope_stack: None,
-                range: None,
-                scope: None,
+                runtime:None,
             });
             symbols.functions.push(ShaderSymbol {
                 label: format!("tex{}", dim_text),
@@ -3534,9 +3308,7 @@ impl HlslIntrinsicParser {
                     stages: Some(vec![ShaderStage::Fragment]),
                     ..Default::default()
                 })),
-                scope_stack: None,
-                range: None,
-                scope: None,
+                runtime:None,
             });
             symbols.functions.push(ShaderSymbol {
                 label: format!("tex{}bias", dim_text),
@@ -3565,9 +3337,7 @@ impl HlslIntrinsicParser {
                     stages: Some(vec![ShaderStage::Fragment]),
                     ..Default::default()
                 })),
-                scope_stack: None,
-                range: None,
-                scope: None,
+                runtime:None,
             });
             symbols.functions.push(ShaderSymbol {
                 label: format!("tex{}grad", dim_text),
@@ -3610,9 +3380,7 @@ impl HlslIntrinsicParser {
                     stages: Some(vec![ShaderStage::Fragment]),
                     ..Default::default()
                 })),
-                scope_stack: None,
-                range: None,
-                scope: None,
+                runtime:None,
             });
             symbols.functions.push(ShaderSymbol {
                 label: format!("tex{}lod", dim_text),
@@ -3641,9 +3409,7 @@ impl HlslIntrinsicParser {
                     stages: Some(vec![ShaderStage::Fragment]),
                     ..Default::default()
                 })),
-                scope_stack: None,
-                range: None,
-                scope: None,
+                runtime:None,
             });
             symbols.functions.push(ShaderSymbol {
                 label: format!("tex{}proj", dim_text),
@@ -3672,9 +3438,7 @@ impl HlslIntrinsicParser {
                     stages: Some(vec![ShaderStage::Fragment]),
                     ..Default::default()
                 })),
-                scope_stack: None,
-                range: None,
-                scope: None,
+                runtime:None,
             });
         }
         symbols.functions.push(ShaderSymbol {
@@ -3696,9 +3460,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "trunc".into(),
@@ -3719,9 +3481,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         // sm 6.0
         symbols.functions.push(ShaderSymbol {
@@ -3744,9 +3504,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "QuadReadLaneAt".into(),
@@ -3774,9 +3532,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "QuadReadAcrossX".into(),
@@ -3798,9 +3554,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "QuadReadAcrossY".into(),
@@ -3822,9 +3576,7 @@ impl HlslIntrinsicParser {
                 stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveAllEqual".into(),
@@ -3845,9 +3597,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveBitAnd".into(),
@@ -3868,9 +3618,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveBitOr".into(),
@@ -3891,9 +3639,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveBitXor".into(),
@@ -3914,9 +3660,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveCountBits".into(),
@@ -3937,9 +3681,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveMax".into(),
@@ -3960,9 +3702,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveMin".into(),
@@ -3983,9 +3723,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveProduct".into(),
@@ -4006,9 +3744,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveSum".into(),
@@ -4029,9 +3765,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveAllTrue".into(),
@@ -4058,9 +3792,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveAnyTrue".into(),
@@ -4081,9 +3813,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveActiveBallot".into(),
@@ -4104,9 +3834,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveGetLaneCount".into(),
@@ -4121,9 +3849,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveGetLaneIndex".into(),
@@ -4138,9 +3864,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveIsFirstLane".into(),
@@ -4164,9 +3888,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime: None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WavePrefixCountBits".into(),
@@ -4187,9 +3909,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WavePrefixProduct".into(),
@@ -4210,9 +3930,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WavePrefixSum".into(),
@@ -4233,9 +3951,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveReadLaneFirst".into(),
@@ -4256,9 +3972,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
         symbols.functions.push(ShaderSymbol {
             label: "WaveReadLaneAt".into(),
@@ -4286,9 +4000,7 @@ impl HlslIntrinsicParser {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
                 ..Default::default()
             })),
-            scope_stack: None,
-            range: None,
-            scope: None,
+            runtime:None,
         });
     }
 }
