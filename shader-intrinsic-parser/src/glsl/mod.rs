@@ -1,10 +1,9 @@
-use shader_sense::symbols::symbols::ShaderSymbolList;
-
 use crate::common::{download_file, IntrinsicParser};
 use std::collections::HashSet;
 
 use regex::Regex;
 use scraper::{Html, Selector};
+use shader_sense::symbols::symbol_list::ShaderSymbolList;
 use xmltree::XMLNode;
 
 mod extensions;

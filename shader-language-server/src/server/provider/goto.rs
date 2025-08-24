@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use shader_sense::{
     position::{ShaderFilePosition, ShaderRange},
     shader_error::ShaderError,
-    symbols::symbols::ShaderSymbolData,
+    symbols::symbols::{ShaderSymbolData, ShaderSymbolMode},
 };
 
 use lsp_types::{GotoDefinitionResponse, Position, Url};
@@ -41,40 +41,47 @@ impl ServerLanguage {
                         .iter()
                         .filter_map(|symbol| {
                             if let ShaderSymbolData::Link { target } = &symbol.data {
-                                match &symbol.runtime {
+                                match &symbol.mode {
                                     // _runtime.range here should be equal to selected_range.
-                                    Some(_runtime) => Some(lsp_types::LocationLink {
-                                        origin_selection_range: Some(shader_range_to_lsp_range(
-                                            &word.get_range(),
-                                        )),
-                                        target_uri: Url::from_file_path(&target.file_path).unwrap(),
-                                        target_range: shader_range_to_lsp_range(&ShaderRange::new(
-                                            target.position.clone(),
-                                            target.position.clone(),
-                                        )),
-                                        target_selection_range: shader_range_to_lsp_range(
-                                            &ShaderRange::new(
-                                                target.position.clone(),
-                                                target.position.clone(),
+                                    ShaderSymbolMode::Runtime(_runtime) => {
+                                        Some(lsp_types::LocationLink {
+                                            origin_selection_range: Some(
+                                                shader_range_to_lsp_range(&word.get_range()),
                                             ),
-                                        ),
-                                    }),
-                                    None => None,
+                                            target_uri: Url::from_file_path(&target.file_path)
+                                                .unwrap(),
+                                            target_range: shader_range_to_lsp_range(
+                                                &ShaderRange::new(
+                                                    target.position.clone(),
+                                                    target.position.clone(),
+                                                ),
+                                            ),
+                                            target_selection_range: shader_range_to_lsp_range(
+                                                &ShaderRange::new(
+                                                    target.position.clone(),
+                                                    target.position.clone(),
+                                                ),
+                                            ),
+                                        })
+                                    }
+                                    _ => None,
                                 }
                             } else {
-                                match &symbol.runtime {
-                                    Some(runtime) => Some(lsp_types::LocationLink {
-                                        origin_selection_range: Some(shader_range_to_lsp_range(
-                                            &word.get_range(),
-                                        )),
-                                        target_uri: Url::from_file_path(&runtime.file_path)
-                                            .unwrap(),
-                                        target_range: shader_range_to_lsp_range(&runtime.range),
-                                        target_selection_range: shader_range_to_lsp_range(
-                                            &runtime.range,
-                                        ),
-                                    }),
-                                    None => None,
+                                match &symbol.mode {
+                                    ShaderSymbolMode::Runtime(runtime) => {
+                                        Some(lsp_types::LocationLink {
+                                            origin_selection_range: Some(
+                                                shader_range_to_lsp_range(&word.get_range()),
+                                            ),
+                                            target_uri: Url::from_file_path(&runtime.file_path)
+                                                .unwrap(),
+                                            target_range: shader_range_to_lsp_range(&runtime.range),
+                                            target_selection_range: shader_range_to_lsp_range(
+                                                &runtime.range,
+                                            ),
+                                        })
+                                    }
+                                    _ => None,
                                 }
                             }
                         })

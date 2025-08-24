@@ -1,8 +1,12 @@
 use shader_sense::{
     shader::{HlslShaderModel, ShaderStage},
-    symbols::symbols::{
-        HlslRequirementParameter, RequirementParameter, ShaderMethod, ShaderParameter,
-        ShaderSignature, ShaderSymbol, ShaderSymbolData, ShaderSymbolList,
+    symbols::{
+        symbol_list::ShaderSymbolList,
+        symbols::{
+            HlslRequirementParameter, RequirementParameter, ShaderMethod, ShaderParameter,
+            ShaderSignature, ShaderSymbol, ShaderSymbolData, ShaderSymbolIntrinsic,
+            ShaderSymbolMode,
+        },
     },
 };
 
@@ -15,15 +19,14 @@ pub fn new_hlsl_scalar(
 ) -> ShaderSymbol {
     ShaderSymbol {
         label: label.into(),
-        description: description.into(),
+        mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+            description.into(),
+            Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-scalar".into())
+        )),
         requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
             min_shader_model: Some(min_shader_model),
             ..Default::default()
         })),
-        link: Some(
-            "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-scalar"
-                .into(),
-        ),
         data: ShaderSymbolData::Types {
             constructors: vec![ShaderSignature {
                 returnType: "".into(),
@@ -37,7 +40,6 @@ pub fn new_hlsl_scalar(
                 }],
             }],
         },
-        runtime: None,
     }
 }
 
@@ -427,12 +429,14 @@ impl HlslIntrinsicParser {
         // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-type
         symbols.types.push(ShaderSymbol {
             label: "Buffer".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A buffer containing data".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-buffer".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-buffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -471,162 +475,163 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture1D".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A 1D texture type.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1d".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            link: Some(
-                "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1d"
-                    .into(),
-            ),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
                 methods: get_texture_object_methods("Texture1D"),
             },
-            runtime: None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture1DArray".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A 1D texture array type.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1darray".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture1darray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
                 methods: get_texture_object_methods("Texture1DArray"),
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture2D".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A 2D texture type.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2d".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            link: Some(
-                "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2d"
-                    .into(),
-            ),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
                 methods: get_texture_object_methods("Texture2D"),
             },
-            runtime: None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture2DArray".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A 2D texture array type.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2darray".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2darray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
                 methods: get_texture_object_methods("Texture2DArray"),
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture3D".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A 3D texture type.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture3d".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            link: Some(
-                "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture3d"
-                    .into(),
-            ),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
                 methods: get_texture_object_methods("Texture3D"),
             },
-            runtime: None,
         });
         symbols.types.push(ShaderSymbol {
             label: "TextureCube".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A cube texture type.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texturecube".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texturecube".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
                 methods: get_texture_object_methods("TextureCube"),
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "TextureCubeArray".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A cube texture array type.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texturecubearray".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4_1),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texturecubearray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
                 methods: get_texture_object_methods("TextureCubeArray"),
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture2DMS".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A 2D multisampled texture type.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2dms".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4_1),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-texture2dms".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
                 methods: get_texture_object_methods("Texture2DMS"),
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "Texture2DMSArray".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A 2D multisampled texture type.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-Texture2DMSArray".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel4_1),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-Texture2DMSArray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
                 methods: get_texture_object_methods("Texture2DMSArray"),
             },
-            runtime:None,
         });
         // sm 5.0 : Object<Type, Samples> name
         // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/d3d11-graphics-reference-sm5-objects
         symbols.types.push(ShaderSymbol {
             label: "AppendStructuredBuffer".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "Output buffer that appears as a stream the shader may append to. Only structured buffers can take T types that are structures.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-AppendStructuredBuffer".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-AppendStructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -671,16 +676,17 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "ByteAddressBuffer".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A read-only buffer that is indexed in bytes.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-ByteAddressBuffer".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-ByteAddressBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -767,16 +773,17 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "ConsumeStructuredBuffer".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "An input buffer that appears as a stream the shader may pull values from. Only structured buffers can take T types that are structures.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-ConsumeStructuredBuffer".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-ConsumeStructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -815,51 +822,51 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "InputPatch".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "Represents an array of control points that are available to the hull shader as inputs.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-InputPatch".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-InputPatch".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
                 methods: vec![], // Only [] operator
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "OutputPatch".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "Represents an array of output control points that are available to the hull shader's patch-constant function as well as the domain shader.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-OutputPatch".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 stages: Some(vec![ShaderStage::TesselationControl]),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-OutputPatch".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
                 methods: vec![], // Only [] operator
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWBuffer".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A read/write buffer.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWBuffer".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some(
-                "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWBuffer"
-                    .into(),
-            ),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -898,16 +905,17 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWByteAddressBuffer".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A read/write buffer.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWByteAddressBuffer".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWByteAddressBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -1362,16 +1370,17 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWStructuredBuffer".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A read/write buffer that can take a T type that is a structure.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWStructuredBuffer".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWStructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -1436,16 +1445,17 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWTexture1D".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A read/write resource.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture1D".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture1D".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -1483,16 +1493,17 @@ impl HlslIntrinsicParser {
                         range: None,
                     }],
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWTexture1DArray".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A read/write resource.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture1DArray".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture1DArray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -1537,16 +1548,17 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWTexture2D".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A read/write resource.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture2D".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture2D".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -1591,16 +1603,17 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWTexture2DArray".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A read/write resource.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture2DArray".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture2DArray".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -1650,16 +1663,17 @@ impl HlslIntrinsicParser {
                         range: None,
                     }],
             },
-            runtime:None,
         });
         symbols.types.push(ShaderSymbol {
             label: "RWTexture3D".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A read/write resource.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture3D".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-RWTexture3D".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -1710,17 +1724,18 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            runtime:None,
         });
         // sm 5.1
         symbols.types.push(ShaderSymbol {
             label: "StructuredBuffer".into(),
-            description: "".into(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                "A read-only buffer, which can take a T type that is a structure.".into(), 
+                Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-StructuredBuffer".into()),
+            )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
                 ..Default::default()
             })),
-            link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-StructuredBuffer".into()),
             data: ShaderSymbolData::Struct {
                 constructors: vec![],
                 members: vec![],
@@ -1765,7 +1780,6 @@ impl HlslIntrinsicParser {
                     }
                 ],
             },
-            runtime:None,
         });
         // The following types are alias, so copy existing types.
         // RasterizerOrderedBuffer
@@ -1965,8 +1979,10 @@ impl HlslIntrinsicParser {
                 let fmt = format!("{}{}", scalar.label, component_col);
                 symbols.types.push(ShaderSymbol {
                     label: fmt.clone(),
-                    description: format!("Vector with {} components of {}", component_col, scalar.label),
-                    link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-vector".into()),
+                    mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                        format!("Vector with {} components of {}", component_col, scalar.label),
+                        Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-vector".into()),
+                    )),
                     data: ShaderSymbolData::Types { constructors: vec![
                         ShaderSignature {
                             returnType: fmt.clone(),
@@ -1992,7 +2008,6 @@ impl HlslIntrinsicParser {
                         }
                     ]},
                     requirement: None,
-                    runtime:None,
                 });
                 /*symbols.types.push(ShaderSymbol {
                     label: format!("vector<{},{}>", scalar.label, component_col),
@@ -2006,8 +2021,10 @@ impl HlslIntrinsicParser {
                     let fmt = format!("{}{}x{}", scalar.label, component_row, component_col);
                     symbols.types.push(ShaderSymbol{
                         label: fmt.clone(),
-                        description: format!("Matrice with {} rows and {} columns of {}", component_row, component_col, scalar.label),
-                        link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-matrix".into()),
+                        mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                            format!("Matrice with {} rows and {} columns of {}", component_row, component_col, scalar.label), 
+                            Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-matrix".into())
+                        )),
                         data: ShaderSymbolData::Types { constructors: vec![
                             ShaderSignature {
                                 returnType: fmt.clone(),
@@ -2035,7 +2052,6 @@ impl HlslIntrinsicParser {
                             }
                         ] },
                         requirement: None,
-                        runtime:None,
                     });
                     /*symbols.types.push(ShaderSymbol{
                         label: format!("matrix<{},{},{}>", scalar.label, component_row, component_col),

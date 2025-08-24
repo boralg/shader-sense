@@ -1,5 +1,8 @@
 use scraper::{Html, Selector};
-use shader_sense::symbols::symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolList};
+use shader_sense::symbols::{
+    symbol_list::ShaderSymbolList,
+    symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolIntrinsic, ShaderSymbolMode},
+};
 
 use super::{HlslIntrinsicParser, SEMANTIC_FILE};
 
@@ -42,11 +45,12 @@ impl HlslIntrinsicParser {
 
                     symbols.constants.push(ShaderSymbol {
                         label: label.into(),
-                        description: description.into(),
+                        mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                            description.into(),
+                            Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-semantics".into())
+                        )),
                         requirement: None,
-                        link: Some("https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-semantics".into()),
                         data: ShaderSymbolData::Variables { ty, count: None },
-                        runtime:None,
                     });
                 }
             }

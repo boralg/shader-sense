@@ -1,4 +1,4 @@
-use shader_sense::{shader::ShadingLanguage, symbols::symbols::ShaderSymbolList};
+use shader_sense::{shader::ShadingLanguage, symbols::symbol_list::ShaderSymbolList};
 
 use crate::{glsl::GlslIntrinsicParser, hlsl::HlslIntrinsicParser, wgsl::WgslIntrinsicParser};
 

@@ -6,7 +6,7 @@ use crate::{
         symbol_parser::{get_name, ShaderSymbolListBuilder, SymbolTreeParser},
         symbols::{
             ShaderMember, ShaderParameter, ShaderScope, ShaderSymbol, ShaderSymbolData,
-            ShaderSymbolRuntime,
+            ShaderSymbolMode, ShaderSymbolRuntime,
         },
     },
 };
@@ -45,9 +45,7 @@ impl SymbolTreeParser for WgslStructTreeParser {
         let struct_name: String = get_name(shader_content, matches.captures[0].node).into();
         symbols.add_type(ShaderSymbol {
             label: struct_name.clone(),
-            description: "".into(),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::Struct {
                 constructors: vec![], // Constructor in wgsl ?
                 members: matches.captures[1..]
@@ -66,7 +64,7 @@ impl SymbolTreeParser for WgslStructTreeParser {
                 methods: vec![],
             },
             // TODO: compute scope
-            runtime: Some(ShaderSymbolRuntime::new(
+            mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                 file_path.into(),
                 range,
                 None,

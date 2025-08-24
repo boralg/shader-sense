@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use scraper::{Html, Selector};
-use shader_sense::symbols::symbols::ShaderSymbolList;
+use shader_sense::symbols::symbol_list::ShaderSymbolList;
 
 use crate::common::{download_file, IntrinsicParser};
 

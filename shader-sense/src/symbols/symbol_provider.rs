@@ -337,12 +337,10 @@ impl SymbolProvider {
                     included_preprocessor
                         .defines
                         .iter()
-                        .filter(|define| match define.get_range() {
-                            Some(range) => {
-                                range.start >= last_position
-                                    && range.end <= included_include.get_range().start
-                            }
-                            None => false, // Global define, already filled ?
+                        .filter(|define| {
+                            let range = define.get_range();
+                            range.start >= last_position
+                                && range.end <= included_include.get_range().start
                         })
                         .cloned()
                         .collect::<Vec<ShaderPreprocessorDefine>>(),
@@ -362,9 +360,9 @@ impl SymbolProvider {
             let define_left = included_preprocessor
                 .defines
                 .iter_mut()
-                .filter(|define| match define.get_range() {
-                    Some(range) => range.start > last_position,
-                    None => false, // Global define
+                .filter(|define| {
+                    let range = define.get_range();
+                    range.start > last_position
                 })
                 .map(|d| d.clone())
                 .collect::<Vec<ShaderPreprocessorDefine>>();

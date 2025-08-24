@@ -1,8 +1,11 @@
 use shader_sense::{
     shader::{HlslShaderModel, HlslVersion, ShaderStage},
-    symbols::symbols::{
-        HlslRequirementParameter, RequirementParameter, ShaderSymbol, ShaderSymbolData,
-        ShaderSymbolList,
+    symbols::{
+        symbol_list::ShaderSymbolList,
+        symbols::{
+            HlslRequirementParameter, RequirementParameter, ShaderSymbol, ShaderSymbolData,
+            ShaderSymbolIntrinsic, ShaderSymbolMode,
+        },
     },
     validator::dxc::Dxc,
 };
@@ -43,16 +46,14 @@ impl HlslIntrinsicParser {
         fn add_macro(symbols: &mut ShaderSymbolList, name: &str, value: &str) {
             symbols.macros.push(ShaderSymbol {
                 label: name.into(),
-                description: "".into(),
+                mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                    "".into(), 
+                    Some("https://github.com/microsoft/DirectXShaderCompiler/wiki/Predefined-Version-Macros".into())
+                )),
                 requirement: None,
-                link: Some(
-                    "https://github.com/microsoft/DirectXShaderCompiler/wiki/Predefined-Version-Macros"
-                        .into(),
-                ),
                 data: ShaderSymbolData::Macro {
                     value: value.into(),
                 },
-                runtime:None,
             });
         }
         fn add_macro_with_req(
@@ -63,16 +64,14 @@ impl HlslIntrinsicParser {
         ) {
             symbols.macros.push(ShaderSymbol {
                 label: name.into(),
-                description: "".into(),
+                mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                    "".into(), 
+                    Some("https://github.com/microsoft/DirectXShaderCompiler/wiki/Predefined-Version-Macros".into())
+                )),
                 requirement: Some(RequirementParameter::Hlsl(req)),
-                link: Some(
-                    "https://github.com/microsoft/DirectXShaderCompiler/wiki/Predefined-Version-Macros"
-                        .into(),
-                ),
                 data: ShaderSymbolData::Macro {
                     value: value.into(),
                 },
-                runtime:None,
             });
         }
 

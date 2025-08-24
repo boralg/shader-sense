@@ -1,6 +1,9 @@
-use shader_sense::symbols::symbols::{
-    GlslRequirementParameter, RequirementParameter, ShaderParameter, ShaderSignature, ShaderSymbol,
-    ShaderSymbolData, ShaderSymbolList,
+use shader_sense::symbols::{
+    symbol_list::ShaderSymbolList,
+    symbols::{
+        GlslRequirementParameter, RequirementParameter, ShaderParameter, ShaderSignature,
+        ShaderSymbol, ShaderSymbolData, ShaderSymbolIntrinsic, ShaderSymbolMode,
+    },
 };
 
 use super::GlslIntrinsicParser;
@@ -10,12 +13,14 @@ impl GlslIntrinsicParser {
         pub fn new_glsl_type(label: &str, description: &str, min_version: u32) -> ShaderSymbol {
             ShaderSymbol {
                 label: label.into(),
-                description: description.into(),
+                mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                    description.into(),
+                    None,
+                )),
                 requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                     min_version: Some(min_version),
                     ..Default::default()
                 })),
-                link: None,
                 data: ShaderSymbolData::Types {
                     constructors: vec![ShaderSignature {
                         returnType: "".into(),
@@ -29,7 +34,6 @@ impl GlslIntrinsicParser {
                         }],
                     }],
                 },
-                runtime: None,
             }
         }
         fn get_vector_component_label(index: u32) -> String {
@@ -53,12 +57,14 @@ impl GlslIntrinsicParser {
         ) -> ShaderSymbol {
             ShaderSymbol {
                 label: label.into(),
-                description: description.into(),
+                mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                    description.into(),
+                    None,
+                )),
                 requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                     min_version: Some(min_version),
                     ..Default::default()
                 })),
-                link: None,
                 data: ShaderSymbolData::Types {
                     constructors: vec![
                         ShaderSignature {
@@ -87,7 +93,6 @@ impl GlslIntrinsicParser {
                         },
                     ],
                 },
-                runtime: None,
             }
         }
         pub fn new_glsl_mat_type(
@@ -100,12 +105,14 @@ impl GlslIntrinsicParser {
         ) -> ShaderSymbol {
             ShaderSymbol {
                 label: label.into(),
-                description: description.into(),
+                mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                    description.into(),
+                    None,
+                )),
                 requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                     min_version: Some(min_version),
                     ..Default::default()
                 })),
-                link: None,
                 data: ShaderSymbolData::Types {
                     constructors: vec![
                         ShaderSignature {
@@ -139,7 +146,6 @@ impl GlslIntrinsicParser {
                         },
                     ],
                 },
-                runtime: None,
             }
         }
         // Manually push types as they are not in documentation

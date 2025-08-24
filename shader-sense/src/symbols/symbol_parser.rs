@@ -6,8 +6,10 @@ use crate::{
     position::{ShaderFilePosition, ShaderPosition, ShaderRange},
     shader::ShaderCompilationParams,
     shader_error::ShaderError,
-    symbols::symbol_list::{ShaderSymbolList, ShaderSymbolListRef},
-    symbols::symbols::ShaderSymbolData,
+    symbols::{
+        symbol_list::{ShaderSymbolList, ShaderSymbolListRef},
+        symbols::{ShaderSymbolData, ShaderSymbolMode},
+    },
 };
 
 use super::{
@@ -236,19 +238,21 @@ impl ShaderWordRange {
                         members,
                         methods,
                     } => {
+                        let file_path = if let ShaderSymbolMode::Runtime(runtime) = &symbol_ty.mode
+                        {
+                            Some(runtime.file_path.clone())
+                        } else {
+                            None
+                        };
                         let member_symbols: Vec<ShaderSymbol> = members
                             .iter()
                             .filter(|m| m.parameters.label == next_item.word)
-                            .map(|m| {
-                                m.as_symbol(symbol_ty.runtime.as_ref().map(|s| s.file_path.clone()))
-                            })
+                            .map(|m| m.as_symbol(file_path.clone()))
                             .collect();
                         let method_symbols: Vec<ShaderSymbol> = methods
                             .iter()
                             .filter(|m| m.label == next_item.word)
-                            .map(|m| {
-                                m.as_symbol(symbol_ty.runtime.as_ref().map(|s| s.file_path.clone()))
-                            })
+                            .map(|m| m.as_symbol(file_path.clone()))
                             .collect();
                         [member_symbols, method_symbols].concat()
                     }

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     position::ShaderFilePosition,
-    symbols::symbols::{ShaderSymbol, ShaderSymbolType},
+    symbols::symbols::{ShaderSymbol, ShaderSymbolMode, ShaderSymbolType},
 };
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -125,8 +125,8 @@ impl<'a> ShaderSymbolListRef<'a> {
         shader_symbol: &ShaderSymbol,
         cursor_position: &ShaderFilePosition,
     ) -> bool {
-        match &shader_symbol.runtime {
-            Some(runtime) => {
+        match &shader_symbol.mode {
+            ShaderSymbolMode::Runtime(runtime) => {
                 if runtime.file_path.as_os_str() == cursor_position.file_path.as_os_str() {
                     // Ensure symbols are already defined at pos
                     let is_already_defined =
@@ -152,7 +152,8 @@ impl<'a> ShaderSymbolListRef<'a> {
                     runtime.scope_stack.is_empty() // Global scope or inaccessible
                 }
             }
-            None => true, // intrinsics
+            ShaderSymbolMode::RuntimeContext(_) => true, // available in context.
+            ShaderSymbolMode::Intrinsic(_) => true,      // intrinsics
         }
     }
     pub fn find_symbols_at(

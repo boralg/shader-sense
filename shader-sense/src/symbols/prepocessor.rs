@@ -11,7 +11,10 @@ use crate::{
     symbols::{
         shader_module::ShaderSymbols,
         symbol_list::{ShaderSymbolList, ShaderSymbolListRef},
-        symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolRuntime},
+        symbols::{
+            ShaderSymbol, ShaderSymbolData, ShaderSymbolMode, ShaderSymbolRuntime,
+            ShaderSymbolRuntimeContext,
+        },
     },
 };
 
@@ -44,13 +47,11 @@ impl ShaderPreprocessorContext {
                 .iter()
                 .map(|(key, value)| ShaderSymbol {
                     label: key.clone(),
-                    description: format!("Preprocessor macro. Expanding to \n```\n{}\n```", value),
                     requirement: None,
-                    link: None,
                     data: ShaderSymbolData::Macro {
                         value: value.clone(),
                     },
-                    runtime: None,
+                    mode: ShaderSymbolMode::RuntimeContext(ShaderSymbolRuntimeContext::new()),
                 })
                 .collect(),
             include_handler: IncludeHandler::main(
@@ -74,16 +75,11 @@ impl ShaderPreprocessorContext {
     pub fn push_define(&mut self, name: &str, value: &str) {
         self.defines.push(ShaderSymbol {
             label: name.into(),
-            description: format!(
-                "Config preprocessor macro. Expanding to \n```\n{}\n```",
-                value
-            ),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::Macro {
                 value: value.into(),
             },
-            runtime: None,
+            mode: ShaderSymbolMode::RuntimeContext(ShaderSymbolRuntimeContext::new()),
         });
     }
     pub fn append_defines(&mut self, defines: Vec<ShaderPreprocessorDefine>) {
@@ -203,29 +199,25 @@ impl ShaderPreprocessorDefine {
         Self {
             symbol: ShaderSymbol {
                 label: name.clone(),
-                description: match &value {
-                    Some(value) => {
-                        format!("Preprocessor macro. Expanding to \n```\n{}\n```", value)
-                    }
-                    None => format!("Preprocessor macro."),
-                },
                 requirement: None,
-                link: None,
                 data: ShaderSymbolData::Macro {
                     value: match &value {
                         Some(value) => value.clone(),
                         None => "".into(),
                     },
                 },
-                runtime: Some(ShaderSymbolRuntime::global(range.file_path, range.range)),
+                mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::global(
+                    range.file_path,
+                    range.range,
+                )),
             },
         }
     }
-    pub fn get_file_path(&self) -> Option<&Path> {
-        self.symbol.runtime.as_ref().map(|r| r.file_path.as_path())
+    pub fn get_file_path(&self) -> &Path {
+        &self.symbol.mode.unwrap_runtime().file_path
     }
-    pub fn get_range(&self) -> Option<&ShaderRange> {
-        self.symbol.runtime.as_ref().map(|r| &r.range)
+    pub fn get_range(&self) -> &ShaderRange {
+        &self.symbol.mode.unwrap_runtime().range
     }
     pub fn get_name(&self) -> &String {
         &self.symbol.label
@@ -243,29 +235,23 @@ impl ShaderPreprocessorInclude {
             cache: None,
             symbol: ShaderSymbol {
                 label: relative_path,
-                description: format!("Including file {}", absolute_path.display()),
                 requirement: None,
-                link: None,
                 data: ShaderSymbolData::Link {
                     target: ShaderFilePosition::new(absolute_path, 0, 0),
                 },
-                runtime: Some(ShaderSymbolRuntime::global(range.file_path, range.range)),
+                mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::global(
+                    range.file_path,
+                    range.range,
+                )),
             },
         }
     }
     pub fn get_range(&self) -> &ShaderRange {
-        self.symbol
-            .runtime
-            .as_ref()
-            .map(|r| &r.range)
-            .expect("Include symbol should have range.")
+        &self.symbol.mode.unwrap_runtime().range
     }
     pub fn get_file_range(&self) -> ShaderFileRange {
-        self.symbol
-            .runtime
-            .as_ref()
-            .map(|r| r.range.clone().into_file(r.file_path.clone()))
-            .expect("Include symbol should have range.")
+        let runtime = self.symbol.mode.unwrap_runtime();
+        runtime.range.clone_into_file(runtime.file_path.clone())
     }
     pub fn get_relative_path(&self) -> &String {
         &self.symbol.label
@@ -303,12 +289,13 @@ impl ShaderPreprocessor {
         let inactive_regions: Vec<&ShaderRegion> =
             self.regions.iter().filter(|r| !r.is_active).collect();
         let mut preprocessed_symbols =
-            shader_symbols.filter(move |_symbol_type, symbol| match &symbol.runtime {
-                Some(runtime) => inactive_regions
+            shader_symbols.filter(move |_symbol_type, symbol| match &symbol.mode {
+                ShaderSymbolMode::Runtime(runtime) => inactive_regions
                     .iter()
                     .find(|r| r.range.contain_bounds(&runtime.range))
                     .is_none(),
-                None => true, // Global range
+                ShaderSymbolMode::RuntimeContext(_) => true, // Global range
+                ShaderSymbolMode::Intrinsic(_) => true,      // Global range
             });
         // Add defines
         let mut define_symbols: Vec<&ShaderSymbol> =

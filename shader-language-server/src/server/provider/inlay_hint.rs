@@ -2,7 +2,7 @@ use lsp_types::{InlayHint, InlayHintKind, InlayHintLabel, Range, Url};
 
 use shader_sense::{
     shader_error::ShaderError,
-    symbols::symbols::{ShaderSymbolData, ShaderSymbolType},
+    symbols::symbols::{ShaderSymbolData, ShaderSymbolMode, ShaderSymbolType},
 };
 
 use crate::server::common::{lsp_range_to_shader_range, shader_position_to_lsp_position};
@@ -24,15 +24,15 @@ impl ServerLanguage {
             .iter()
             .filter(|s| {
                 s.is_type(ShaderSymbolType::CallExpression)
-                    && match &s.runtime {
-                        Some(runtime) => {
+                    && match &s.mode {
+                        ShaderSymbolMode::Runtime(runtime) => {
                             if runtime.file_path.as_os_str() == file_path.as_os_str() {
                                 valid_range.contain_bounds(&runtime.range)
                             } else {
                                 false // Skip call not in main file
                             }
                         }
-                        None => false, // Should not happen with local symbols
+                        _ => false, // Should not happen with local symbols
                     }
             })
             .map(|s| match &s.data {

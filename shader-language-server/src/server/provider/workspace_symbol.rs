@@ -1,4 +1,5 @@
 use lsp_types::{SymbolInformation, SymbolKind};
+use shader_sense::symbols::symbols::ShaderSymbolMode;
 use shader_sense::{shader_error::ShaderError, symbols::symbols::ShaderSymbolType};
 
 use crate::server::common::shader_range_to_location;
@@ -24,13 +25,15 @@ impl ServerLanguage {
                         (ty == ShaderSymbolType::Functions
                             || ty == ShaderSymbolType::Types
                             || ty == ShaderSymbolType::Macros)
-                            && match &symbol.runtime {
-                                Some(runtime) => runtime.scope_stack.is_empty(),
-                                None => false,
+                            && match &symbol.mode {
+                                ShaderSymbolMode::Runtime(runtime) => {
+                                    runtime.scope_stack.is_empty()
+                                }
+                                _ => false,
                             }
                     })
                     .map(|symbol| {
-                        let runtime = symbol.runtime.clone().unwrap();
+                        let runtime = symbol.mode.unwrap_runtime();
                         #[allow(deprecated)]
                         // https://github.com/rust-lang/rust/issues/102777
                         SymbolInformation {

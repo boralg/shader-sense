@@ -1,4 +1,7 @@
-use shader_sense::symbols::symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolList};
+use shader_sense::symbols::{
+    symbol_list::ShaderSymbolList,
+    symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolIntrinsic, ShaderSymbolMode},
+};
 
 use super::GlslIntrinsicParser;
 
@@ -7,11 +10,12 @@ impl GlslIntrinsicParser {
         fn new_glsl_keyword(label: &str, description: &str) -> ShaderSymbol {
             ShaderSymbol {
                 label: label.into(),
-                description: description.into(),
+                mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                    description.into(),
+                    Some("https://www.khronos.org/opengl/wiki/Type_Qualifier_(GLSL)".into()),
+                )),
                 requirement: None,
-                link: Some("https://www.khronos.org/opengl/wiki/Type_Qualifier_(GLSL)".into()),
                 data: ShaderSymbolData::Keyword {},
-                runtime: None,
             }
         }
         symbols

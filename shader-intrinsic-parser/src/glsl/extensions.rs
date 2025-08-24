@@ -1,5 +1,9 @@
-use shader_sense::symbols::symbols::{
-    GlslRequirementParameter, RequirementParameter, ShaderSymbol, ShaderSymbolList,
+use shader_sense::symbols::{
+    symbol_list::ShaderSymbolList,
+    symbols::{
+        GlslRequirementParameter, RequirementParameter, ShaderSymbol, ShaderSymbolIntrinsic,
+        ShaderSymbolMode,
+    },
 };
 
 use super::GlslIntrinsicParser;
@@ -12,14 +16,12 @@ impl GlslIntrinsicParser {
         #[allow(unreachable_code)]
         list.constants.push(ShaderSymbol {
             label: "gl_PrimitivePointIndicesEXT".into(),
-            description: todo!(),
+            mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(todo!(), Some(todo!()))),
             requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                 extension: Some("GLSL_EXT_mesh_shader".into()),
                 ..Default::default()
             })),
-            link: todo!(),
             data: todo!(),
-            runtime: None,
         });
         list
     }

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::position::ShaderRange;
 use crate::symbols::symbol_parser::ShaderSymbolListBuilder;
-use crate::symbols::symbols::{ShaderMember, ShaderSymbolRuntime};
+use crate::symbols::symbols::{ShaderMember, ShaderSymbolMode, ShaderSymbolRuntime};
 
 use crate::symbols::{
     symbol_parser::{get_name, SymbolTreeParser},
@@ -80,14 +80,12 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
                 let label: String = get_name(shader_content, w[1].node).into();
                 symbols.add_variable(ShaderSymbol {
                     label: label.clone(),
-                    description: "".into(),
                     requirement: None,
-                    link: None,
                     data: ShaderSymbolData::Variables {
                         ty: ty.clone(),
                         count: None,
                     },
-                    runtime: Some(ShaderSymbolRuntime::new(
+                    mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                         file_path.into(),
                         ShaderRange::from(w[1].node.range()),
                         None,
@@ -105,9 +103,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
             .collect::<Vec<ShaderParameter>>();
         symbols.add_function(ShaderSymbol {
             label: get_name(shader_content, matches.captures[1].node).into(),
-            description: "".into(),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::Functions {
                 signatures: vec![ShaderSignature {
                     returnType: get_name(shader_content, matches.captures[0].node).into(),
@@ -115,7 +111,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
                     parameters: parameters,
                 }],
             },
-            runtime: Some(ShaderSymbolRuntime::new(
+            mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                 file_path.into(),
                 range,
                 Some(scope_range),
@@ -197,7 +193,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
                         } else {
                             panic!("Invalid function type");
                         },
-                        range: f.runtime.as_ref().map(|r| r.range.clone()),
+                        range: f.mode.map_runtime().map(|r| r.range.clone()),
                     })
                     .collect::<Vec<ShaderMethod>>()
             })
@@ -240,7 +236,7 @@ impl SymbolTreeParser for HlslStructTreeParser {
                                 panic!("Invalid variable type");
                             },
                             description: "".into(),
-                            range: f.runtime.as_ref().map(|r| r.range.clone()),
+                            range: f.mode.map_runtime().map(|r| r.range.clone()),
                         },
                     })
                     .collect::<Vec<ShaderMember>>()
@@ -249,16 +245,14 @@ impl SymbolTreeParser for HlslStructTreeParser {
             .concat();
         symbols.add_type(ShaderSymbol {
             label: struct_name,
-            description: "".into(),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::Struct {
                 constructors: vec![], // No constructor in HLSL
                 members: members,
                 methods: methods,
             },
             // TODO: compute scope
-            runtime: Some(ShaderSymbolRuntime::new(
+            mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                 file_path.into(),
                 range,
                 None,
@@ -319,9 +313,7 @@ impl SymbolTreeParser for HlslVariableTreeParser {
         let scope_stack = self.compute_scope_stack(&scopes, &range);
         symbol_builder.add_variable(ShaderSymbol {
             label: get_name(shader_content, label_node).into(),
-            description: "".into(),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::Variables {
                 ty: get_name(shader_content, type_node).into(),
                 count: size_node.map(|s| match get_name(shader_content, s).parse::<u32>() {
@@ -329,7 +321,7 @@ impl SymbolTreeParser for HlslVariableTreeParser {
                     Err(_) => 0, // TODO: Need to resolve the parameter. Could use proxy tree same as for region conditions. For now, simply return zero.
                 }),
             },
-            runtime: Some(ShaderSymbolRuntime::new(
+            mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                 file_path.into(),
                 range,
                 None,
@@ -377,9 +369,7 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
         let label = get_name(shader_content, label_node).into();
         symbol_builder.add_call_expression(ShaderSymbol {
             label: label,
-            description: "".into(),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::CallExpression {
                 label: get_name(shader_content, label_node).into(),
                 range: range.clone(),
@@ -393,7 +383,7 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
                     .collect(),
             },
             // TODO: range should be range of whole expression.
-            runtime: Some(ShaderSymbolRuntime::new(
+            mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                 file_path.into(),
                 range,
                 None,
@@ -418,8 +408,8 @@ mod hlsl_parser_tests {
             symbol_list::ShaderSymbolList,
             symbol_parser::{ShaderSymbolListBuilder, SymbolTreeParser},
             symbols::{
-                ShaderMember, ShaderMethod, ShaderParameter, ShaderSignature, ShaderSymbol,
-                ShaderSymbolData,
+                ShaderMember, ShaderMethod, ShaderParameter, ShaderScope, ShaderSignature,
+                ShaderSymbol, ShaderSymbolData, ShaderSymbolMode, ShaderSymbolRuntime,
             },
         },
     };
@@ -453,11 +443,6 @@ mod hlsl_parser_tests {
     }
     fn compare(symbol_expected: &ShaderSymbol, symbol: &ShaderSymbol) {
         assert!(symbol_expected.label == symbol.label, "Invalid label");
-        assert!(
-            symbol_expected.description == symbol.description,
-            "Invalid description"
-        );
-        assert!(symbol_expected.link == symbol.link, "Invalid link");
         match (&symbol.data, &symbol_expected.data) {
             (
                 ShaderSymbolData::Types { constructors: c1 },
@@ -522,13 +507,42 @@ mod hlsl_parser_tests {
                     parameters: _p2,
                 },
             ) => todo!(),
-            (ShaderSymbolData::Link { target: t1 }, ShaderSymbolData::Link { target: t2 }) => {
+            (
+                ShaderSymbolData::Include { target: t1 },
+                ShaderSymbolData::Include { target: t2 },
+            ) => {
                 assert!(t1 == t2, "Mismatching link")
             }
             (ShaderSymbolData::Macro { value: v1 }, ShaderSymbolData::Macro { value: v2 }) => {
                 assert!(v1 == v2, "Mismatching macro")
             }
             _ => panic!("data mismatch"),
+        }
+        match (&symbol.mode, &symbol_expected.mode) {
+            (ShaderSymbolMode::Intrinsic(intrinsic0), ShaderSymbolMode::Intrinsic(intrinsic1)) => {
+                assert!(
+                    intrinsic0.description == intrinsic1.description,
+                    "Mismatching description"
+                );
+                assert!(intrinsic0.link == intrinsic1.link, "Mismatching link");
+            }
+            (ShaderSymbolMode::Runtime(runtime0), ShaderSymbolMode::Runtime(runtime1)) => {
+                assert!(
+                    runtime0.file_path == runtime1.file_path,
+                    "Mismatching file_path"
+                );
+                assert!(runtime0.range == runtime1.range, "Mismatching range");
+                assert!(runtime0.scope == runtime1.scope, "Mismatching scope");
+                assert!(
+                    runtime0.scope_stack == runtime1.scope_stack,
+                    "Mismatching scope_stack"
+                );
+            }
+            (
+                ShaderSymbolMode::RuntimeContext(_context0),
+                ShaderSymbolMode::RuntimeContext(_context1),
+            ) => {}
+            _ => panic!("mode mismatch"),
         }
     }
 
@@ -547,9 +561,7 @@ mod hlsl_parser_tests {
         compare(
             &ShaderSymbol {
                 label: "TestStruct".into(),
-                description: "".into(),
                 requirement: None,
-                link: None,
                 data: ShaderSymbolData::Struct {
                     constructors: vec![],
                     members: vec![
@@ -594,7 +606,12 @@ mod hlsl_parser_tests {
                         )),
                     }],
                 },
-                runtime: None, // assume global
+                mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
+                    path.into(),
+                    ShaderRange::new(ShaderPosition::new(1, 19), ShaderPosition::new(1, 29)),
+                    None,
+                    vec![],
+                )),
             },
             &result.types[0],
         );
@@ -611,9 +628,7 @@ mod hlsl_parser_tests {
         compare(
             &ShaderSymbol {
                 label: "function".into(),
-                description: "".into(),
                 requirement: None,
-                link: None,
                 data: ShaderSymbolData::Functions {
                     signatures: vec![ShaderSignature {
                         returnType: "void".into(),
@@ -642,7 +657,15 @@ mod hlsl_parser_tests {
                         ],
                     }],
                 },
-                runtime: None, // assume global
+                mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
+                    path.into(),
+                    ShaderRange::new(ShaderPosition::new(1, 17), ShaderPosition::new(1, 25)),
+                    Some(ShaderScope::new(
+                        ShaderPosition::new(1, 49),
+                        ShaderPosition::new(2, 13),
+                    )),
+                    vec![],
+                )),
             },
             &result.functions[0],
         );

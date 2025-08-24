@@ -2,6 +2,7 @@ use std::cell::RefCell;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, Position, Url};
 
+use shader_sense::symbols::symbols::ShaderSymbolMode;
 use shader_sense::{position::ShaderFilePosition, shader_error::ShaderError};
 
 use crate::server::common::shader_range_to_lsp_range;
@@ -38,13 +39,19 @@ impl ServerLanguage {
                 } else {
                     let symbol = &matching_symbols[0];
                     let label = symbol.format();
-                    let description = symbol.description.clone();
-                    let link = match &symbol.link {
-                        Some(link) => format!("[Online documentation]({})", link),
-                        None => "".into(),
+                    let (description, link) = match &symbol.mode {
+                        ShaderSymbolMode::Intrinsic(intrinsic) => {
+                            let description = intrinsic.description.clone();
+                            let link = match &intrinsic.link {
+                                Some(link) => format!("[Online documentation]({})", link),
+                                None => "".into(),
+                            };
+                            (description, link)
+                        }
+                        _ => ("".into(), "".into()),
                     };
-                    let location = match &symbol.runtime {
-                        Some(runtime) => format!(
+                    let location = match &symbol.mode {
+                        ShaderSymbolMode::Runtime(runtime) => format!(
                             "Defined in {}, line {}",
                             if runtime.file_path.as_os_str() == file_path.as_os_str() {
                                 "this file".into()
@@ -53,7 +60,7 @@ impl ServerLanguage {
                             },
                             runtime.range.start.line + 1
                         ),
-                        None => "".into(),
+                        _ => "".into(),
                     };
 
                     Ok(Some(Hover {

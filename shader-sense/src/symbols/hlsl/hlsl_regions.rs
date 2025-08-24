@@ -381,9 +381,9 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
             // TODO: avoid duplicated macros.
             defines
                 .iter()
-                .filter(|define| match define.get_range() {
-                    Some(range) => range.start >= *last_position && range.end <= *position,
-                    None => false, // Global define, already filled ?
+                .filter(|define| {
+                    let range = define.get_range();
+                    range.start >= *last_position && range.end <= *position
                 })
                 .cloned()
                 .collect::<Vec<ShaderPreprocessorDefine>>()
@@ -573,16 +573,12 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                                     is_active_region != 0,
                                 ));
                                 // Filter out local define & include in region as it may impact next region in file.
-                                preprocessor
-                                    .defines
-                                    .retain(|define| match &define.get_range() {
-                                        Some(range) => {
-                                            is_active_region != 0
-                                                || (is_active_region == 0
-                                                    && !region_range.contain_bounds(&range))
-                                        }
-                                        None => true,
-                                    });
+                                preprocessor.defines.retain(|define| {
+                                    let range = define.get_range();
+                                    is_active_region != 0
+                                        || (is_active_region == 0
+                                            && !region_range.contain_bounds(&range))
+                                });
                                 preprocessor.includes.retain(|include| {
                                     is_active_region != 0
                                         || (is_active_region == 0
@@ -635,15 +631,11 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
                     is_active_region != 0,
                 ));
                 // Filter out local define & include in region as it may impact next region in file.
-                preprocessor
-                    .defines
-                    .retain(|define| match &define.get_range() {
-                        Some(range) => {
-                            is_active_region != 0
-                                || (is_active_region == 0 && !region_range.contain_bounds(&range))
-                        }
-                        None => true,
-                    });
+                preprocessor.defines.retain(|define| {
+                    let range = define.get_range();
+                    is_active_region != 0
+                        || (is_active_region == 0 && !region_range.contain_bounds(&range))
+                });
                 preprocessor.includes.retain(|include| {
                     is_active_region != 0
                         || (is_active_region == 0
@@ -719,9 +711,9 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         let define_after_last_include = preprocessor
             .defines
             .iter()
-            .filter(|define| match &define.get_range() {
-                Some(range) => range.start > last_processed_position,
-                None => false, // Global, should already be added ?
+            .filter(|define| {
+                let range = define.get_range();
+                range.start > last_processed_position
             })
             .cloned()
             .collect::<Vec<ShaderPreprocessorDefine>>();

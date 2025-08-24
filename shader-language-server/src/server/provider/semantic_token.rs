@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 
 use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensResult, Url};
+use shader_sense::symbols::symbols::ShaderSymbolMode;
 use shader_sense::{
     position::ShaderPosition, shader_error::ShaderError, symbols::symbol_list::ShaderSymbolListRef,
     symbols::symbols::ShaderSymbolData,
@@ -22,8 +23,8 @@ impl ServerLanguage {
             .macros
             .iter()
             .map(|symbol| {
-                let byte_offset_start = match &symbol.runtime {
-                    Some(runtime) => {
+                let byte_offset_start = match &symbol.mode {
+                    ShaderSymbolMode::Runtime(runtime) => {
                         if runtime.file_path.as_os_str() == file_path.as_os_str() {
                             runtime.range.start.to_byte_offset(content).unwrap()
                         } else {
@@ -41,7 +42,7 @@ impl ServerLanguage {
                             }
                         }
                     }
-                    None => 0, // No range means its everywhere
+                    _ => 0, // Not runtime means no range means its everywhere
                 };
                 // Need to ignore comment aswell... Might need tree sitter instead.
                 // Looking for preproc_arg & identifier might be enough.
@@ -91,7 +92,7 @@ impl ServerLanguage {
             .map(|symbol| {
                 let mut tokens = Vec::new();
                 // If we own a scope and have a range.
-                if let Some(runtime) = &symbol.runtime {
+                if let ShaderSymbolMode::Runtime(runtime) = &symbol.mode {
                     if let Some(scope) = &runtime.scope {
                         if runtime.file_path.as_os_str() == file_path.as_os_str() {
                             let content_start = scope.start.to_byte_offset(&content).unwrap();

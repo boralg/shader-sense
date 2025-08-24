@@ -8,7 +8,7 @@ use shader_sense::{
     position::{ShaderFilePosition, ShaderPosition},
     shader::ShadingLanguage,
     shader_error::ShaderError,
-    symbols::symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolType},
+    symbols::symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolMode, ShaderSymbolType},
 };
 
 use crate::server::ServerLanguage;
@@ -110,8 +110,8 @@ impl ServerLanguage {
                                                 .iter()
                                                 .map(|m| {
                                                     m.as_symbol(
-                                                        ty.runtime
-                                                            .as_ref()
+                                                        ty.mode
+                                                            .map_runtime()
                                                             .map(|s| s.file_path.clone()),
                                                     )
                                                 })
@@ -122,8 +122,8 @@ impl ServerLanguage {
                                                 .iter()
                                                 .map(|m| {
                                                     m.as_symbol(
-                                                        ty.runtime
-                                                            .as_ref()
+                                                        ty.mode
+                                                            .map_runtime()
                                                             .map(|s| s.file_path.clone()),
                                                     )
                                                 })
@@ -180,8 +180,13 @@ fn convert_completion_item(
             unreachable!("Field should be filtered out.")
         }
     };
-    let doc_link = if let Some(link) = &shader_symbol.link {
-        if !link.is_empty() {
+    let doc_link = if let ShaderSymbolMode::Intrinsic(intrinsic) = &shader_symbol.mode {
+        if let Some(link) = &intrinsic.link {
+            debug_assert!(
+                !link.is_empty(),
+                "Link for {} is empty but not None.",
+                shader_symbol.label
+            );
             format!("\n[Online documentation]({})", link)
         } else {
             "".to_string()
@@ -208,7 +213,7 @@ fn convert_completion_item(
     } else {
         "".to_string()
     };
-    let position = if let Some(runtime) = &shader_symbol.runtime {
+    let position = if let ShaderSymbolMode::Runtime(runtime) = &shader_symbol.mode {
         format!(
             "{}:{}:{}",
             runtime
@@ -223,14 +228,16 @@ fn convert_completion_item(
         "".to_string()
     };
     let shading_language = shading_language.to_string();
-    let description = {
-        let mut description = shader_symbol.description.clone();
+    let description = if let ShaderSymbolMode::Intrinsic(intrinsic) = &shader_symbol.mode {
+        let mut description = intrinsic.description.clone();
         let max_len = 500;
         if description.len() > max_len {
             description.truncate(max_len);
             description.push_str("...");
         }
         description
+    } else {
+        "".into()
     };
 
     let signature = shader_symbol.format();

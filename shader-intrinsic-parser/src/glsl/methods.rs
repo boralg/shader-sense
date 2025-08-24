@@ -1,9 +1,12 @@
 use std::{borrow::Borrow, collections::HashMap};
 
 use regex::Regex;
-use shader_sense::symbols::symbols::{
-    GlslRequirementParameter, RequirementParameter, ShaderParameter, ShaderSignature, ShaderSymbol,
-    ShaderSymbolData, ShaderSymbolList,
+use shader_sense::symbols::{
+    symbol_list::ShaderSymbolList,
+    symbols::{
+        GlslRequirementParameter, RequirementParameter, ShaderParameter, ShaderSignature,
+        ShaderSymbol, ShaderSymbolData, ShaderSymbolIntrinsic, ShaderSymbolMode,
+    },
 };
 use xmltree::Element;
 
@@ -92,13 +95,14 @@ impl GlslIntrinsicParser {
                     // function
                     link_symbol.push(ShaderSymbol {
                         label: signature.0,
-                        description: "".to_string(),
+                        mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                            "".into(),
+                            Some(link.clone()),
+                        )),
                         requirement: None,
-                        link: Some(link.clone()),
                         data: ShaderSymbolData::Functions {
                             signatures: signature.1,
                         },
-                        runtime: None,
                     });
                 }
             } else {
@@ -165,14 +169,15 @@ impl GlslIntrinsicParser {
 
                 link_symbol.push(ShaderSymbol {
                     label: var_name.trim().into(),
-                    description: "".to_string(),
+                    mode: ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                        "".into(),
+                        Some(link.clone()),
+                    )),
                     requirement: None,
-                    link: Some(link.clone()),
                     data: ShaderSymbolData::Variables {
                         ty: ty.into(),
                         count: None,
                     },
-                    runtime: None,
                 });
             }
             let refsect = get_childs(&elements, "refsect1");
@@ -192,7 +197,11 @@ impl GlslIntrinsicParser {
                         });
                         // All symbols shares same description...
                         for symbol in &mut link_symbol {
-                            symbol.description = description.clone();
+                            if let ShaderSymbolMode::Intrinsic(intrinsic) = &mut symbol.mode {
+                                intrinsic.description = description.clone();
+                            } else {
+                                panic!("Trying to set description but not an intrinsic.")
+                            }
                         }
                     }
                     "versions" => {

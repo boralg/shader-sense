@@ -14,8 +14,9 @@ use shader_sense::{
     },
     shader_error::ShaderDiagnosticSeverity,
     symbols::{
-        shader_module_parser::ShaderModuleParser, symbol_provider::SymbolProvider,
-        symbols::ShaderSymbolType,
+        shader_module_parser::ShaderModuleParser,
+        symbol_provider::SymbolProvider,
+        symbols::{ShaderSymbolMode, ShaderSymbolType},
     },
     validator::validator::Validator,
 };
@@ -259,14 +260,14 @@ pub fn main() {
                         let symbol_list = symbols.get_all_symbols();
                         let mut found_some_symbols = false;
                         for symbol in symbol_list.iter() {
-                            let header = match &symbol.runtime {
-                                Some(runtime) => format!(
+                            let header = match &symbol.mode {
+                                ShaderSymbolMode::Runtime(runtime) => format!(
                                     "{}:{}:{}",
                                     runtime.file_path.file_name().unwrap().display(),
                                     runtime.range.start.line,
                                     runtime.range.start.pos
                                 ),
-                                None => symbol.format(),
+                                _ => symbol.format(),
                             };
                             let icon = match &symbol.get_type() {
                                 Some(ty) => {

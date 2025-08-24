@@ -1,4 +1,4 @@
-use shader_sense::symbols::symbols::ShaderSymbolList;
+use shader_sense::symbols::symbol_list::ShaderSymbolList;
 
 use crate::common::IntrinsicParser;
 

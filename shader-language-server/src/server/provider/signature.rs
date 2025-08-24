@@ -9,7 +9,7 @@ use regex::Regex;
 use shader_sense::{
     position::{ShaderFilePosition, ShaderFileRange, ShaderPosition},
     shader_error::ShaderError,
-    symbols::symbols::ShaderSymbolData,
+    symbols::symbols::{ShaderSymbolData, ShaderSymbolMode},
 };
 
 use crate::server::ServerLanguage;
@@ -88,7 +88,14 @@ impl ServerLanguage {
                                             lsp_types::Documentation::MarkupContent(
                                                 MarkupContent {
                                                     kind: lsp_types::MarkupKind::Markdown,
-                                                    value: shader_symbol.description.clone(),
+                                                    value: if let ShaderSymbolMode::Intrinsic(
+                                                        intrinsic,
+                                                    ) = &shader_symbol.mode
+                                                    {
+                                                        intrinsic.description.clone()
+                                                    } else {
+                                                        "".into()
+                                                    },
                                                 },
                                             ),
                                         ),

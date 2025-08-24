@@ -3,7 +3,7 @@ use std::path::Path;
 use crate::position::ShaderRange;
 use crate::symbols::symbol_parser::ShaderSymbolListBuilder;
 
-use crate::symbols::symbols::{ShaderMember, ShaderSymbolRuntime};
+use crate::symbols::symbols::{ShaderMember, ShaderSymbolMode, ShaderSymbolRuntime};
 use crate::symbols::{
     symbol_parser::{get_name, SymbolTreeParser},
     symbols::{ShaderParameter, ShaderScope, ShaderSignature, ShaderSymbol, ShaderSymbolData},
@@ -68,9 +68,7 @@ impl SymbolTreeParser for GlslFunctionTreeParser {
         );
         symbols.add_function(ShaderSymbol {
             label: get_name(shader_content, matches.captures[1].node).into(),
-            description: "".into(),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::Functions {
                 signatures: vec![ShaderSignature {
                     returnType: get_name(shader_content, matches.captures[0].node).into(),
@@ -87,7 +85,7 @@ impl SymbolTreeParser for GlslFunctionTreeParser {
                         .collect::<Vec<ShaderParameter>>(),
                 }],
             },
-            runtime: Some(ShaderSymbolRuntime::new(
+            mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                 file_path.into(),
                 range,
                 Some(ShaderRange::from(scope_node.range())),
@@ -129,9 +127,7 @@ impl SymbolTreeParser for GlslUniformBlock {
             let uniform_block_name: String = get_name(shader_content, identifier_node).into();
             symbols.add_type(ShaderSymbol {
                 label: uniform_block_name.clone(),
-                description: "".into(),
                 requirement: None,
-                link: None,
                 data: ShaderSymbolData::Struct {
                     constructors: vec![], // No constructor for uniform.
                     members: matches.captures[1..capture_count - 1]
@@ -150,7 +146,7 @@ impl SymbolTreeParser for GlslUniformBlock {
                     methods: vec![],
                 },
                 // Uniform are global stack in GLSL.
-                runtime: Some(ShaderSymbolRuntime::new(
+                mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                     file_path.into(),
                     identifier_range,
                     None,
@@ -162,15 +158,13 @@ impl SymbolTreeParser for GlslUniformBlock {
             let variable_range = ShaderRange::from(variable_node.range());
             symbols.add_variable(ShaderSymbol {
                 label: get_name(shader_content, variable_node).into(),
-                description: "".into(),
                 requirement: None,
-                link: None,
                 data: ShaderSymbolData::Variables {
                     ty: get_name(shader_content, identifier_node).into(),
                     count: None,
                 },
                 // Uniform are global stack in GLSL.
-                runtime: Some(ShaderSymbolRuntime::new(
+                mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                     file_path.into(),
                     variable_range,
                     None,
@@ -185,15 +179,13 @@ impl SymbolTreeParser for GlslUniformBlock {
                 let range = ShaderRange::from(label_node.range());
                 symbols.add_variable(ShaderSymbol {
                     label: get_name(shader_content, uniform_value[1].node).into(),
-                    description: "".into(),
                     requirement: None,
-                    link: None,
                     data: ShaderSymbolData::Variables {
                         ty: get_name(shader_content, uniform_value[0].node).into(),
                         count: None,
                     },
                     // Uniform are global stack in GLSL.
-                    runtime: Some(ShaderSymbolRuntime::new(
+                    mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                         file_path.into(),
                         range,
                         None,
@@ -244,9 +236,7 @@ impl SymbolTreeParser for GlslStructTreeParser {
             .collect::<Vec<ShaderParameter>>();
         symbols.add_type(ShaderSymbol {
             label: label.clone(),
-            description: "".into(),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::Struct {
                 // In Glsl, constructor are auto built from all their members.
                 constructors: vec![ShaderSignature {
@@ -264,7 +254,7 @@ impl SymbolTreeParser for GlslStructTreeParser {
                 methods: vec![],
             },
             // TODO: compute scope
-            runtime: Some(ShaderSymbolRuntime::new(
+            mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                 file_path.into(),
                 range,
                 None,
@@ -308,14 +298,12 @@ impl SymbolTreeParser for GlslVariableTreeParser {
         //let _value = get_name(shader_content, matche.captures[2].node);
         symbols.add_variable(ShaderSymbol {
             label: get_name(shader_content, matches.captures[1].node).into(),
-            description: "".into(),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::Variables {
                 ty: get_name(shader_content, matches.captures[0].node).into(),
                 count: None,
             },
-            runtime: Some(ShaderSymbolRuntime::new(
+            mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                 file_path.into(),
                 range,
                 None,
@@ -361,9 +349,7 @@ impl SymbolTreeParser for GlslCallExpressionTreeParser {
         let label = get_name(shader_content, label_node).into();
         symbol_builder.add_call_expression(ShaderSymbol {
             label: label,
-            description: "".into(),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::CallExpression {
                 label: get_name(shader_content, label_node).into(),
                 range: range.clone(),
@@ -377,7 +363,7 @@ impl SymbolTreeParser for GlslCallExpressionTreeParser {
                     .collect(),
             },
             // TODO: range should be range of whole expression.
-            runtime: Some(ShaderSymbolRuntime::new(
+            mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
                 file_path.into(),
                 range,
                 None,

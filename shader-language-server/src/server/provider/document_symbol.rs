@@ -1,7 +1,7 @@
 use lsp_types::{DocumentSymbol, SymbolKind, Url};
 use shader_sense::{
     shader_error::ShaderError,
-    symbols::symbols::{ShaderScope, ShaderSymbolType},
+    symbols::symbols::{ShaderScope, ShaderSymbolMode, ShaderSymbolType},
 };
 
 use crate::server::common::shader_range_to_location;
@@ -22,10 +22,13 @@ impl ServerLanguage {
                 // Dont publish keywords & transient.
                 !symbol.is_type(ShaderSymbolType::Keyword)
                     && !symbol.is_transient()
-                    && symbol.runtime.is_some()
+                    && match &symbol.mode {
+                        ShaderSymbolMode::Runtime(_) => true,
+                        _ => false,
+                    }
             })
             .map(|symbol| {
-                let label_runtime = symbol.runtime.clone().expect("Should be filtered out");
+                let label_runtime = symbol.mode.unwrap_runtime();
                 // Content expected to englobe label.
                 let content_range = match &label_runtime.scope {
                     Some(scope) => ShaderScope::join(scope.clone(), label_runtime.range.clone()),
@@ -56,6 +59,7 @@ impl ServerLanguage {
                     selection_range: shader_range_to_location(
                         &label_runtime
                             .range
+                            .clone()
                             .into_file(label_runtime.file_path.clone()),
                     )
                     .range,

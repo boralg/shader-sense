@@ -78,22 +78,23 @@ impl ShaderMember {
     pub fn as_symbol(&self, file_path: Option<PathBuf>) -> ShaderSymbol {
         ShaderSymbol {
             label: self.parameters.label.clone(),
-            description: self.parameters.description.clone(),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::Parameter {
                 context: self.context.clone(),
                 ty: self.parameters.ty.clone(),
                 count: self.parameters.count.clone(),
             },
-            runtime: match file_path {
+            mode: match file_path {
                 // We assume it as range if it has path.
-                // TODO: This should not be a global.
-                Some(file_path) => Some(ShaderSymbolRuntime::global(
+                // TODO: This should not be a global. Should use symbol directly in fact...
+                Some(file_path) => ShaderSymbolMode::Runtime(ShaderSymbolRuntime::global(
                     file_path,
                     self.parameters.range.clone().unwrap(),
                 )),
-                None => None,
+                None => ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                    self.parameters.description.clone(),
+                    None,
+                )),
             },
         }
     }
@@ -103,19 +104,22 @@ impl ShaderMethod {
     pub fn as_symbol(&self, file_path: Option<PathBuf>) -> ShaderSymbol {
         ShaderSymbol {
             label: self.label.clone(),
-            description: self.signature.description.clone(),
             requirement: None,
-            link: None,
             data: ShaderSymbolData::Method {
                 context: self.context.clone(),
                 signatures: vec![self.signature.clone()],
             },
-            runtime: match file_path {
-                Some(file_path) => Some(ShaderSymbolRuntime::global(
+            mode: match file_path {
+                // We assume it as range if it has path.
+                // TODO: This should not be a global. Should use symbol directly in fact...
+                Some(file_path) => ShaderSymbolMode::Runtime(ShaderSymbolRuntime::global(
                     file_path,
                     self.range.clone().unwrap(),
                 )),
-                None => None,
+                None => ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                    self.signature.description.clone(),
+                    None,
+                )),
             },
         }
     }
@@ -312,18 +316,92 @@ impl ShaderSymbolRuntime {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ShaderSymbolRuntimeContext {}
+
+impl ShaderSymbolRuntimeContext {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[allow(non_snake_case)] // for JSON
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub struct ShaderSymbolIntrinsic {
+    pub description: String,  // Description of the item
+    pub link: Option<String>, // Link to some external documentation
+}
+
+impl ShaderSymbolIntrinsic {
+    pub fn new(description: String, link: Option<String>) -> Self {
+        Self { description, link }
+    }
+}
+
+#[allow(non_snake_case)] // for JSON
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum ShaderSymbolMode {
+    Intrinsic(ShaderSymbolIntrinsic),
+    // We do not want to serialize runtime info.
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    Runtime(ShaderSymbolRuntime),
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    RuntimeContext(ShaderSymbolRuntimeContext),
+}
+impl ShaderSymbolMode {
+    pub fn map_intrinsic(&self) -> Option<&ShaderSymbolIntrinsic> {
+        if let ShaderSymbolMode::Intrinsic(intrinsic) = &self {
+            Some(intrinsic)
+        } else {
+            None
+        }
+    }
+    pub fn map_runtime(&self) -> Option<&ShaderSymbolRuntime> {
+        if let ShaderSymbolMode::Runtime(runtime) = &self {
+            Some(runtime)
+        } else {
+            None
+        }
+    }
+    pub fn map_runtime_context(&self) -> Option<&ShaderSymbolRuntimeContext> {
+        if let ShaderSymbolMode::RuntimeContext(runtime) = &self {
+            Some(runtime)
+        } else {
+            None
+        }
+    }
+    pub fn unwrap_intrinsic(&self) -> &ShaderSymbolIntrinsic {
+        if let ShaderSymbolMode::Intrinsic(intrinsic) = &self {
+            intrinsic
+        } else {
+            panic!("Trying to unwrap as intrinsic but type is not.");
+        }
+    }
+    pub fn unwrap_runtime_context(&self) -> &ShaderSymbolRuntimeContext {
+        if let ShaderSymbolMode::RuntimeContext(runtime) = &self {
+            runtime
+        } else {
+            panic!("Trying to unwrap as runtime context but type is not.");
+        }
+    }
+    pub fn unwrap_runtime(&self) -> &ShaderSymbolRuntime {
+        if let ShaderSymbolMode::Runtime(runtime) = &self {
+            runtime
+        } else {
+            panic!("Trying to unwrap as runtime but type is not.");
+        }
+    }
+}
+
 #[allow(non_snake_case)] // for JSON
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShaderSymbol {
-    pub label: String, // Label for the item
-    // TODO:OPTIM: description & link are only used by intrinsics and should not take all memory.
-    pub description: String,                       // Description of the item
-    pub link: Option<String>,                      // Link to some external documentation
+    pub label: String,                             // Label for the item
     pub requirement: Option<RequirementParameter>, // Used for filtering symbols.
     pub data: ShaderSymbolData,                    // Data for the variable
-
-    #[serde(skip)] // Runtime info. No serialization.
-    pub runtime: Option<ShaderSymbolRuntime>,
+    pub mode: ShaderSymbolMode,                    // Data for runtime or intrinsic.
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
