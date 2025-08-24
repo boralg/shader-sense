@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     include::IncludeHandler,
-    position::{ShaderFilePosition, ShaderFileRange, ShaderRange},
+    position::{ShaderFileRange, ShaderRange},
     shader::ShaderContextParams,
     shader_error::ShaderDiagnostic,
     symbols::{
@@ -236,8 +236,8 @@ impl ShaderPreprocessorInclude {
             symbol: ShaderSymbol {
                 label: relative_path,
                 requirement: None,
-                data: ShaderSymbolData::Link {
-                    target: ShaderFilePosition::new(absolute_path, 0, 0),
+                data: ShaderSymbolData::Include {
+                    target: absolute_path,
                 },
                 mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::global(
                     range.file_path,
@@ -258,7 +258,7 @@ impl ShaderPreprocessorInclude {
     }
     pub fn get_absolute_path(&self) -> &Path {
         match &self.symbol.data {
-            ShaderSymbolData::Link { target } => &target.file_path,
+            ShaderSymbolData::Include { target } => &target,
             _ => panic!("Expected ShaderSymbolData::Link"),
         }
     }

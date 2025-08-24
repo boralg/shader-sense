@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    position::{ShaderFilePosition, ShaderRange},
+    position::ShaderRange,
     shader::{HlslShaderModel, HlslVersion, ShaderCompilationParams, ShaderStage},
 };
 
@@ -166,8 +166,8 @@ pub enum ShaderSymbolData {
         parameters: Vec<(String, ShaderRange)>,
     },
     #[serde(skip)] // This is runtime only. No serialization.
-    Link {
-        target: ShaderFilePosition,
+    Include {
+        target: PathBuf,
     },
     Macro {
         value: String,
@@ -469,7 +469,7 @@ impl ShaderSymbol {
             } => Some(ShaderSymbolType::CallExpression),
             ShaderSymbolData::Functions { signatures: _ } => Some(ShaderSymbolType::Functions),
             ShaderSymbolData::Keyword {} => Some(ShaderSymbolType::Keyword),
-            ShaderSymbolData::Link { target: _ } => Some(ShaderSymbolType::Include),
+            ShaderSymbolData::Include { target: _ } => Some(ShaderSymbolType::Include),
             ShaderSymbolData::Macro { value: _ } => Some(ShaderSymbolType::Macros),
         }
     }
@@ -513,15 +513,8 @@ impl ShaderSymbol {
             ),
             ShaderSymbolData::Functions { signatures } => signatures[0].format(&self.label), // TODO: append +1 symbol
             ShaderSymbolData::Keyword {} => format!("{}", self.label.clone()),
-            ShaderSymbolData::Link { target } => {
-                if target.position.line == target.position.pos && target.position.line == 0 {
-                    format!("#include \"{}\"", self.label) // No need to display it as we are at start of file.
-                } else {
-                    format!(
-                        "#include \"{}\" at {}:{}",
-                        self.label, target.position.line, target.position.pos
-                    )
-                }
+            ShaderSymbolData::Include { target: _ } => {
+                format!("#include \"{}\"", self.label)
             }
             ShaderSymbolData::Macro { value } => {
                 format!("#define {} {}", self.label, value)

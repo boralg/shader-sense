@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, Position, Url};
 
-use shader_sense::symbols::symbols::ShaderSymbolMode;
+use shader_sense::symbols::symbols::{ShaderSymbolData, ShaderSymbolMode};
 use shader_sense::{position::ShaderFilePosition, shader_error::ShaderError};
 
 use crate::server::common::shader_range_to_lsp_range;
@@ -48,7 +48,35 @@ impl ServerLanguage {
                             };
                             (description, link)
                         }
-                        _ => ("".into(), "".into()),
+                        ShaderSymbolMode::RuntimeContext(_) => match &symbol.data {
+                            ShaderSymbolData::Macro { value } => {
+                                let description = if !value.is_empty() {
+                                    format!(
+                                        "Preprocessor macro. Expanding to \n```\n{}\n```",
+                                        value
+                                    )
+                                } else {
+                                    format!("Preprocessor macro.")
+                                };
+                                (description, "".into())
+                            }
+                            _ => ("".into(), "".into()),
+                        },
+                        ShaderSymbolMode::Runtime(_) => match &symbol.data {
+                            ShaderSymbolData::Include { target } => {
+                                let description = format!("Including file {}", target.display());
+                                (description, "".into())
+                            }
+                            ShaderSymbolData::Macro { value } => {
+                                let description = if !value.is_empty() {
+                                    format!("Config macro. Expanding to \n```\n{}\n```", value)
+                                } else {
+                                    format!("Config macro.")
+                                };
+                                (description, "".into())
+                            }
+                            _ => ("".into(), "".into()),
+                        },
                     };
                     let location = match &symbol.mode {
                         ShaderSymbolMode::Runtime(runtime) => format!(
@@ -67,7 +95,7 @@ impl ServerLanguage {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: lsp_types::MarkupKind::Markdown,
                             value: format!(
-                                "```{}\n{}\n```\n{}{}\n{}\n\n{}",
+                                "```{}\n{}\n```\n{}{}\n\n{}\n\n{}",
                                 cached_file.shading_language.to_string(),
                                 label,
                                 if matching_symbols.len() > 1 {

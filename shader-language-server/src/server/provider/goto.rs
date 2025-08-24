@@ -40,7 +40,7 @@ impl ServerLanguage {
                     matching_symbols
                         .iter()
                         .filter_map(|symbol| {
-                            if let ShaderSymbolData::Link { target } = &symbol.data {
+                            if let ShaderSymbolData::Include { target } = &symbol.data {
                                 match &symbol.mode {
                                     // _runtime.range here should be equal to selected_range.
                                     ShaderSymbolMode::Runtime(_runtime) => {
@@ -48,19 +48,12 @@ impl ServerLanguage {
                                             origin_selection_range: Some(
                                                 shader_range_to_lsp_range(&word.get_range()),
                                             ),
-                                            target_uri: Url::from_file_path(&target.file_path)
-                                                .unwrap(),
+                                            target_uri: Url::from_file_path(&target).unwrap(),
                                             target_range: shader_range_to_lsp_range(
-                                                &ShaderRange::new(
-                                                    target.position.clone(),
-                                                    target.position.clone(),
-                                                ),
+                                                &ShaderRange::zero(),
                                             ),
                                             target_selection_range: shader_range_to_lsp_range(
-                                                &ShaderRange::new(
-                                                    target.position.clone(),
-                                                    target.position.clone(),
-                                                ),
+                                                &ShaderRange::zero(),
                                             ),
                                         })
                                     }
