@@ -21,8 +21,8 @@ use crossbeam_channel::RecvTimeoutError;
 use debug::{DumpAstRequest, DumpDependencyRequest};
 use log::{debug, error, info, warn};
 use lsp_types::notification::{
-    DidChangeConfiguration, DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument,
-    DidSaveTextDocument, Notification, Progress,
+    Cancel, DidChangeConfiguration, DidChangeTextDocument, DidCloseTextDocument,
+    DidOpenTextDocument, DidSaveTextDocument, Notification, Progress,
 };
 use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, FoldingRangeRequest, Formatting,
@@ -31,13 +31,13 @@ use lsp_types::request::{
     WorkspaceSymbolRequest,
 };
 use lsp_types::{
-    CompletionOptionsCompletionItem, CompletionResponse, DidChangeConfigurationParams,
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, DocumentSymbolOptions, DocumentSymbolResponse,
-    FoldingRangeProviderCapability, HoverProviderCapability, OneOf, ProgressParams,
-    SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncKind, Url, WorkDoneProgress, WorkDoneProgressBegin,
+    CancelParams, CompletionOptionsCompletionItem, CompletionResponse,
+    DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentSymbolOptions,
+    DocumentSymbolResponse, FoldingRangeProviderCapability, HoverProviderCapability, OneOf,
+    ProgressParams, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
+    SignatureHelpOptions, TextDocumentSyncKind, Url, WorkDoneProgress, WorkDoneProgressBegin,
     WorkDoneProgressCreateParams, WorkDoneProgressEnd, WorkDoneProgressOptions,
     WorkDoneProgressReport, WorkspaceSymbolOptions, WorkspaceSymbolResponse,
 };
@@ -196,6 +196,20 @@ impl ServerLanguage {
     }
     fn resolve_async_request(&mut self, request: AsyncMessage) -> Result<(), ShaderError> {
         // TODO:ASYNC: Discard all messages which version is too old.
+        // Check file of request was not already removed.
+        match request.get_uri() {
+            Some(uri) => {
+                if let Some(cached_file) = self.watched_files.files.get(uri) {
+                    if !cached_file.is_cachable_file() {
+                        return Err(ShaderError::FileNotWatched(uri.to_file_path().unwrap()));
+                    }
+                } else {
+                    return Err(ShaderError::FileNotWatched(uri.to_file_path().unwrap()));
+                }
+            }
+            None => {} // workspace request or such.
+        }
+
         // For variant, we handle requesting items again on client side, so it does not change version.
         match request {
             AsyncMessage::None | AsyncMessage::UpdateCache(_) => {
@@ -402,7 +416,8 @@ impl ServerLanguage {
                     async_request.params.text_document.uri,
                     self.debug(&async_request.params)
                 );
-                let cached_file = self.get_main_file(&async_request.params.text_document.uri)?;
+                let cached_file =
+                    self.get_cachable_file(&async_request.params.text_document.uri)?;
                 let deps_tree = cached_file
                     .data
                     .as_ref()
@@ -427,7 +442,8 @@ impl ServerLanguage {
                     async_request.params.text_document.uri,
                     self.debug(&async_request.params)
                 );
-                let cached_file = self.get_main_file(&async_request.params.text_document.uri)?;
+                let cached_file =
+                    self.get_cachable_file(&async_request.params.text_document.uri)?;
                 let ast = RefCell::borrow(&cached_file.shader_module).dump_ast();
                 self.connection
                     .send_response::<DumpAstRequest>(async_request.req_id.clone(), Some(ast));
@@ -579,14 +595,56 @@ impl ServerLanguage {
                             if async_request_queue.len() > 0 {
                                 profile_scope!("Solving {} request", async_request_queue.len());
                                 for request in async_request_queue {
+                                    fn request_id_to_i32(
+                                        request_id: &lsp_server::RequestId,
+                                    ) -> Option<i32> {
+                                        // RequestId does not implement anything to get this other than display which use fmt for string...
+                                        // So remove string delimiter from display result.
+                                        let req_id_as_string = request_id.to_string();
+                                        let (offset_start, offset_end) = if req_id_as_string
+                                            .starts_with("\"")
+                                            && req_id_as_string.ends_with("\"")
+                                        {
+                                            (1, req_id_as_string.len() - 1)
+                                        } else if req_id_as_string.starts_with("\"") {
+                                            (1, req_id_as_string.len()) // Weird...
+                                        } else if req_id_as_string.ends_with("\"") {
+                                            (0, req_id_as_string.len() - 1) // Weird...
+                                        } else {
+                                            (0, req_id_as_string.len())
+                                        };
+                                        req_id_as_string[offset_start..offset_end]
+                                            .parse::<i32>()
+                                            .ok()
+                                    }
                                     let req_id = request.get_request_id().clone();
                                     match self.resolve_async_request(request) {
                                         Ok(_) => {}
-                                        Err(err) => self.connection.send_response_error(
-                                            req_id,
-                                            shader_error_to_lsp_error(&err),
-                                            err.to_string(),
-                                        ),
+                                        Err(err) => {
+                                            match err {
+                                                ShaderError::FileNotWatched(_) => {
+                                                    if let Some(req_id_i32) =
+                                                        request_id_to_i32(&req_id)
+                                                    {
+                                                        info!("Cancelling request {}", req_id);
+                                                        self.connection.send_notification::<Cancel>(CancelParams {
+                                                            id: lsp_types::NumberOrString::Number(req_id_i32),
+                                                        })
+                                                    } else {
+                                                        self.connection.send_response_error(
+                                                            req_id,
+                                                            shader_error_to_lsp_error(&err),
+                                                            err.to_string(),
+                                                        )
+                                                    }
+                                                }
+                                                _ => self.connection.send_response_error(
+                                                    req_id,
+                                                    shader_error_to_lsp_error(&err),
+                                                    err.to_string(),
+                                                ),
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -608,12 +666,16 @@ impl ServerLanguage {
             "{}".into()
         }
     }
-    fn get_main_file(&self, uri: &Url) -> Result<&ServerFileCache, ShaderError> {
+    fn get_cachable_file(&self, uri: &Url) -> Result<&ServerFileCache, ShaderError> {
         let main_file = self
             .watched_files
             .get_file(&uri)
             .ok_or(ShaderError::FileNotWatched(uri.to_file_path().unwrap()))?;
-        debug_assert!(main_file.is_main_file(), "File {} is not a main file.", uri);
+        debug_assert!(
+            main_file.is_cachable_file(),
+            "File {} is not a cachable file.",
+            uri
+        );
         Ok(main_file)
     }
     fn on_request(&mut self, req: lsp_server::Request) -> Result<AsyncMessage, ShaderError> {
@@ -751,7 +813,7 @@ impl ServerLanguage {
                     self.debug(&params)
                 );
                 // File content is updated through DidChangeTextDocument.
-                let cached_file = self.get_main_file(&uri)?;
+                let cached_file = self.get_cachable_file(&uri)?;
 
                 assert!(
                     params.text.is_none()
@@ -806,7 +868,7 @@ impl ServerLanguage {
                     uri,
                     self.debug(&params)
                 );
-                let cached_file = self.get_main_file(&uri)?;
+                let cached_file = self.get_cachable_file(&uri)?;
                 let shading_language = cached_file.shading_language;
                 let language_data = self.language_data.get_mut(&shading_language).unwrap();
                 // Update all content before caching data.

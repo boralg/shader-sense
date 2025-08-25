@@ -20,7 +20,7 @@ impl ServerLanguage {
         position: Position,
         trigger_character: Option<String>,
     ) -> Result<Vec<CompletionItem>, ShaderError> {
-        let cached_file = self.get_main_file(&uri)?;
+        let cached_file = self.get_cachable_file(&uri)?;
         let language_data = self
             .language_data
             .get(&cached_file.shading_language)

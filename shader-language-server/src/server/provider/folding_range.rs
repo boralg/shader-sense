@@ -7,7 +7,7 @@ use crate::server::ServerLanguage;
 
 impl ServerLanguage {
     pub fn recolt_folding_range(&mut self, uri: &Url) -> Result<Vec<FoldingRange>, ShaderError> {
-        let cached_file = self.get_main_file(&uri)?;
+        let cached_file = self.get_cachable_file(&uri)?;
         // Adding regions
         let mut folding_ranges: Vec<FoldingRange> = cached_file
             .data

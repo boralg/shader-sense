@@ -12,7 +12,7 @@ impl ServerLanguage {
         &mut self,
         uri: &Url,
     ) -> Result<Vec<DocumentSymbol>, ShaderError> {
-        let cached_file = self.get_main_file(&uri)?;
+        let cached_file = self.get_cachable_file(&uri)?;
         let symbols = cached_file
             .get_data()
             .symbol_cache

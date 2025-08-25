@@ -14,7 +14,7 @@ impl ServerLanguage {
         uri: &Url,
         position: Position,
     ) -> Result<Option<Hover>, ShaderError> {
-        let cached_file = self.get_main_file(&uri)?;
+        let cached_file = self.get_cachable_file(&uri)?;
         let file_path = uri.to_file_path().unwrap();
         let shader_position = ShaderFilePosition::new(
             file_path.clone(),

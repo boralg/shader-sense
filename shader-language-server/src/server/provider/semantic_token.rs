@@ -172,7 +172,7 @@ impl ServerLanguage {
         &mut self,
         uri: &Url,
     ) -> Result<SemanticTokensResult, ShaderError> {
-        let cached_file = self.get_main_file(&uri)?;
+        let cached_file = self.get_cachable_file(&uri)?;
         // For now, only handle macros as we cant resolve them with textmate.
         let symbols = self.watched_files.get_all_symbols(&uri);
         // Find occurences of tokens to paint

@@ -15,7 +15,7 @@ impl ServerLanguage {
         lsp_range: &Range,
     ) -> Result<Vec<InlayHint>, ShaderError> {
         // Ensure main file.
-        let _cached_file = self.get_main_file(&uri)?;
+        let _cached_file = self.get_cachable_file(&uri)?;
         // Get all symbols
         let symbols = self.watched_files.get_all_symbols(uri);
         let file_path = uri.to_file_path().unwrap();

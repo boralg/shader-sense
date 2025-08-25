@@ -99,7 +99,7 @@ impl ServerLanguage {
         &mut self,
         uri: &Url,
     ) -> Result<HashMap<Url, Vec<Diagnostic>>, ShaderError> {
-        let cached_file = self.get_main_file(&uri)?;
+        let cached_file = self.get_cachable_file(&uri)?;
         let data = cached_file.get_data();
         // Diagnostic for included file stored in main cache.
         let mut diagnostics: HashMap<Url, Vec<Diagnostic>> = HashMap::new();
