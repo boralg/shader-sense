@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
+## [1.0.0] - 2025-08-25
+
+This new version features a lot of changes that should drastically improve performances on huge shader codebase, memory usage and behaviour of variant & updates. There was also some redesign with the architecture to handle this and make the API more friendly to use.
+
+### Fixed
+
+- Fixed an issue where regions were not displayed when diagnostics were disabled.
+- Fixed an issue with file using variant context missing some symbols behind include guards.
+- Fixed and improved the way symbols caching are handled.
+- Fixed a warning when hovering a field return by a method. 
+- Fixed an issue whith HLSL database where its missing some parameters in Texture objects.
+- Fixed an issue with include handler pushing include from inactive region on stack, which could end up including file from a wrong folder.
+- Fixed intrinsics depending on requirements that were ignored.
+- Fixed some missing diagnostics clear when files are closed.
+- Fixed some dependency files not being cleared from memory when main file was closed.
+- Fixed an issue with updating a variant dependency that would cause it to clear inactive regions.
+- Fixed diagnostic not being cleared when passing from error state to non error state.
+- Fixed an issue where a variant file not opened prevent using the feature.
+ 
+### Changed
+
+- There can be only **one** variant at a time to avoid file randomly picking a variant.
+- ValidationParams & SymbolParams have been merged into a single struct ShaderParams.
+- Update messages are now handled asynchronously, which avoid messages from getting queued when caching take a lot of time. This can increase server speed drastically in huge codebase.
+- Reporting cache update through progress report notification.
+- Validator is now behind a solid struct instead of a trait.
+- Main functions are now sharing common entry point for uniformity.
+- Reduced memory usage of the server.
+- Changed API entry point.
+- Clean code, moved files & renaming
+
+### Added
+
+- Added Dxc builtins macros to symbols.
+- Added advanced symbols filterings for intrinsics. Extensions should be now easy to add for GLSL in an upcoming release.
+- Added test for each shader stage.
+- Added check for which shader stage is supported in Validator
+- Added command line argument for shader-language-server to pass configuration on startup.
+
 ## [0.8.2] - 2025-08-03
 
 ### Fixed
@@ -305,8 +344,9 @@ Initial release of this extension
 
 
 <!-- Below are link for above changelog titles-->
-[unreleased]: https://github.com/antaalt/shader-sense/compare/v0.8.2...HEAD
-[0.8.1]: https://github.com/antaalt/shader-sense/compare/v0.8.1...v0.8.2
+[unreleased]: https://github.com/antaalt/shader-sense/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/antaalt/shader-sense/compare/v0.8.2...v1.0.0
+[0.8.2]: https://github.com/antaalt/shader-sense/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/antaalt/shader-sense/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/antaalt/shader-sense/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/antaalt/shader-sense/compare/v0.6.1...v0.7.0
