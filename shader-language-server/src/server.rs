@@ -4,7 +4,6 @@ use std::fmt::Debug;
 use std::str::FromStr;
 use std::time::Duration;
 
-// TODO:ASYNC: move provider to specific folder and file updater in another one.
 mod async_message;
 mod common;
 mod debug;
@@ -195,7 +194,7 @@ impl ServerLanguage {
         return Ok(());
     }
     fn resolve_async_request(&mut self, request: AsyncMessage) -> Result<(), ShaderError> {
-        // TODO:ASYNC: Discard all messages which version is too old.
+        // TODO: Discard all messages which version is too old.
         // Check file of request was not already removed.
         match request.get_uri() {
             Some(uri) => {
@@ -552,7 +551,7 @@ impl ServerLanguage {
                                                         WorkDoneProgressReport {
                                                             cancellable: Some(false),
                                                             message: Some(format!(
-                                                                "{}/{} {} ",
+                                                                "{}/{} {}",
                                                                 progress, total, file_updating
                                                             )),
                                                             percentage: Some(
@@ -649,8 +648,6 @@ impl ServerLanguage {
                                 }
                             }
                         }
-                        // TODO:ASYNC: should have condvar & co instead to restart queue ideally
-                        std::thread::sleep(std::time::Duration::from_millis(100));
                     }
                     RecvTimeoutError::Disconnected => {
                         return Ok(());
@@ -913,17 +910,19 @@ impl ServerLanguage {
                 );
                 if new_variant != self.watched_files.variant {
                     let updated_url = if let Some(new_variant) = &new_variant {
-                        let language_data =
-                            self.language_data.get_mut(&new_variant.language).unwrap();
+                        let language_data = self
+                            .language_data
+                            .get_mut(&new_variant.shading_language)
+                            .unwrap();
                         if let Some(old_variant) = &self.watched_files.variant {
                             // Remove old variant if not used anymore.
                             if new_variant.url != old_variant.url {
                                 let old_variant_url = old_variant.url.clone();
-                                let old_variant_language = old_variant.language;
+                                let old_variant_language = old_variant.shading_language;
                                 // Watch new variant
                                 self.watched_files.watch_variant_file(
                                     &new_variant.url,
-                                    new_variant.language,
+                                    new_variant.shading_language,
                                     &mut language_data.shader_module_parser,
                                 )?;
                                 // Remove old one.
@@ -935,7 +934,7 @@ impl ServerLanguage {
                                 vec![
                                     AsyncCacheRequest::new(
                                         new_variant.url.clone(),
-                                        new_variant.language,
+                                        new_variant.shading_language,
                                         false, // Only context changed
                                     ),
                                     AsyncCacheRequest::new(
@@ -948,7 +947,7 @@ impl ServerLanguage {
                                 // Simply update.
                                 vec![AsyncCacheRequest::new(
                                     new_variant.url.clone(),
-                                    old_variant.language,
+                                    old_variant.shading_language,
                                     false, // Only context changed
                                 )]
                             }
@@ -956,19 +955,19 @@ impl ServerLanguage {
                             // Watch new variant
                             self.watched_files.watch_variant_file(
                                 &new_variant.url,
-                                new_variant.language,
+                                new_variant.shading_language,
                                 &mut language_data.shader_module_parser,
                             )?;
                             vec![AsyncCacheRequest::new(
                                 new_variant.url.clone(),
-                                new_variant.language,
+                                new_variant.shading_language,
                                 false, // Only context changed
                             )]
                         }
                     } else if let Some(old_variant) = &self.watched_files.variant {
                         // Remove old variant if not used anymore.
                         let old_variant_url = old_variant.url.clone();
-                        let old_variant_language = old_variant.language;
+                        let old_variant_language = old_variant.shading_language;
                         let removed_urls =
                             self.watched_files.remove_variant_file(&old_variant_url)?;
                         for removed_url in removed_urls {

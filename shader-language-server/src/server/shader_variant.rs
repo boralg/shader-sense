@@ -10,7 +10,7 @@ use crate::server::{clean_url, ServerLanguage};
 #[serde(rename_all = "camelCase")]
 pub struct ShaderVariant {
     pub url: Url,
-    pub language: ShadingLanguage,
+    pub shading_language: ShadingLanguage,
     pub entry_point: String,
     pub stage: Option<ShaderStage>,
     pub defines: HashMap<String, String>,
@@ -96,7 +96,7 @@ impl ServerLanguage {
                                     // If we pass a variant with new URL, update (will pick the latest enabled.)
                                     let url = clean_url(&new_variant.text_document.uri);
                                     Ok(new_variant.shader_variant.map(|v| ShaderVariant {
-                                        language: match self.watched_files.files.get(&url) {
+                                        shading_language: match self.watched_files.files.get(&url) {
                                             Some(file) => file.shading_language,
                                             None => ShadingLanguage::Hlsl, // Default to HLSL as we have no way to guess it.
                                         },
@@ -114,7 +114,7 @@ impl ServerLanguage {
                             None => {
                                 let url = clean_url(&new_variant.text_document.uri);
                                 Ok(new_variant.shader_variant.map(|v| ShaderVariant {
-                                    language: match self.watched_files.files.get(&url) {
+                                    shading_language: match self.watched_files.files.get(&url) {
                                         Some(file) => file.shading_language,
                                         None => ShadingLanguage::Hlsl, // Default to HLSL as we have no way to guess it.
                                     },

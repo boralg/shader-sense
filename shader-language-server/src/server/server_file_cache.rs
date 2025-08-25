@@ -603,7 +603,7 @@ impl ServerLanguageFileCache {
             // Recompute variant.
             let variant = self.variant.as_ref().unwrap();
             let variant_url = variant.url.clone();
-            let variant_shading_language = variant.language; // TODO:ASYNC: rename for compat.
+            let variant_shading_language = variant.shading_language;
             let language_data = language_data.get_mut(&variant_shading_language).unwrap();
             unique_remaining_files.remove(&variant_url);
             files_to_publish.insert(variant_url.clone());
@@ -734,7 +734,7 @@ impl ServerLanguageFileCache {
             need_to_recompute_variant as u32,
             file_progress_index
         );
-        // TODO:ASYNC: Diagnostics return here are unique but might be in incorrect order...
+        // TODO: Diagnostics return here are unique but might be in incorrect order...
         files_to_publish.extend(dependent_files_to_update);
         Ok((files_to_clear, files_to_publish))
     }

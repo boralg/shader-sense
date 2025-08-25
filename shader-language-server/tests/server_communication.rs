@@ -111,7 +111,7 @@ fn test_variant() {
     server.send_notification::<DidChangeShaderVariant>(&DidChangeShaderVariantParams {
         shader_variant: Some(ShaderVariant {
             url: file.url.clone(),
-            language: ShadingLanguage::Hlsl,
+            shading_language: ShadingLanguage::Hlsl,
             entry_point: "".into(),
             stage: None,
             defines: HashMap::from([("VARIANT_DEFINE".into(), "1".into())]),
@@ -183,7 +183,7 @@ fn test_variant_dependency() {
     server.send_notification::<DidChangeShaderVariant>(&DidChangeShaderVariantParams {
         shader_variant: Some(ShaderVariant {
             url: file_variant.url.clone(),
-            language: ShadingLanguage::Hlsl,
+            shading_language: ShadingLanguage::Hlsl,
             entry_point: "".into(),
             stage: None,
             defines: HashMap::new(),
@@ -342,7 +342,7 @@ fn test_dependency_include_guard() {
     server.send_notification::<DidChangeShaderVariant>(&DidChangeShaderVariantParams {
         shader_variant: Some(ShaderVariant {
             url: variant.url.clone(),
-            language: ShadingLanguage::Hlsl,
+            shading_language: ShadingLanguage::Hlsl,
             entry_point: "".into(),
             stage: Some(ShaderStage::Compute),
             defines: HashMap::new(),
