@@ -626,7 +626,15 @@ impl ServerLanguageFileCache {
             files_to_clear.extend(removed_files);
             // Remove request for relying files as they are already updated by variant.
             let relying_files = self.get_all_relying_files(&variant_url);
-            unique_remaining_files.retain(|f| !relying_files.contains(f));
+            unique_remaining_files.retain(|f| {
+                if relying_files.contains(f) {
+                    let dependent_files = self.get_dependent_main_files(f);
+                    dependent_files_to_update.extend(dependent_files);
+                    false
+                } else {
+                    true
+                }
+            });
             files_updating.extend(relying_files);
             // If file is dirty, request update for dependent files.
             if dirty_files.contains(&variant_url) {
