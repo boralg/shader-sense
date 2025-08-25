@@ -90,6 +90,7 @@ impl ServerLanguageFileCache {
             .filter(|(file_url, file)| {
                 *file_url != dependent_url
                     && file.is_cachable_file()
+                    && file.has_data()
                     && file
                         .get_data()
                         .symbol_cache
@@ -100,7 +101,7 @@ impl ServerLanguageFileCache {
     }
     // Get all main files relying on the given file.
     #[allow(dead_code)]
-    pub fn get_relyicng_main_files(&self, url: &Url) -> HashSet<Url> {
+    pub fn get_relying_main_files(&self, url: &Url) -> HashSet<Url> {
         match self.files.get(url) {
             Some(file) => {
                 let mut relying_on_files = HashSet::new();
