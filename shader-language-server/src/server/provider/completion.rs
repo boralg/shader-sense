@@ -31,14 +31,24 @@ impl ServerLanguage {
         let shader_position = {
             let position =
                 ShaderFilePosition::new(file_path.clone(), position.line, position.character);
-
+            let position_byte_offset = position.position.to_byte_offset(content).unwrap();
             // Get UTF8 offset of trigger character
             let trigger_offset = match &trigger_character {
-                Some(trigger) => trigger.len(),
+                Some(trigger) => match trigger.as_str() {
+                    ":" => {
+                        if content[..position_byte_offset].ends_with("::") {
+                            2
+                        } else {
+                            return Ok(vec![]); // No completion for single ":"
+                        }
+                    }
+                    "." => 1,
+                    _ => trigger.len(),
+                },
                 None => 0,
             };
             // Remove offset
-            let byte_offset = position.position.to_byte_offset(content).unwrap() - trigger_offset;
+            let byte_offset = position_byte_offset - trigger_offset;
             assert!(content.is_char_boundary(byte_offset));
             if byte_offset == 0 {
                 ShaderPosition::from_byte_offset(content, byte_offset).unwrap()
@@ -80,25 +90,68 @@ impl ServerLanguage {
                         if symbols.is_empty() {
                             Ok(vec![])
                         } else {
+                            // TODO: Could handle all symbols here
                             let symbol_type = &symbols[0];
                             let ty = match &symbol_type.data {
-                                ShaderSymbolData::Variables { ty, count: _ } => ty,
+                                ShaderSymbolData::Variables { ty, count: _ } => {
+                                    symbol_list.find_type_symbol(ty)
+                                }
                                 ShaderSymbolData::Functions { signatures } => {
-                                    &signatures[0].returnType
+                                    symbol_list.find_type_symbol(&signatures[0].returnType)
                                 }
                                 ShaderSymbolData::Parameter {
                                     context: _,
                                     ty,
                                     count: _,
-                                } => ty,
+                                } => symbol_list.find_type_symbol(ty),
                                 ShaderSymbolData::Method {
                                     context: _,
                                     signatures,
-                                } => &signatures[0].returnType,
+                                } => symbol_list.find_type_symbol(&signatures[0].returnType),
+                                ShaderSymbolData::Enum { values: _ } => Some(symbol_type),
                                 _ => return Ok(vec![]),
                             };
-                            let completion_items = match symbol_list.find_type_symbol(ty) {
+                            let completion_items = match ty {
                                 Some(ty) => match &ty.data {
+                                    ShaderSymbolData::Enum { values } => {
+                                        values.iter().map(|v| {
+                                            let description = v.description.clone();
+                                            let signature = if let Some(value) = &v.value {
+                                                format!("{}::{} = {}", ty.label, v.label, value)
+                                            } else {
+                                                format!("{}::{}", ty.label, v.label)
+                                            };
+                                            let shading_language = cached_file.shading_language.to_string();
+                                            let position = if let Some(range) = &v.range {
+                                                format!(
+                                                    "{}:{}:{}",
+                                                    file_path
+                                                        .file_name()
+                                                        .unwrap_or(OsStr::new("file"))
+                                                        .to_string_lossy(),
+                                                    range.start.line,
+                                                    range.start.pos
+                                                )
+                                            } else {
+                                                "".to_string()
+                                            };
+                                            CompletionItem {
+                                                kind: Some(CompletionItemKind::ENUM_MEMBER),
+                                                label: v.label.clone(),
+                                                detail: None,
+                                                label_details: Some(CompletionItemLabelDetails {
+                                                    detail: None,
+                                                    description: Some(signature.clone())
+                                                }),
+                                                filter_text: Some(v.label.clone()),
+                                                documentation: Some(lsp_types::Documentation::MarkupContent(MarkupContent {
+                                                    kind: lsp_types::MarkupKind::Markdown,
+                                                    value: format!("```{shading_language}\n{signature}\n```\n{description}\n\n{position}"),
+                                                })),
+                                                ..Default::default()
+                                            }
+                                        }).collect()
+                                    },
                                     ShaderSymbolData::Struct {
                                         constructors: _,
                                         members,

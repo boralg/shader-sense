@@ -34,7 +34,8 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                 // type_identifier = struct name, class name...
                 // primitive_type = float, uint...
                 // string_content = include, should check preproc_include as parent.
-                "identifier" | "type_identifier" | "primitive_type" => {
+                // namespace_identifier = enum, namespace
+                "identifier" | "type_identifier" | "primitive_type" | "namespace_identifier" => {
                     return Ok(ShaderWordRange::new(
                         get_name(&shader_module.content, node).into(),
                         ShaderRange::from(node.range()),

@@ -126,6 +126,15 @@ impl ShaderMethod {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ShaderEnumValue {
+    pub label: String,
+    pub description: String,
+    pub value: Option<String>,
+    #[serde(skip)] // Runtime only
+    pub range: Option<ShaderRange>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ShaderSymbolData {
     // A bit of duplicate from variables ? Should be struct (Which should be renamed something else)
     Types {
@@ -158,6 +167,9 @@ pub enum ShaderSymbolData {
     Variables {
         ty: String,
         count: Option<u32>,
+    },
+    Enum {
+        values: Vec<ShaderEnumValue>,
     },
     #[serde(skip)] // This is runtime only. No serialization.
     CallExpression {
@@ -462,6 +474,7 @@ impl ShaderSymbol {
                 context: _,
                 signatures: _,
             } => Some(ShaderSymbolType::Functions),
+            ShaderSymbolData::Enum { values: _ } => Some(ShaderSymbolType::Types),
             ShaderSymbolData::CallExpression {
                 label: _,
                 range: _,
@@ -490,6 +503,7 @@ impl ShaderSymbol {
                 Some(count) => format!("{} {}[{}]", ty, self.label, count),
                 None => format!("{} {}", ty, self.label),
             },
+            ShaderSymbolData::Enum { values: _ } => format!("enum {}", self.label),
             ShaderSymbolData::Parameter { context, ty, count } => match count {
                 Some(count) => format!("{} {}::{}[{}]", ty, context, self.label, count),
                 None => format!("{} {}::{}", ty, context, self.label),

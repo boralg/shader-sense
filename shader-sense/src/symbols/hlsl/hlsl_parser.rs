@@ -2,7 +2,9 @@ use std::path::Path;
 
 use crate::position::ShaderRange;
 use crate::symbols::symbol_parser::ShaderSymbolListBuilder;
-use crate::symbols::symbols::{ShaderMember, ShaderSymbolMode, ShaderSymbolRuntime};
+use crate::symbols::symbols::{
+    ShaderEnumValue, ShaderMember, ShaderSymbolMode, ShaderSymbolRuntime,
+};
 
 use crate::symbols::{
     symbol_parser::{get_name, SymbolTreeParser},
@@ -17,6 +19,7 @@ pub fn get_hlsl_parsers() -> Vec<Box<dyn SymbolTreeParser>> {
         Box::new(HlslStructTreeParser::new()),
         Box::new(HlslVariableTreeParser { is_field: false }),
         Box::new(HlslCallExpressionTreeParser {}),
+        Box::new(HlslEnumTreeParser {}),
     ]
 }
 
@@ -331,6 +334,61 @@ impl SymbolTreeParser for HlslVariableTreeParser {
     }
 }
 
+struct HlslEnumTreeParser {}
+
+impl SymbolTreeParser for HlslEnumTreeParser {
+    fn get_query(&self) -> String {
+        r#"(enum_specifier
+            name: (type_identifier) @enum.label
+            body: (enumerator_list
+                ((enumerator
+                    name:(identifier) @enum.value.label
+                    value: (_)  @enum.value.value
+                )(",")?)*
+            ) @enum.scope
+        )"#
+        .into()
+    }
+    fn process_match(
+        &self,
+        matches: tree_sitter::QueryMatch,
+        file_path: &Path,
+        shader_content: &str,
+        scopes: &Vec<ShaderScope>,
+        symbol_builder: &mut ShaderSymbolListBuilder,
+    ) {
+        // TODO: differentiate enum class
+        // TODO: Handle no values aswell (will be tricky with count...)
+        let label_node = matches.captures[0].node;
+        let range = ShaderRange::from(label_node.range());
+        let scope_stack = self.compute_scope_stack(&scopes, &range);
+        let scope_node = matches.captures[1].node;
+        let scope_range = ShaderRange::from(scope_node.range());
+        symbol_builder.add_type(ShaderSymbol {
+            label: get_name(shader_content, label_node).into(),
+            requirement: None,
+            data: ShaderSymbolData::Enum {
+                values: matches.captures[2..]
+                    .chunks(2)
+                    .into_iter()
+                    .map(|c| ShaderEnumValue {
+                        label: get_name(shader_content, c[0].node).into(),
+                        description: "".into(),
+                        value: Some(get_name(shader_content, c[1].node).into()),
+                        range: Some(ShaderRange::from(c[0].node.range())),
+                    })
+                    .collect(),
+            },
+            mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
+                file_path.into(),
+                range,
+                Some(scope_range),
+                scope_stack,
+            )),
+        });
+    }
+}
+
 struct HlslCallExpressionTreeParser {}
 
 impl SymbolTreeParser for HlslCallExpressionTreeParser {
@@ -403,13 +461,14 @@ mod hlsl_parser_tests {
         position::{ShaderPosition, ShaderRange},
         shader::ShadingLanguage,
         symbols::{
-            hlsl::hlsl_parser::{HlslFunctionTreeParser, HlslStructTreeParser},
+            hlsl::hlsl_parser::{HlslEnumTreeParser, HlslFunctionTreeParser, HlslStructTreeParser},
             shader_module_parser::ShaderModuleParser,
             symbol_list::ShaderSymbolList,
             symbol_parser::{ShaderSymbolListBuilder, SymbolTreeParser},
             symbols::{
-                ShaderMember, ShaderMethod, ShaderParameter, ShaderScope, ShaderSignature,
-                ShaderSymbol, ShaderSymbolData, ShaderSymbolMode, ShaderSymbolRuntime,
+                ShaderEnumValue, ShaderMember, ShaderMethod, ShaderParameter, ShaderScope,
+                ShaderSignature, ShaderSymbol, ShaderSymbolData, ShaderSymbolMode,
+                ShaderSymbolRuntime,
             },
         },
     };
@@ -516,6 +575,9 @@ mod hlsl_parser_tests {
             (ShaderSymbolData::Macro { value: v1 }, ShaderSymbolData::Macro { value: v2 }) => {
                 assert!(v1 == v2, "Mismatching macro")
             }
+            (ShaderSymbolData::Enum { values: v1 }, ShaderSymbolData::Enum { values: v2 }) => {
+                assert!(v1.len() == v2.len(), "Invalid enum");
+            }
             _ => panic!("data mismatch"),
         }
         match (&symbol.mode, &symbol_expected.mode) {
@@ -531,8 +593,18 @@ mod hlsl_parser_tests {
                     runtime0.file_path == runtime1.file_path,
                     "Mismatching file_path"
                 );
-                assert!(runtime0.range == runtime1.range, "Mismatching range");
-                assert!(runtime0.scope == runtime1.scope, "Mismatching scope");
+                assert!(
+                    runtime0.range == runtime1.range,
+                    "Mismatching range ({:?} vs {:?})",
+                    runtime0.range,
+                    runtime1.range
+                );
+                assert!(
+                    runtime0.scope == runtime1.scope,
+                    "Mismatching scope ({:?} vs {:?})",
+                    runtime0.scope,
+                    runtime1.scope
+                );
                 assert!(
                     runtime0.scope_stack == runtime1.scope_stack,
                     "Mismatching scope_stack"
@@ -668,6 +740,55 @@ mod hlsl_parser_tests {
                 )),
             },
             &result.functions[0],
+        );
+    }
+    #[test]
+    fn enum_parser() {
+        let path = Path::new("dontcare");
+        let content = r"
+            enum class EnumClassTest {
+                VALUE0 = 0,
+                VALUE1 = 1,
+            };
+        ";
+        let result = parse(&HlslEnumTreeParser {}, path, content);
+        compare(
+            &ShaderSymbol {
+                label: "EnumClassTest".into(),
+                requirement: None,
+                data: ShaderSymbolData::Enum {
+                    values: vec![
+                        ShaderEnumValue {
+                            label: "VALUE0".into(),
+                            description: "".into(),
+                            value: Some("0".into()),
+                            range: Some(ShaderRange::new(
+                                ShaderPosition::new(2, 16),
+                                ShaderPosition::new(2, 22),
+                            )),
+                        },
+                        ShaderEnumValue {
+                            label: "VALUE1".into(),
+                            description: "".into(),
+                            value: Some("1".into()),
+                            range: Some(ShaderRange::new(
+                                ShaderPosition::new(3, 16),
+                                ShaderPosition::new(3, 22),
+                            )),
+                        },
+                    ],
+                },
+                mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
+                    path.into(),
+                    ShaderRange::new(ShaderPosition::new(1, 23), ShaderPosition::new(1, 36)),
+                    Some(ShaderScope::new(
+                        ShaderPosition::new(1, 37),
+                        ShaderPosition::new(4, 13),
+                    )),
+                    vec![],
+                )),
+            },
+            &result.types[0],
         );
     }
 }

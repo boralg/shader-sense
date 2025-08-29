@@ -79,6 +79,115 @@ impl ServerLanguage {
             .collect::<Vec<Vec<SemanticToken>>>()
             .concat()
     }
+    fn find_enum(
+        uri: &Url,
+        cached_file: &ServerFileCache,
+        symbols: &ShaderSymbolListRef,
+    ) -> Vec<SemanticToken> {
+        let file_path = uri.to_file_path().unwrap();
+        let content = &RefCell::borrow(&cached_file.shader_module).content;
+        symbols
+            .types
+            .iter()
+            .filter_map(|symbol| match &symbol.data {
+                ShaderSymbolData::Enum { values } => {
+                    let byte_offset_start = match &symbol.mode {
+                        ShaderSymbolMode::Runtime(runtime) => {
+                            if runtime.file_path.as_os_str() == file_path.as_os_str() {
+                                runtime.range.start.to_byte_offset(content).unwrap()
+                            } else {
+                                match cached_file
+                                    .data
+                                    .as_ref()
+                                    .unwrap()
+                                    .symbol_cache
+                                    .find_direct_includer(&runtime.file_path)
+                                {
+                                    Some(include) => {
+                                        include.get_range().start.to_byte_offset(content).unwrap()
+                                    }
+                                    None => 0, // Included from another file, but not found...
+                                }
+                            }
+                        }
+                        _ => 0, // Not runtime means no range means its everywhere
+                    };
+                    let mut tokens = Vec::new();
+                    // Add enum label aswell.
+                    // TODO: use cache lru for caching regex heavy cost.
+                    let reg = regex::Regex::new(
+                        format!("\\b({})\\b", regex::escape(&symbol.label)).as_str(),
+                    )
+                    .unwrap();
+                    let word_byte_offsets: Vec<usize> = reg
+                        .captures_iter(&content)
+                        .map(|e| e.get(0).unwrap().range().start)
+                        .collect();
+                    tokens.extend(
+                        word_byte_offsets
+                            .iter()
+                            .filter_map(|byte_offset| {
+                                // TODO:OPTIM: could avoid this heavy conversion by checking byte_offset before.
+                                match ShaderPosition::from_byte_offset(&content, *byte_offset) {
+                                    Ok(position) => {
+                                        if byte_offset_start > *byte_offset {
+                                            None
+                                        } else {
+                                            Some(SemanticToken {
+                                                delta_line: position.line,
+                                                delta_start: position.pos,
+                                                length: symbol.label.len() as u32,
+                                                token_type: 3, // SemanticTokenType::ENUM, view registration
+                                                token_modifiers_bitset: 0,
+                                            })
+                                        }
+                                    }
+                                    Err(_) => None,
+                                }
+                            })
+                            .collect::<Vec<SemanticToken>>(),
+                    );
+                    // Collect enum member now.
+                    for value in values {
+                        let reg = regex::Regex::new(
+                            format!("\\b({})\\b", regex::escape(&value.label)).as_str(),
+                        )
+                        .unwrap();
+                        let word_byte_offsets: Vec<usize> = reg
+                            .captures_iter(&content)
+                            .map(|e| e.get(0).unwrap().range().start)
+                            .collect();
+                        tokens.extend(
+                            word_byte_offsets
+                                .iter()
+                                .filter_map(|byte_offset| {
+                                    match ShaderPosition::from_byte_offset(&content, *byte_offset) {
+                                        Ok(position) => {
+                                            if byte_offset_start > *byte_offset {
+                                                None
+                                            } else {
+                                                Some(SemanticToken {
+                                                    delta_line: position.line,
+                                                    delta_start: position.pos,
+                                                    length: value.label.len() as u32,
+                                                    token_type: 2, // SemanticTokenType::ENUM_MEMBER, view registration
+                                                    token_modifiers_bitset: 0,
+                                                })
+                                            }
+                                        }
+                                        Err(_) => None,
+                                    }
+                                })
+                                .collect::<Vec<SemanticToken>>(),
+                        );
+                    }
+                    Some(tokens)
+                }
+                _ => None,
+            })
+            .collect::<Vec<Vec<SemanticToken>>>()
+            .concat()
+    }
     fn find_parameters_variables(
         uri: &Url,
         cached_file: &ServerFileCache,
@@ -109,7 +218,7 @@ impl ServerLanguage {
                                                 delta_line: range.start.line,
                                                 delta_start: range.start.pos,
                                                 length: parameter.label.len() as u32,
-                                                token_type: 1, // SemanticTokenType::PARAMETERS, view registration
+                                                token_type: 1, // SemanticTokenType::PARAMETER, view registration
                                                 token_modifiers_bitset: 0,
                                             }),
                                             None => continue, // Should not happen for local symbol, but skip it to be sure...
@@ -141,7 +250,7 @@ impl ServerLanguage {
                                                                 delta_start: position.pos,
                                                                 length: parameter.label.len()
                                                                     as u32,
-                                                                token_type: 1, // SemanticTokenType::PARAMETERS, view registration
+                                                                token_type: 1, // SemanticTokenType::PARAMETER, view registration
                                                                 token_modifiers_bitset: 0,
                                                             })
                                                         }
@@ -179,6 +288,7 @@ impl ServerLanguage {
         let mut tokens = Vec::new();
         tokens.extend(Self::find_macros(uri, cached_file, &symbols));
         tokens.extend(Self::find_parameters_variables(uri, cached_file, &symbols));
+        tokens.extend(Self::find_enum(uri, cached_file, &symbols));
 
         // Sort by positions
         tokens.sort_by(|lhs, rhs| {
