@@ -7,8 +7,10 @@ use crate::common::{download_file, IntrinsicParser};
 
 mod functions;
 mod macros;
+mod raytracing;
 mod semantics;
 mod types;
+mod work_graph;
 
 pub const SEMANTIC_FILE: &str = "semantics.html";
 
@@ -147,6 +149,8 @@ impl IntrinsicParser for HlslIntrinsicParser {
         self.add_functions(&mut symbols);
         self.add_types(&mut symbols);
         self.add_macros(&mut symbols);
+        self.add_raytracing(&mut symbols);
+        self.add_work_graph(&mut symbols);
         self.add_semantic(&mut symbols, cache_path);
 
         symbols

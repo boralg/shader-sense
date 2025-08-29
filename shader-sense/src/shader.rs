@@ -57,6 +57,30 @@ impl ShaderStage {
         // For header files & undefined, will output issue with missing version...
         None
     }
+    pub fn graphics() -> Vec<ShaderStage> {
+        vec![
+            ShaderStage::Vertex,
+            ShaderStage::Fragment,
+            ShaderStage::Geometry,
+            ShaderStage::TesselationControl,
+            ShaderStage::TesselationEvaluation,
+            ShaderStage::Task,
+            ShaderStage::Mesh,
+        ]
+    }
+    pub fn compute() -> Vec<ShaderStage> {
+        vec![ShaderStage::Compute]
+    }
+    pub fn raytracing() -> Vec<ShaderStage> {
+        vec![
+            ShaderStage::RayGeneration,
+            ShaderStage::Intersect,
+            ShaderStage::ClosestHit,
+            ShaderStage::AnyHit,
+            ShaderStage::Miss,
+            ShaderStage::Callable,
+        ]
+    }
 }
 
 impl ToString for ShaderStage {
