@@ -272,10 +272,17 @@ struct HlslVariableTreeParser {
 impl SymbolTreeParser for HlslVariableTreeParser {
     fn get_query(&self) -> String {
         let field_prestring = if self.is_field { "field_" } else { "" };
+        // TODO: handle basic templating.
         format!(
             r#"({}declaration
             (qualifiers)?
-            type: (_) @variable.type
+            [
+                type: (template_type
+                    name: (type_identifier) @variable.type
+                )
+                type: (identifier) @variable.type
+                type: (primitive_type) @variable.type
+            ]
             declarator: [
                 (init_declarator
                     declarator: [
