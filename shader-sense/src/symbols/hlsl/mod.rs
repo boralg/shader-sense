@@ -194,5 +194,17 @@ mod tests {
         assert!(word.get_word() == "test2");
         assert!(word.get_parent().unwrap().get_word() == "method");
         assert!(word.get_parent().unwrap().get_parent().unwrap().get_word() == "container");
+
+        // container.testArray[0].oui
+        let word = word_provider
+            .find_word_at_position_in_node(
+                &shader_module,
+                shader_module.tree.root_node(),
+                &ShaderPosition::new(24, 44),
+            )
+            .unwrap();
+        assert!(word.get_word() == "oui");
+        assert!(word.get_parent().unwrap().get_word() == "testArray");
+        assert!(word.get_parent().unwrap().get_parent().unwrap().get_word() == "container");
     }
 }

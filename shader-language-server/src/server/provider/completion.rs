@@ -54,22 +54,25 @@ impl ServerLanguage {
                 ShaderPosition::from_byte_offset(content, byte_offset).unwrap()
             } else {
                 let mut new_byte_offset = byte_offset;
-                // Check if the previous character is ')' for getting function call label position
+                // Check if the previous character is ')' or ']' for getting function call / array label position
                 let prev = &content[..byte_offset];
-                let mut chars = prev.char_indices().rev();
-                if let Some((_, ')')) = chars.next() {
-                    let mut depth = 1;
-                    for (idx, ch) in chars {
-                        match ch {
-                            ')' => depth += 1,
-                            '(' => {
-                                depth -= 1;
-                                if depth == 0 {
-                                    new_byte_offset = idx;
-                                    break;
+                let ranges_to_skip = [('(', ')'), ('[', ']')];
+                for range_to_skip in ranges_to_skip {
+                    let mut chars = prev.char_indices().rev();
+                    if let Some((_, character)) = chars.next() {
+                        if character == range_to_skip.1 {
+                            let mut depth = 1;
+                            for (idx, ch) in chars {
+                                if ch == range_to_skip.1 {
+                                    depth += 1
+                                } else if ch == range_to_skip.0 {
+                                    depth -= 1;
+                                    if depth == 0 {
+                                        new_byte_offset = idx;
+                                        break;
+                                    }
                                 }
                             }
-                            _ => {}
                         }
                     }
                 }

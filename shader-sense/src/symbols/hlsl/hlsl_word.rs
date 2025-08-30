@@ -106,6 +106,28 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
                                     _ => return Err(ShaderError::NoSymbol),
                                 }
                             }
+                            "subscript_expression" => {
+                                cursor.goto_first_child();
+                                match cursor.node().kind() {
+                                    "field_expression" => {
+                                        cursor.goto_first_child();
+                                        current_node = cursor.node();
+                                    }
+                                    "identifier" => {
+                                        let identifier = cursor.node();
+                                        set_parent(
+                                            &mut word,
+                                            ShaderWordRange::new(
+                                                get_name(&shader_module.content, identifier).into(),
+                                                ShaderRange::from(identifier.range()),
+                                                None,
+                                            ),
+                                        );
+                                        break;
+                                    }
+                                    _ => return Err(ShaderError::NoSymbol),
+                                }
+                            }
                             "identifier" => {
                                 let identifier = current_node;
                                 set_parent(
