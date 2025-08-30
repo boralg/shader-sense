@@ -1,12 +1,12 @@
 use tree_sitter::Node;
 
 use crate::{
-    position::{ShaderPosition, ShaderRange},
+    position::ShaderPosition,
     shader_error::ShaderError,
     symbols::{
         hlsl::HlslSymbolWordProvider,
         shader_module::ShaderModule,
-        symbol_parser::{get_name, ShaderWordRange, SymbolWordProvider},
+        symbol_parser::{ShaderWordRange, SymbolWordProvider},
     },
 };
 
