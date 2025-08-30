@@ -22,16 +22,15 @@ impl ShaderModuleParser {
     pub fn from_shading_language(shading_language: ShadingLanguage) -> Self {
         let mut tree_sitter_parser = tree_sitter::Parser::new();
         tree_sitter_parser
-            .set_language(Self::get_tree_sitter_language(shading_language))
+            .set_language(&match shading_language {
+                // TODO:WGSL: Wgsl is not yet compatible with tree-sitter-language.
+                // A PR is waiting to be merged here https://github.com/tree-sitter-grammars/tree-sitter-wgsl-bevy/pull/19
+                ShadingLanguage::Wgsl => tree_sitter_hlsl::LANGUAGE_HLSL.into(),//tree_sitter_wgsl_bevy::language(),
+                ShadingLanguage::Hlsl => tree_sitter_hlsl::LANGUAGE_HLSL.into(),
+                ShadingLanguage::Glsl => tree_sitter_glsl::LANGUAGE_GLSL.into(),
+            })
             .expect("Error loading grammar");
         Self { tree_sitter_parser }
-    }
-    fn get_tree_sitter_language(shading_language: ShadingLanguage) -> tree_sitter::Language {
-        match shading_language {
-            ShadingLanguage::Wgsl => tree_sitter_wgsl_bevy::language(),
-            ShadingLanguage::Hlsl => tree_sitter_hlsl::language(),
-            ShadingLanguage::Glsl => tree_sitter_glsl::language(),
-        }
     }
     // Create shader module from file.
     pub fn create_module(

@@ -41,17 +41,17 @@ impl SymbolTreeParser for GlslFunctionTreeParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
         symbols: &mut ShaderSymbolListBuilder,
     ) {
-        let label_node = matches.captures[1].node;
+        let label_node = symbol_match.captures[1].node;
         let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(scopes, &range);
         // Query internal scopes variables
-        let scope_node = matches.captures[matches.captures.len() - 1].node;
+        let scope_node = symbol_match.captures[symbol_match.captures.len() - 1].node;
         /*let content_scope_stack = {
             let mut s = scope_stack.clone();
             s.push(range.clone());
@@ -67,13 +67,13 @@ impl SymbolTreeParser for GlslFunctionTreeParser {
             "In GLSL all function are global scope"
         );
         symbols.add_function(ShaderSymbol {
-            label: get_name(shader_content, matches.captures[1].node).into(),
+            label: get_name(shader_content, symbol_match.captures[1].node).into(),
             requirement: None,
             data: ShaderSymbolData::Functions {
                 signatures: vec![ShaderSignature {
-                    returnType: get_name(shader_content, matches.captures[0].node).into(),
+                    returnType: get_name(shader_content, symbol_match.captures[0].node).into(),
                     description: "".into(),
-                    parameters: matches.captures[2..matches.captures.len() - 1]
+                    parameters: symbol_match.captures[2..symbol_match.captures.len() - 1]
                         .chunks(2)
                         .map(|w| ShaderParameter {
                             ty: get_name(shader_content, w[0].node).into(),
@@ -113,16 +113,16 @@ impl SymbolTreeParser for GlslUniformBlock {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         _scopes: &Vec<ShaderScope>,
         symbols: &mut ShaderSymbolListBuilder,
     ) {
-        let capture_count = matches.captures.len();
+        let capture_count = symbol_match.captures.len();
         if capture_count % 2 == 0 {
             // name
-            let identifier_node = matches.captures[0].node;
+            let identifier_node = symbol_match.captures[0].node;
             let identifier_range = ShaderRange::from(identifier_node.range());
             let uniform_block_name: String = get_name(shader_content, identifier_node).into();
             symbols.add_type(ShaderSymbol {
@@ -130,7 +130,7 @@ impl SymbolTreeParser for GlslUniformBlock {
                 requirement: None,
                 data: ShaderSymbolData::Struct {
                     constructors: vec![], // No constructor for uniform.
-                    members: matches.captures[1..capture_count - 1]
+                    members: symbol_match.captures[1..capture_count - 1]
                         .chunks(2)
                         .map(|w| ShaderMember {
                             context: uniform_block_name.clone(),
@@ -154,7 +154,7 @@ impl SymbolTreeParser for GlslUniformBlock {
                 )),
             });
             // Add variable of type
-            let variable_node = matches.captures.last().unwrap().node;
+            let variable_node = symbol_match.captures.last().unwrap().node;
             let variable_range = ShaderRange::from(variable_node.range());
             symbols.add_variable(ShaderSymbol {
                 label: get_name(shader_content, variable_node).into(),
@@ -173,8 +173,8 @@ impl SymbolTreeParser for GlslUniformBlock {
             });
         } else {
             // no name, content global
-            let _identifier_node = matches.captures[0].node;
-            for uniform_value in matches.captures[1..].chunks(2) {
+            let _identifier_node = symbol_match.captures[0].node;
+            for uniform_value in symbol_match.captures[1..].chunks(2) {
                 let label_node = uniform_value[1].node;
                 let range = ShaderRange::from(label_node.range());
                 symbols.add_variable(ShaderSymbol {
@@ -214,17 +214,17 @@ impl SymbolTreeParser for GlslStructTreeParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
         symbols: &mut ShaderSymbolListBuilder,
     ) {
-        let label_node = matches.captures[0].node;
+        let label_node = symbol_match.captures[0].node;
         let label = get_name(shader_content, label_node).to_string();
         let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
-        let members = matches.captures[1..]
+        let members = symbol_match.captures[1..]
             .chunks(2)
             .map(|w| ShaderParameter {
                 ty: get_name(shader_content, w[0].node).into(),
@@ -283,24 +283,24 @@ impl SymbolTreeParser for GlslVariableTreeParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
         symbols: &mut ShaderSymbolListBuilder,
     ) {
-        let label_node = matches.captures[1].node;
+        let label_node = symbol_match.captures[1].node;
         let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
         // Check if its parameter or struct element.
-        let _type_qualifier = get_name(shader_content, matches.captures[0].node);
+        let _type_qualifier = get_name(shader_content, symbol_match.captures[0].node);
         // TODO: handle values & qualifiers..
         //let _value = get_name(shader_content, matche.captures[2].node);
         symbols.add_variable(ShaderSymbol {
-            label: get_name(shader_content, matches.captures[1].node).into(),
+            label: get_name(shader_content, symbol_match.captures[1].node).into(),
             requirement: None,
             data: ShaderSymbolData::Variables {
-                ty: get_name(shader_content, matches.captures[0].node).into(),
+                ty: get_name(shader_content, symbol_match.captures[0].node).into(),
                 count: None,
             },
             mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
@@ -337,13 +337,13 @@ impl SymbolTreeParser for GlslCallExpressionTreeParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
         symbol_builder: &mut ShaderSymbolListBuilder,
     ) {
-        let label_node = matches.captures[0].node;
+        let label_node = symbol_match.captures[0].node;
         let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
         let label = get_name(shader_content, label_node).into();
@@ -353,7 +353,7 @@ impl SymbolTreeParser for GlslCallExpressionTreeParser {
             data: ShaderSymbolData::CallExpression {
                 label: get_name(shader_content, label_node).into(),
                 range: range.clone(),
-                parameters: matches.captures[1..]
+                parameters: symbol_match.captures[1..]
                     .iter()
                     .enumerate()
                     .map(|(i, e)| {

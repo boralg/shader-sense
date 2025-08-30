@@ -12,13 +12,13 @@ pub use hlsl_regions::HlslSymbolRegionFinder;
 use super::symbol_provider::SymbolProvider;
 
 pub(super) fn create_hlsl_symbol_provider(
-    tree_sitter_language: tree_sitter::Language,
+    tree_sitter_language: &tree_sitter::Language,
 ) -> SymbolProvider {
     SymbolProvider::new(
-        tree_sitter_language.clone(),
+        tree_sitter_language,
         get_hlsl_parsers(),
         get_hlsl_preprocessor_parser(),
-        Box::new(HlslSymbolRegionFinder::new(tree_sitter_language.clone())),
+        Box::new(HlslSymbolRegionFinder::new(&tree_sitter_language)),
         Box::new(hlsl_word::HlslSymbolWordProvider {}),
     )
 }

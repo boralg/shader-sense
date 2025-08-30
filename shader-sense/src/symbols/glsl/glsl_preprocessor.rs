@@ -21,14 +21,6 @@ struct GlslIncludeTreePreprocessorParser {}
 
 impl SymbolTreePreprocessorParser for GlslIncludeTreePreprocessorParser {
     fn get_query(&self) -> String {
-        // TODO: string_content unsupported
-        // string_content unsupported on tree_sitter 0.20.9
-        /*r#"(preproc_include
-            (#include)
-            path: (string_literal
-                (string_content) @include
-            )
-        )"#*/
         r#"(preproc_include
             (#include)
             path: [(string_literal)(system_lib_string)] @include
@@ -37,17 +29,17 @@ impl SymbolTreePreprocessorParser for GlslIncludeTreePreprocessorParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         preprocessor: &mut ShaderPreprocessor,
         context: &mut ShaderPreprocessorContext,
     ) {
-        let include_node = matches.captures[0].node;
+        let include_node = symbol_match.captures[0].node;
         let range =
             ShaderFileRange::from(file_path.into(), ShaderRange::from(include_node.range()));
         let relative_path = get_name(shader_content, include_node);
-        let relative_path = &relative_path[1..relative_path.len() - 1]; // TODO: use string_content instead
+        let relative_path = &relative_path[1..relative_path.len() - 1];
 
         // Only add symbol if path can be resolved.
         match context.search_path_in_includes(Path::new(relative_path)) {
@@ -75,18 +67,18 @@ impl SymbolTreePreprocessorParser for GlslDefineTreePreprocessorParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         symbols: &mut ShaderPreprocessor,
         _context: &mut ShaderPreprocessorContext,
     ) {
-        let identifier_node = matches.captures[0].node;
+        let identifier_node = symbol_match.captures[0].node;
         let range =
             ShaderFileRange::from(file_path.into(), ShaderRange::from(identifier_node.range()));
         let name = get_name(shader_content, identifier_node).into();
-        let value = if matches.captures.len() > 1 {
-            Some(get_name(shader_content, matches.captures[1].node).trim())
+        let value = if symbol_match.captures.len() > 1 {
+            Some(get_name(shader_content, symbol_match.captures[1].node).trim())
         } else {
             None
         };

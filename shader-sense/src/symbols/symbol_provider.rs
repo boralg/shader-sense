@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use tree_sitter::{Query, QueryCursor};
+use tree_sitter::{Query, QueryCursor, StreamingIterator};
 
 use crate::{
     position::{ShaderFilePosition, ShaderFileRange, ShaderPosition, ShaderRange},
@@ -55,13 +55,14 @@ pub fn default_include_callback<T: ShadingLanguageTag>(
 
 impl SymbolProvider {
     pub fn glsl() -> Self {
-        create_glsl_symbol_provider(tree_sitter_glsl::language())
+        create_glsl_symbol_provider(&tree_sitter_glsl::LANGUAGE_GLSL.into())
     }
     pub fn hlsl() -> Self {
-        create_hlsl_symbol_provider(tree_sitter_hlsl::language())
+        create_hlsl_symbol_provider(&tree_sitter_hlsl::LANGUAGE_HLSL.into())
     }
     pub fn wgsl() -> Self {
-        create_wgsl_symbol_provider(tree_sitter_wgsl_bevy::language())
+        // TODO:WGSL: need to wait for merge.
+        create_wgsl_symbol_provider(&tree_sitter_hlsl::LANGUAGE_HLSL.into())//tree_sitter_wgsl_bevy::LANGUAGE_WGSL.into())
     }
     pub fn from_shading_language(shading_language: ShadingLanguage) -> Self {
         match shading_language {
@@ -71,7 +72,7 @@ impl SymbolProvider {
         }
     }
     pub(crate) fn new(
-        language: tree_sitter::Language,
+        language: &tree_sitter::Language,
         parsers: Vec<Box<dyn SymbolTreeParser>>,
         preprocessor_parsers: Vec<Box<dyn SymbolTreePreprocessorParser>>,
         region_finder: Box<dyn SymbolRegionFinder>,
@@ -91,8 +92,8 @@ impl SymbolProvider {
                     (e, query)
                 })
                 .collect(),
-            scope_query: tree_sitter::Query::new(language.clone(), scope_query).unwrap(),
-            error_query: tree_sitter::Query::new(language.clone(), error_query).unwrap(),
+            scope_query: tree_sitter::Query::new(language, scope_query).unwrap(),
+            error_query: tree_sitter::Query::new(language, error_query).unwrap(),
             preprocessor_parsers: preprocessor_parsers
                 .into_iter()
                 .map(|e| {
@@ -110,23 +111,24 @@ impl SymbolProvider {
         // Should be per lang instead.
         let mut query_cursor = QueryCursor::new();
         let mut scopes = Vec::new();
-        for matche in query_cursor.matches(
+        let mut all_matches = query_cursor.matches(
             &self.scope_query,
             shader_module.tree.root_node(),
             shader_module.content.as_bytes(),
-        ) {
-            scopes.push(match matche.captures.len() {
+        );
+        while let Some(symbol_match) = all_matches.next()  {
+            scopes.push(match symbol_match.captures.len() {
                 // one body
-                1 => ShaderScope::from(ShaderRange::from(matche.captures[0].node.range())),
+                1 => ShaderScope::from(ShaderRange::from(symbol_match.captures[0].node.range())),
                 // a bit weird, a body and single curly brace ? mergin them to be safe.
                 2 => ShaderScope::join(
-                    ShaderScope::from(ShaderRange::from(matche.captures[0].node.range())),
-                    ShaderScope::from(ShaderRange::from(matche.captures[1].node.range())),
+                    ShaderScope::from(ShaderRange::from(symbol_match.captures[0].node.range())),
+                    ShaderScope::from(ShaderRange::from(symbol_match.captures[1].node.range())),
                 ),
                 // Remove curly braces from scope.
                 3 => {
-                    let curly_start = matche.captures[1].node.range();
-                    let curly_end = matche.captures[2].node.range();
+                    let curly_start = symbol_match.captures[1].node.range();
+                    let curly_end = symbol_match.captures[2].node.range();
                     ShaderScope::from(ShaderRange::from(tree_sitter::Range {
                         start_byte: curly_start.end_byte,
                         end_byte: curly_end.start_byte,
@@ -271,13 +273,14 @@ impl SymbolProvider {
             // Recompute everything as its dirty.
             for parser in &self.preprocessor_parsers {
                 let mut query_cursor = QueryCursor::new();
-                for matches in query_cursor.matches(
+                let mut all_matches = query_cursor.matches(
                     &parser.1,
                     shader_module.tree.root_node(),
                     shader_module.content.as_bytes(),
-                ) {
+                );
+                while let Some(symbol_match) = all_matches.next()  {
                     parser.0.process_match(
-                        matches,
+                        symbol_match,
                         &shader_module.file_path,
                         &shader_module.content,
                         &mut preprocessor,
@@ -306,11 +309,12 @@ impl SymbolProvider {
             )?;
             // Add errors
             let mut query_error_cursor = QueryCursor::new();
-            for matches in query_error_cursor.matches(
+            let mut all_matches = query_error_cursor.matches(
                 &self.error_query,
                 shader_module.tree.root_node(),
                 shader_module.content.as_bytes(),
-            ) {
+            );
+            while let Some(symbol_match) = all_matches.next()  {
                 preprocessor.diagnostics.push(ShaderDiagnostic {
                     severity: ShaderDiagnosticSeverity::Warning,
                     error:
@@ -318,7 +322,7 @@ impl SymbolProvider {
                             .into(),
                     range: ShaderFileRange::from(
                         shader_module.file_path.clone(),
-                        ShaderRange::from(matches.captures[0].node.range()),
+                        ShaderRange::from(symbol_match.captures[0].node.range()),
                     ),
                 });
             }
@@ -386,13 +390,14 @@ impl SymbolProvider {
         let scopes = self.query_file_scopes(shader_module);
         for parser in &self.symbol_parsers {
             let mut query_cursor = QueryCursor::new();
-            for matches in query_cursor.matches(
+            let mut all_matches = query_cursor.matches(
                 &parser.1,
                 shader_module.tree.root_node(),
                 shader_module.content.as_bytes(),
-            ) {
+            );
+            while let Some(symbol_match) = all_matches.next()  {
                 parser.0.process_match(
-                    matches,
+                    symbol_match,
                     &shader_module.file_path,
                     &shader_module.content,
                     &scopes,

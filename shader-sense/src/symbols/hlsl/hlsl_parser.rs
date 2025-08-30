@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use tree_sitter::StreamingIterator;
+
 use crate::position::ShaderRange;
 use crate::symbols::symbol_parser::ShaderSymbolListBuilder;
 use crate::symbols::symbols::{
@@ -58,17 +60,17 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
         symbols: &mut ShaderSymbolListBuilder,
     ) {
-        let label_node = matches.captures[1].node;
+        let label_node = symbol_match.captures[1].node;
         let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(scopes, &range);
         // Query internal scope
-        let scope_node = matches.captures[matches.captures.len() - 1].node;
+        let scope_node = symbol_match.captures[symbol_match.captures.len() - 1].node;
         let scope_range = ShaderRange::from(scope_node.range());
         let parameter_scope_stack = {
             let mut s = scope_stack.clone();
@@ -76,7 +78,7 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
             s
         };
         // Get parameters & add them as function scope variable.
-        let parameters = matches.captures[2..matches.captures.len() - 1]
+        let parameters = symbol_match.captures[2..symbol_match.captures.len() - 1]
             .chunks(2)
             .map(|w| {
                 let ty: String = get_name(shader_content, w[0].node).into();
@@ -105,11 +107,11 @@ impl SymbolTreeParser for HlslFunctionTreeParser {
             })
             .collect::<Vec<ShaderParameter>>();
         symbols.add_function(ShaderSymbol {
-            label: get_name(shader_content, matches.captures[1].node).into(),
+            label: get_name(shader_content, symbol_match.captures[1].node).into(),
             requirement: None,
             data: ShaderSymbolData::Functions {
                 signatures: vec![ShaderSignature {
-                    returnType: get_name(shader_content, matches.captures[0].node).into(),
+                    returnType: get_name(shader_content, symbol_match.captures[0].node).into(),
                     description: "".into(),
                     parameters: parameters,
                 }],
@@ -133,16 +135,16 @@ struct HlslStructTreeParser {
 impl HlslStructTreeParser {
     pub fn new() -> Self {
         // Cache for perf.
-        let lang = tree_sitter_hlsl::language();
+        let lang = tree_sitter_hlsl::LANGUAGE_HLSL;
         let func_parser = HlslFunctionTreeParser { is_field: true };
         let var_parser = HlslVariableTreeParser { is_field: true };
         let var_query = var_parser.get_query();
         let func_query = func_parser.get_query();
         Self {
             var_parser,
-            var_query: tree_sitter::Query::new(lang.clone(), var_query.as_str()).unwrap(),
+            var_query: tree_sitter::Query::new(&lang.into(), var_query.as_str()).unwrap(),
             func_parser,
-            func_query: tree_sitter::Query::new(lang.clone(), func_query.as_str()).unwrap(),
+            func_query: tree_sitter::Query::new(&lang.into(), func_query.as_str()).unwrap(),
         }
     }
 }
@@ -156,103 +158,102 @@ impl SymbolTreeParser for HlslStructTreeParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
         symbols: &mut ShaderSymbolListBuilder,
     ) {
-        let label_node = matches.captures[0].node;
-        let struct_name: String = get_name(shader_content, matches.captures[0].node).into();
+        let label_node = symbol_match.captures[0].node;
+        let struct_name: String = get_name(shader_content, symbol_match.captures[0].node).into();
         let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
 
         // QUERY INNER METHODS
         let mut query_cursor = tree_sitter::QueryCursor::new();
-        let methods = query_cursor
+        let mut all_matches = query_cursor
             .matches(
                 &self.func_query,
-                matches.captures[1].node,
+                symbol_match.captures[1].node,
                 shader_content.as_bytes(),
-            )
-            .map(|matches| {
-                let mut symbols = ShaderSymbolListBuilder::new(&|_| true);
-                self.func_parser.process_match(
-                    matches,
-                    file_path,
-                    shader_content,
-                    scopes,
-                    &mut symbols,
-                );
-                symbols
-                    .get_shader_symbol_list()
-                    .functions
-                    .into_iter()
-                    .map(|f| ShaderMethod {
-                        context: struct_name.clone(),
-                        label: f.label.clone(),
-                        signature: if let ShaderSymbolData::Functions { signatures } = &f.data {
-                            signatures[0].clone()
-                        } else {
-                            panic!("Invalid function type");
-                        },
-                        range: f.mode.map_runtime().map(|r| r.range.clone()),
-                    })
-                    .collect::<Vec<ShaderMethod>>()
-            })
-            .collect::<Vec<Vec<ShaderMethod>>>()
-            .concat();
+            );
+        let mut methods = Vec::new();
+        while let Some(method_match) = all_matches.next() {
+            let mut symbols = ShaderSymbolListBuilder::new(&|_| true);
+            self.func_parser.process_match(
+                method_match,
+                file_path,
+                shader_content,
+                scopes,
+                &mut symbols,
+            );
+            methods.push(symbols
+                .get_shader_symbol_list()
+                .functions
+                .into_iter()
+                .map(|f| ShaderMethod {
+                    context: struct_name.clone(),
+                    label: f.label.clone(),
+                    signature: if let ShaderSymbolData::Functions { signatures } = &f.data {
+                        signatures[0].clone()
+                    } else {
+                        panic!("Invalid function type");
+                    },
+                    range: f.mode.map_runtime().map(|r| r.range.clone()),
+                })
+                .collect::<Vec<ShaderMethod>>());
+        }
 
         // QUERY INNER MEMBERS
         let mut query_cursor = tree_sitter::QueryCursor::new();
-        let members = query_cursor
+        let mut all_matches = query_cursor
             .matches(
                 &self.var_query,
-                matches.captures[1].node,
+                symbol_match.captures[1].node,
                 shader_content.as_bytes(),
-            )
-            .map(|matches| {
-                let mut symbols = ShaderSymbolListBuilder::new(&|_| true);
-                self.var_parser.process_match(
-                    matches,
-                    file_path,
-                    shader_content,
-                    scopes,
-                    &mut symbols,
-                );
-                symbols
-                    .get_shader_symbol_list()
-                    .variables
-                    .into_iter()
-                    .map(|f| ShaderMember {
-                        context: struct_name.clone(),
-                        parameters: ShaderParameter {
-                            label: f.label.clone(),
-                            ty: if let ShaderSymbolData::Variables { ty, count: _ } = &f.data {
-                                ty.clone()
-                            } else {
-                                panic!("Invalid variable type");
-                            },
-                            count: if let ShaderSymbolData::Variables { ty: _, count } = &f.data {
-                                count.clone()
-                            } else {
-                                panic!("Invalid variable type");
-                            },
-                            description: "".into(),
-                            range: f.mode.map_runtime().map(|r| r.range.clone()),
+            );
+            
+        let mut members = Vec::new();
+        while let Some(method_match) = all_matches.next() {
+            let mut symbols = ShaderSymbolListBuilder::new(&|_| true);
+            self.var_parser.process_match(
+                method_match,
+                file_path,
+                shader_content,
+                scopes,
+                &mut symbols,
+            );
+            members.push(symbols
+                .get_shader_symbol_list()
+                .variables
+                .into_iter()
+                .map(|f| ShaderMember {
+                    context: struct_name.clone(),
+                    parameters: ShaderParameter {
+                        label: f.label.clone(),
+                        ty: if let ShaderSymbolData::Variables { ty, count: _ } = &f.data {
+                            ty.clone()
+                        } else {
+                            panic!("Invalid variable type");
                         },
-                    })
-                    .collect::<Vec<ShaderMember>>()
-            })
-            .collect::<Vec<Vec<ShaderMember>>>()
-            .concat();
+                        count: if let ShaderSymbolData::Variables { ty: _, count } = &f.data {
+                            count.clone()
+                        } else {
+                            panic!("Invalid variable type");
+                        },
+                        description: "".into(),
+                        range: f.mode.map_runtime().map(|r| r.range.clone()),
+                    },
+                })
+                .collect::<Vec<ShaderMember>>())
+        }
         symbols.add_type(ShaderSymbol {
             label: struct_name,
             requirement: None,
             data: ShaderSymbolData::Struct {
                 constructors: vec![], // No constructor in HLSL
-                members: members,
-                methods: methods,
+                members: members.concat(),
+                methods: methods.concat(),
             },
             // TODO: compute scope
             mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(
@@ -306,16 +307,16 @@ impl SymbolTreeParser for HlslVariableTreeParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
         symbol_builder: &mut ShaderSymbolListBuilder,
     ) {
-        let type_node = matches.captures[0].node;
-        let label_node = matches.captures[1].node;
-        let size_node = if matches.captures.len() == 3 {
-            Some(matches.captures[2].node)
+        let type_node = symbol_match.captures[0].node;
+        let label_node = symbol_match.captures[1].node;
+        let size_node = if symbol_match.captures.len() == 3 {
+            Some(symbol_match.captures[2].node)
         } else {
             None
         };
@@ -358,7 +359,7 @@ impl SymbolTreeParser for HlslEnumTreeParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
@@ -366,16 +367,16 @@ impl SymbolTreeParser for HlslEnumTreeParser {
     ) {
         // TODO: differentiate enum class
         // TODO: Handle no values aswell (will be tricky with count...)
-        let label_node = matches.captures[0].node;
+        let label_node = symbol_match.captures[0].node;
         let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
-        let scope_node = matches.captures[1].node;
+        let scope_node = symbol_match.captures[1].node;
         let scope_range = ShaderRange::from(scope_node.range());
         symbol_builder.add_type(ShaderSymbol {
             label: get_name(shader_content, label_node).into(),
             requirement: None,
             data: ShaderSymbolData::Enum {
-                values: matches.captures[2..]
+                values: symbol_match.captures[2..]
                     .chunks(2)
                     .into_iter()
                     .map(|c| ShaderEnumValue {
@@ -422,13 +423,13 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
         symbol_builder: &mut ShaderSymbolListBuilder,
     ) {
-        let label_node = matches.captures[0].node;
+        let label_node = symbol_match.captures[0].node;
         let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
         let label = get_name(shader_content, label_node).into();
@@ -438,7 +439,7 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
             data: ShaderSymbolData::CallExpression {
                 label: get_name(shader_content, label_node).into(),
                 range: range.clone(),
-                parameters: matches.captures[1..]
+                parameters: symbol_match.captures[1..]
                     .iter()
                     .enumerate()
                     .map(|(i, e)| {
@@ -462,7 +463,7 @@ impl SymbolTreeParser for HlslCallExpressionTreeParser {
 mod hlsl_parser_tests {
     use std::{path::Path, vec};
 
-    use tree_sitter::{Query, QueryCursor};
+    use tree_sitter::{Query, QueryCursor, StreamingIterator};
 
     use crate::{
         position::{ShaderPosition, ShaderRange},
@@ -487,18 +488,17 @@ mod hlsl_parser_tests {
     ) -> ShaderSymbolList {
         let mut symbol_list_builder = ShaderSymbolListBuilder::new(&|_| true);
         let mut query_cursor = QueryCursor::new();
-        let query = Query::new(tree_sitter_hlsl::language(), parser.get_query().as_str()).unwrap();
+        let query = Query::new(&tree_sitter_hlsl::LANGUAGE_HLSL.into(), parser.get_query().as_str()).unwrap();
 
         let mut shader_module_parser =
             ShaderModuleParser::from_shading_language(ShadingLanguage::Hlsl);
         let module = shader_module_parser
             .create_module(file_path, shader_content)
             .unwrap();
-        for matches in
-            query_cursor.matches(&query, module.tree.root_node(), module.content.as_bytes())
-        {
+        let mut all_matches = query_cursor.matches(&query, module.tree.root_node(), module.content.as_bytes());
+        while let Some(symbol_match) = all_matches.next() {
             parser.process_match(
-                matches,
+                symbol_match,
                 &module.file_path,
                 &module.content,
                 &vec![],

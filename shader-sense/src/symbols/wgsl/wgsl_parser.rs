@@ -33,22 +33,22 @@ impl SymbolTreeParser for WgslStructTreeParser {
     }
     fn process_match(
         &self,
-        matches: tree_sitter::QueryMatch,
+        symbol_match: &tree_sitter::QueryMatch,
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
         symbols: &mut ShaderSymbolListBuilder,
     ) {
-        let label_node = matches.captures[0].node;
+        let label_node = symbol_match.captures[0].node;
         let range = ShaderRange::from(label_node.range());
         let scope_stack = self.compute_scope_stack(&scopes, &range);
-        let struct_name: String = get_name(shader_content, matches.captures[0].node).into();
+        let struct_name: String = get_name(shader_content, symbol_match.captures[0].node).into();
         symbols.add_type(ShaderSymbol {
             label: struct_name.clone(),
             requirement: None,
             data: ShaderSymbolData::Struct {
                 constructors: vec![], // Constructor in wgsl ?
-                members: matches.captures[1..]
+                members: symbol_match.captures[1..]
                     .chunks(2)
                     .map(|w| ShaderMember {
                         context: struct_name.clone(),

@@ -1,6 +1,6 @@
 use std::num::ParseIntError;
 
-use tree_sitter::{Query, QueryCursor};
+use tree_sitter::{Query, QueryCursor, StreamingIterator};
 
 use crate::{
     position::{ShaderFilePosition, ShaderFileRange, ShaderPosition, ShaderRange},
@@ -103,7 +103,7 @@ pub struct HlslSymbolRegionFinder {
 }
 
 impl HlslSymbolRegionFinder {
-    pub fn new(lang: tree_sitter::Language) -> Self {
+    pub fn new(lang: &tree_sitter::Language) -> Self {
         let query_if = Query::new(
             lang,
             r#"
@@ -392,9 +392,8 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         let mut query_cursor = QueryCursor::new();
         let mut regions = Vec::new();
         let mut last_processed_position = ShaderPosition::zero();
-        for region_match in
-            query_cursor.matches(&self.query_if, node, shader_module.content.as_bytes())
-        {
+        let mut all_match = query_cursor.matches(&self.query_if, node, shader_module.content.as_bytes());
+        while let Some(region_match) = all_match.next() {
             fn parse_region<'a>(
                 shader_module: &ShaderModule,
                 symbol_provider: &SymbolProvider,

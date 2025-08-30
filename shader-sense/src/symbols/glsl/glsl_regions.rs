@@ -17,7 +17,7 @@ pub struct GlslRegionFinder {
 impl GlslRegionFinder {
     pub fn new() -> Self {
         Self {
-            region_finder: HlslSymbolRegionFinder::new(tree_sitter_glsl::language()),
+            region_finder: HlslSymbolRegionFinder::new(&tree_sitter_glsl::LANGUAGE_GLSL.into()),
         }
     }
 }

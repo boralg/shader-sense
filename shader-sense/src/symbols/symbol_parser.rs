@@ -278,7 +278,7 @@ pub trait SymbolTreeParser {
     // Process the match & convert it to symbol
     fn process_match(
         &self,
-        matches: QueryMatch,
+        symbol_match: &QueryMatch,
         file_path: &Path,
         shader_content: &str,
         scopes: &Vec<ShaderScope>,
@@ -322,7 +322,7 @@ pub trait SymbolTreePreprocessorParser {
     // Process the match & convert it to preprocessor
     fn process_match(
         &self,
-        matches: QueryMatch,
+        symbol_match: &QueryMatch,
         file_path: &Path,
         shader_content: &str,
         preprocessor: &mut ShaderPreprocessor,

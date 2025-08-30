@@ -26,10 +26,10 @@ impl SymbolWordProvider for WgslSymbolWordProvider {
 }
 
 pub(super) fn create_wgsl_symbol_provider(
-    tree_sitter_language: tree_sitter::Language,
+    tree_sitter_language: &tree_sitter::Language,
 ) -> SymbolProvider {
     SymbolProvider::new(
-        tree_sitter_language.clone(),
+        tree_sitter_language,
         get_wgsl_parsers(),
         vec![],
         Box::new(WgslRegionFinder {}),
