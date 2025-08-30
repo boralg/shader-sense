@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use tree_sitter::{Node, QueryMatch};
 
 use crate::{
-    position::{ShaderFilePosition, ShaderPosition, ShaderRange},
+    position::{ShaderPosition, ShaderRange},
     shader::ShaderCompilationParams,
     shader_error::ShaderError,
     symbols::{
@@ -335,6 +335,6 @@ pub trait SymbolWordProvider {
         &self,
         shader_module: &ShaderModule,
         node: Node,
-        position: &ShaderFilePosition,
+        position: &ShaderPosition,
     ) -> Result<ShaderWordRange, ShaderError>;
 }

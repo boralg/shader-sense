@@ -44,7 +44,7 @@ impl ServerLanguage {
                 );
                 let word_range = language_data.symbol_provider.get_word_range_at_position(
                     &RefCell::borrow(&cached_file.shader_module),
-                    &function_label_range.start_as_file_position(),
+                    &function_label_range.start(),
                 );
                 if let Some(parameter_index) = parameter_index {
                     (word_range, parameter_index)

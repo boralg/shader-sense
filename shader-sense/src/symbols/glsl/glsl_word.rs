@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
 use crate::{
-    position::{ShaderFilePosition, ShaderFileRange, ShaderRange},
+    position::{ShaderPosition, ShaderRange},
     shader_error::ShaderError,
     symbols::{
         shader_module::ShaderModule,
@@ -16,16 +16,10 @@ impl SymbolWordProvider for GlslSymbolWordProvider {
         &self,
         shader_module: &ShaderModule,
         node: Node,
-        position: &ShaderFilePosition,
+        position: &ShaderPosition,
     ) -> Result<ShaderWordRange, ShaderError> {
-        fn range_contain(
-            including_range: tree_sitter::Range,
-            position: ShaderFilePosition,
-        ) -> bool {
-            let including_range = ShaderFileRange::from(
-                position.file_path.clone(),
-                ShaderRange::from(including_range),
-            );
+        fn range_contain(including_range: tree_sitter::Range, position: ShaderPosition) -> bool {
+            let including_range = ShaderRange::from(including_range);
             including_range.contain(&position)
         }
         if range_contain(node.range(), position.clone()) {

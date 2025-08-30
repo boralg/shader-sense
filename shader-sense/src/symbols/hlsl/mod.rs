@@ -34,8 +34,10 @@ mod tests {
             ShadingLanguageTag,
         },
         symbols::{
+            hlsl::hlsl_word::HlslSymbolWordProvider,
             prepocessor::ShaderRegion,
             shader_module_parser::ShaderModuleParser,
+            symbol_parser::SymbolWordProvider,
             symbol_provider::{default_include_callback, SymbolProvider},
         },
     };
@@ -146,5 +148,51 @@ mod tests {
                 region_index
             );
         }
+    }
+
+    #[test]
+    fn test_words() {
+        let file_path = "./test/hlsl/struct.hlsl";
+        let shader_content = std::fs::read_to_string(file_path).unwrap();
+        let word_provider = HlslSymbolWordProvider {};
+        let mut shader_module_parser =
+            ShaderModuleParser::from_shading_language(ShadingLanguage::Hlsl);
+        let shader_module = shader_module_parser
+            .create_module(Path::new(file_path), &shader_content)
+            .unwrap();
+
+        // container
+        let word = word_provider
+            .find_word_at_position_in_node(
+                &shader_module,
+                shader_module.tree.root_node(),
+                &ShaderPosition::new(23, 17),
+            )
+            .unwrap();
+        assert!(word.get_word() == "container");
+        assert!(word.get_parent().is_none());
+
+        // container.method()
+        let word = word_provider
+            .find_word_at_position_in_node(
+                &shader_module,
+                shader_module.tree.root_node(),
+                &ShaderPosition::new(23, 27),
+            )
+            .unwrap();
+        assert!(word.get_word() == "method");
+        assert!(word.get_parent().unwrap().get_word() == "container");
+
+        // container.method().test2
+        let word = word_provider
+            .find_word_at_position_in_node(
+                &shader_module,
+                shader_module.tree.root_node(),
+                &ShaderPosition::new(23, 44),
+            )
+            .unwrap();
+        assert!(word.get_word() == "test2");
+        assert!(word.get_parent().unwrap().get_word() == "method");
+        assert!(word.get_parent().unwrap().get_parent().unwrap().get_word() == "container");
     }
 }

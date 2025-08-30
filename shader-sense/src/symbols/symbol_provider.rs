@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use tree_sitter::{Query, QueryCursor, StreamingIterator};
 
 use crate::{
-    position::{ShaderFilePosition, ShaderFileRange, ShaderPosition, ShaderRange},
+    position::{ShaderFileRange, ShaderPosition, ShaderRange},
     shader::{ShaderCompilationParams, ShaderParams, ShadingLanguage, ShadingLanguageTag},
     shader_error::{ShaderDiagnostic, ShaderDiagnosticSeverity, ShaderError},
     symbols::{
@@ -62,7 +62,7 @@ impl SymbolProvider {
     }
     pub fn wgsl() -> Self {
         // TODO:WGSL: need to wait for merge.
-        create_wgsl_symbol_provider(&tree_sitter_hlsl::LANGUAGE_HLSL.into())//tree_sitter_wgsl_bevy::LANGUAGE_WGSL.into())
+        create_wgsl_symbol_provider(&tree_sitter_hlsl::LANGUAGE_HLSL.into()) //tree_sitter_wgsl_bevy::LANGUAGE_WGSL.into())
     }
     pub fn from_shading_language(shading_language: ShadingLanguage) -> Self {
         match shading_language {
@@ -116,7 +116,7 @@ impl SymbolProvider {
             shader_module.tree.root_node(),
             shader_module.content.as_bytes(),
         );
-        while let Some(symbol_match) = all_matches.next()  {
+        while let Some(symbol_match) = all_matches.next() {
             scopes.push(match symbol_match.captures.len() {
                 // one body
                 1 => ShaderScope::from(ShaderRange::from(symbol_match.captures[0].node.range())),
@@ -278,7 +278,7 @@ impl SymbolProvider {
                     shader_module.tree.root_node(),
                     shader_module.content.as_bytes(),
                 );
-                while let Some(symbol_match) = all_matches.next()  {
+                while let Some(symbol_match) = all_matches.next() {
                     parser.0.process_match(
                         symbol_match,
                         &shader_module.file_path,
@@ -314,7 +314,7 @@ impl SymbolProvider {
                 shader_module.tree.root_node(),
                 shader_module.content.as_bytes(),
             );
-            while let Some(symbol_match) = all_matches.next()  {
+            while let Some(symbol_match) = all_matches.next() {
                 preprocessor.diagnostics.push(ShaderDiagnostic {
                     severity: ShaderDiagnosticSeverity::Warning,
                     error:
@@ -395,7 +395,7 @@ impl SymbolProvider {
                 shader_module.tree.root_node(),
                 shader_module.content.as_bytes(),
             );
-            while let Some(symbol_match) = all_matches.next()  {
+            while let Some(symbol_match) = all_matches.next() {
                 parser.0.process_match(
                     symbol_match,
                     &shader_module.file_path,
@@ -410,7 +410,7 @@ impl SymbolProvider {
     pub fn get_word_range_at_position(
         &self,
         shader_module: &ShaderModule,
-        position: &ShaderFilePosition,
+        position: &ShaderPosition,
     ) -> Result<ShaderWordRange, ShaderError> {
         self.word_provider.find_word_at_position_in_node(
             shader_module,

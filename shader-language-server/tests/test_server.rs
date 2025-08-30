@@ -10,7 +10,8 @@ use std::{
 use lsp_types::{
     notification::{Exit, Initialized},
     request::{Initialize, Request, Shutdown, WorkDoneProgressCreate, WorkspaceConfiguration},
-    InitializeParams, InitializedParams, TextDocumentIdentifier, TextDocumentItem, Url,
+    InitializeParams, InitializedParams, Position, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPositionParams, Url,
 };
 use serde_json::Value;
 use shader_sense::{include::canonicalize, shader::ShadingLanguage};
@@ -42,6 +43,15 @@ impl TestFile {
     pub fn identifier(&self) -> TextDocumentIdentifier {
         TextDocumentIdentifier {
             uri: self.url.clone(),
+        }
+    }
+    pub fn position_params(&self, line: u32, character: u32) -> TextDocumentPositionParams {
+        TextDocumentPositionParams {
+            text_document: self.identifier(),
+            position: Position {
+                line: line,
+                character: character,
+            },
         }
     }
 }
@@ -170,7 +180,7 @@ impl TestServer {
     pub fn send_request<T: lsp_types::request::Request>(
         &mut self,
         params: &T::Params,
-        callback: fn(T::Result),
+        callback: fn(Option<T::Result>),
     ) {
         let request = lsp_server::Message::Request(lsp_server::Request::new(
             lsp_server::RequestId::from(self.request_id),
@@ -190,9 +200,9 @@ impl TestServer {
                         match response.result {
                             Some(result) => {
                                 let response: T::Result = serde_json::from_value(result).unwrap();
-                                callback(response);
+                                callback(Some(response));
                             }
-                            None => println!("No response received for request {}", T::METHOD),
+                            None => callback(None),
                         }
                         break;
                     }

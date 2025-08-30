@@ -4,8 +4,7 @@ use wgsl_parser::get_wgsl_parsers;
 use wgsl_regions::WgslRegionFinder;
 
 use crate::{
-    position::ShaderFilePosition, shader_error::ShaderError,
-    symbols::symbol_parser::ShaderWordRange,
+    position::ShaderPosition, shader_error::ShaderError, symbols::symbol_parser::ShaderWordRange,
 };
 
 use super::{
@@ -19,7 +18,7 @@ impl SymbolWordProvider for WgslSymbolWordProvider {
         &self,
         _shader_module: &ShaderModule,
         _node: tree_sitter::Node,
-        _position: &ShaderFilePosition,
+        _position: &ShaderPosition,
     ) -> Result<ShaderWordRange, ShaderError> {
         return Err(ShaderError::NoSymbol);
     }

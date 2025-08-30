@@ -392,7 +392,8 @@ impl SymbolRegionFinder for HlslSymbolRegionFinder {
         let mut query_cursor = QueryCursor::new();
         let mut regions = Vec::new();
         let mut last_processed_position = ShaderPosition::zero();
-        let mut all_match = query_cursor.matches(&self.query_if, node, shader_module.content.as_bytes());
+        let mut all_match =
+            query_cursor.matches(&self.query_if, node, shader_module.content.as_bytes());
         while let Some(region_match) = all_match.next() {
             fn parse_region<'a>(
                 shader_module: &ShaderModule,

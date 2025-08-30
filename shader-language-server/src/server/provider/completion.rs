@@ -82,7 +82,7 @@ impl ServerLanguage {
             Some(_) => {
                 match language_data.symbol_provider.get_word_range_at_position(
                     &RefCell::borrow(&cached_file.shader_module),
-                    &shader_file_position,
+                    &shader_file_position.position,
                 ) {
                     Ok(word) => {
                         let symbols = word.find_symbol_from_parent(file_path.clone(), &symbol_list);

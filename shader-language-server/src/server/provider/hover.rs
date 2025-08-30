@@ -27,7 +27,7 @@ impl ServerLanguage {
             .unwrap();
         match language_data.symbol_provider.get_word_range_at_position(
             &RefCell::borrow(&cached_file.shader_module),
-            &shader_position,
+            &shader_position.position,
         ) {
             // word_range should be the same as symbol range
             Ok(word) => {

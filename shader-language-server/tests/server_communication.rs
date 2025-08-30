@@ -6,7 +6,7 @@ use core::panic;
 use std::collections::HashMap;
 use std::path::Path;
 
-use lsp_types::request::{DocumentDiagnosticRequest, WorkspaceSymbolRequest};
+use lsp_types::request::{DocumentDiagnosticRequest, HoverRequest, WorkspaceSymbolRequest};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
     request::DocumentSymbolRequest,
@@ -16,12 +16,13 @@ use lsp_types::{
 };
 use lsp_types::{
     DiagnosticSeverity, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticReportResult, RelatedFullDocumentDiagnosticReport, WorkspaceSymbolParams,
-    WorkspaceSymbolResponse,
+    DocumentDiagnosticReportResult, Hover, HoverParams, RelatedFullDocumentDiagnosticReport,
+    WorkspaceSymbolParams, WorkspaceSymbolResponse,
 };
 use shader_language_server::server::shader_variant::{
     DidChangeShaderVariant, DidChangeShaderVariantParams, ShaderVariant,
 };
+use shader_sense::position::ShaderPosition;
 use shader_sense::shader::{ShaderStage, ShadingLanguage};
 use test_server::{TestFile, TestServer};
 
@@ -104,7 +105,7 @@ fn test_variant() {
     });
     server.send_request::<DocumentSymbolRequest>(&document_symbol_params, |response| {
         assert!(
-            has_document_symbol(response, "mainError"),
+            has_document_symbol(response.unwrap(), "mainError"),
             "Missing symbol mainError for variant"
         );
     });
@@ -120,7 +121,7 @@ fn test_variant() {
     });
     server.send_request::<DocumentSymbolRequest>(&document_symbol_params, |response| {
         assert!(
-            has_document_symbol(response, "mainOk"),
+            has_document_symbol(response.unwrap(), "mainOk"),
             "Missing symbol mainOk for variant"
         );
     });
@@ -163,7 +164,7 @@ fn test_variant_dependency() {
             partial_result_params: PartialResultParams::default(),
         },
         |report| {
-            let report = get_diagnostic_report(report);
+            let report = get_diagnostic_report(report.unwrap());
             let errors: Vec<&lsp_types::Diagnostic> = report
                 .full_document_diagnostic_report
                 .items
@@ -199,7 +200,7 @@ fn test_variant_dependency() {
             partial_result_params: PartialResultParams::default(),
         },
         |report| {
-            let report = get_diagnostic_report(report);
+            let report = get_diagnostic_report(report.unwrap());
             let errors: Vec<&lsp_types::Diagnostic> = report
                 .full_document_diagnostic_report
                 .items
@@ -351,7 +352,7 @@ fn test_dependency_include_guard() {
     });
     server.send_request::<WorkspaceSymbolRequest>(&workspace_symbol_params, |response| {
         assert!(
-            has_workspace_symbol(response, "methodLevel1"),
+            has_workspace_symbol(response.unwrap(), "methodLevel1"),
             "Missing symbol methodLevel1 for variant deps"
         );
     });
@@ -360,5 +361,68 @@ fn test_dependency_include_guard() {
     });
     server.send_notification::<DidCloseTextDocument>(&DidCloseTextDocumentParams {
         text_document: deps.identifier(),
+    });
+}
+
+#[test]
+fn test_hover() {
+    let mut server = TestServer::desktop().unwrap();
+
+    static FILE_PATH: &str = "../shader-sense/test/hlsl/struct.hlsl";
+
+    fn assert_hover_value(response: Option<Hover>, value: &str) {
+        let content = std::fs::read_to_string(&FILE_PATH).unwrap();
+        let item_range = response.unwrap().range.unwrap();
+        let start_byte_offset =
+            ShaderPosition::new(item_range.start.line, item_range.start.character)
+                .to_byte_offset(&content)
+                .unwrap();
+        let end_byte_offset = ShaderPosition::new(item_range.end.line, item_range.end.character)
+            .to_byte_offset(&content)
+            .unwrap();
+        let hovered_item = &content[start_byte_offset..end_byte_offset];
+        println!("Hovered item is {:?} at {:?}", hovered_item, item_range);
+        assert!(
+            hovered_item == value,
+            "Hovered item {:?} is different from {:?}",
+            hovered_item,
+            value
+        );
+    }
+
+    let file = TestFile::new(Path::new(FILE_PATH), ShadingLanguage::Hlsl);
+
+    server.send_notification::<DidOpenTextDocument>(&DidOpenTextDocumentParams {
+        text_document: file.item(),
+    });
+    server.send_request::<HoverRequest>(
+        &HoverParams {
+            text_document_position_params: file.position_params(23, 17),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        },
+        |response| {
+            assert_hover_value(response.unwrap(), "container");
+        },
+    );
+    server.send_request::<HoverRequest>(
+        &HoverParams {
+            text_document_position_params: file.position_params(23, 27),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        },
+        |response| {
+            assert_hover_value(response.unwrap(), "method");
+        },
+    );
+    server.send_request::<HoverRequest>(
+        &HoverParams {
+            text_document_position_params: file.position_params(23, 44),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        },
+        |response| {
+            assert_hover_value(response.unwrap(), "test2");
+        },
+    );
+    server.send_notification::<DidCloseTextDocument>(&DidCloseTextDocumentParams {
+        text_document: file.identifier(),
     });
 }
