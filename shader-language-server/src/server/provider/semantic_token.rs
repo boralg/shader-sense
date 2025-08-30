@@ -1,22 +1,26 @@
 use std::cell::RefCell;
 
+use lru::LruCache;
 use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensResult, Url};
 use shader_sense::symbols::symbols::ShaderSymbolMode;
 use shader_sense::{
-    position::ShaderPosition, shader_error::ShaderError, symbols::symbol_list::ShaderSymbolListRef,
-    symbols::symbols::ShaderSymbolData,
+    position::ShaderPosition, shader_error::ShaderError, symbols::symbols::ShaderSymbolData,
 };
-
-use crate::server::server_file_cache::ServerFileCache;
 
 use crate::server::ServerLanguage;
 
 impl ServerLanguage {
-    fn find_macros(
-        uri: &Url,
-        cached_file: &ServerFileCache,
-        symbols: &ShaderSymbolListRef,
-    ) -> Vec<SemanticToken> {
+    fn get_regex<'a>(
+        label: &String,
+        regex_cache: &'a mut LruCache<String, regex::Regex>,
+    ) -> &'a regex::Regex {
+        regex_cache.get_or_insert(label.clone(), || {
+            regex::Regex::new(format!("\\b({})\\b", regex::escape(label)).as_str()).unwrap()
+        })
+    }
+    fn find_macros(&mut self, uri: &Url) -> Vec<SemanticToken> {
+        let cached_file = self.watched_files.files.get(uri).unwrap();
+        let symbols = self.watched_files.get_all_symbols(&uri);
         let file_path = uri.to_file_path().unwrap();
         let content = &RefCell::borrow(&cached_file.shader_module).content;
         symbols
@@ -47,29 +51,23 @@ impl ServerLanguage {
                 // Need to ignore comment aswell... Might need tree sitter instead.
                 // Looking for preproc_arg & identifier might be enough.
                 // Need to check for regions too...
-                let reg =
-                    regex::Regex::new(format!("\\b({})\\b", regex::escape(&symbol.label)).as_str())
-                        .unwrap();
+                let reg = Self::get_regex(&symbol.label, &mut self.regex_cache);
                 let word_byte_offsets: Vec<usize> = reg
-                    .captures_iter(&content)
-                    .map(|e| e.get(0).unwrap().range().start)
+                    .captures_iter(&content[byte_offset_start..])
+                    .map(|e| e.get(0).unwrap().range().start + byte_offset_start)
                     .collect();
                 word_byte_offsets
                     .iter()
                     .filter_map(|byte_offset| {
                         match ShaderPosition::from_byte_offset(&content, *byte_offset) {
                             Ok(position) => {
-                                if byte_offset_start > *byte_offset {
-                                    None
-                                } else {
-                                    Some(SemanticToken {
-                                        delta_line: position.line,
-                                        delta_start: position.pos,
-                                        length: symbol.label.len() as u32,
-                                        token_type: 0, // SemanticTokenType::MACRO, view registration
-                                        token_modifiers_bitset: 0,
-                                    })
-                                }
+                                Some(SemanticToken {
+                                    delta_line: position.line,
+                                    delta_start: position.pos,
+                                    length: symbol.label.len() as u32,
+                                    token_type: 0, // SemanticTokenType::MACRO, view registration
+                                    token_modifiers_bitset: 0,
+                                })
                             }
                             Err(_) => None,
                         }
@@ -79,11 +77,9 @@ impl ServerLanguage {
             .collect::<Vec<Vec<SemanticToken>>>()
             .concat()
     }
-    fn find_enum(
-        uri: &Url,
-        cached_file: &ServerFileCache,
-        symbols: &ShaderSymbolListRef,
-    ) -> Vec<SemanticToken> {
+    fn find_enum(&mut self, uri: &Url) -> Vec<SemanticToken> {
+        let cached_file = self.watched_files.files.get(uri).unwrap();
+        let symbols = self.watched_files.get_all_symbols(&uri);
         let file_path = uri.to_file_path().unwrap();
         let content = &RefCell::borrow(&cached_file.shader_module).content;
         symbols
@@ -114,33 +110,24 @@ impl ServerLanguage {
                     };
                     let mut tokens = Vec::new();
                     // Add enum label aswell.
-                    // TODO: use cache lru for caching regex heavy cost.
-                    let reg = regex::Regex::new(
-                        format!("\\b({})\\b", regex::escape(&symbol.label)).as_str(),
-                    )
-                    .unwrap();
+                    let reg = Self::get_regex(&symbol.label, &mut self.regex_cache);
                     let word_byte_offsets: Vec<usize> = reg
-                        .captures_iter(&content)
-                        .map(|e| e.get(0).unwrap().range().start)
+                        .captures_iter(&content[byte_offset_start..])
+                        .map(|c| c.get(0).unwrap().range().start + byte_offset_start)
                         .collect();
                     tokens.extend(
                         word_byte_offsets
                             .iter()
                             .filter_map(|byte_offset| {
-                                // TODO:OPTIM: could avoid this heavy conversion by checking byte_offset before.
                                 match ShaderPosition::from_byte_offset(&content, *byte_offset) {
                                     Ok(position) => {
-                                        if byte_offset_start > *byte_offset {
-                                            None
-                                        } else {
-                                            Some(SemanticToken {
-                                                delta_line: position.line,
-                                                delta_start: position.pos,
-                                                length: symbol.label.len() as u32,
-                                                token_type: 3, // SemanticTokenType::ENUM, view registration
-                                                token_modifiers_bitset: 0,
-                                            })
-                                        }
+                                        Some(SemanticToken {
+                                            delta_line: position.line,
+                                            delta_start: position.pos,
+                                            length: symbol.label.len() as u32,
+                                            token_type: 3, // SemanticTokenType::ENUM, view registration
+                                            token_modifiers_bitset: 0,
+                                        })
                                     }
                                     Err(_) => None,
                                 }
@@ -149,13 +136,10 @@ impl ServerLanguage {
                     );
                     // Collect enum member now.
                     for value in values {
-                        let reg = regex::Regex::new(
-                            format!("\\b({})\\b", regex::escape(&value.label)).as_str(),
-                        )
-                        .unwrap();
+                        let reg = Self::get_regex(&value.label, &mut self.regex_cache);
                         let word_byte_offsets: Vec<usize> = reg
-                            .captures_iter(&content)
-                            .map(|e| e.get(0).unwrap().range().start)
+                            .captures_iter(&content[byte_offset_start..])
+                            .map(|e| e.get(0).unwrap().range().start + byte_offset_start)
                             .collect();
                         tokens.extend(
                             word_byte_offsets
@@ -163,17 +147,13 @@ impl ServerLanguage {
                                 .filter_map(|byte_offset| {
                                     match ShaderPosition::from_byte_offset(&content, *byte_offset) {
                                         Ok(position) => {
-                                            if byte_offset_start > *byte_offset {
-                                                None
-                                            } else {
-                                                Some(SemanticToken {
-                                                    delta_line: position.line,
-                                                    delta_start: position.pos,
-                                                    length: value.label.len() as u32,
-                                                    token_type: 2, // SemanticTokenType::ENUM_MEMBER, view registration
-                                                    token_modifiers_bitset: 0,
-                                                })
-                                            }
+                                            Some(SemanticToken {
+                                                delta_line: position.line,
+                                                delta_start: position.pos,
+                                                length: value.label.len() as u32,
+                                                token_type: 2, // SemanticTokenType::ENUM_MEMBER, view registration
+                                                token_modifiers_bitset: 0,
+                                            })
                                         }
                                         Err(_) => None,
                                     }
@@ -188,11 +168,9 @@ impl ServerLanguage {
             .collect::<Vec<Vec<SemanticToken>>>()
             .concat()
     }
-    fn find_parameters_variables(
-        uri: &Url,
-        cached_file: &ServerFileCache,
-        symbols: &ShaderSymbolListRef,
-    ) -> Vec<SemanticToken> {
+    fn find_parameters_variables(&mut self, uri: &Url) -> Vec<SemanticToken> {
+        let cached_file = self.watched_files.files.get(uri).unwrap();
+        let symbols = self.watched_files.get_all_symbols(&uri);
         let file_path = uri.to_file_path().unwrap();
         let content = &RefCell::borrow(&cached_file.shader_module).content;
         symbols
@@ -225,11 +203,8 @@ impl ServerLanguage {
                                         }
                                         // Push occurences in scope
                                         // TODO: NOT dot at beginning of capture (as its a field.)
-                                        let reg = regex::Regex::new(
-                                            format!("\\b({})\\b", regex::escape(&parameter.label))
-                                                .as_str(),
-                                        )
-                                        .unwrap();
+                                        let reg =
+                                            Self::get_regex(&symbol.label, &mut self.regex_cache);
                                         let word_byte_offsets: Vec<usize> = reg
                                             .captures_iter(&content[content_start..content_end])
                                             .map(|e| {
@@ -281,14 +256,13 @@ impl ServerLanguage {
         &mut self,
         uri: &Url,
     ) -> Result<SemanticTokensResult, ShaderError> {
-        let cached_file = self.get_cachable_file(&uri)?;
-        // For now, only handle macros as we cant resolve them with textmate.
-        let symbols = self.watched_files.get_all_symbols(&uri);
+        // Ensure valid file input.
+        let _cached_file = self.get_cachable_file(&uri)?;
         // Find occurences of tokens to paint
         let mut tokens = Vec::new();
-        tokens.extend(Self::find_macros(uri, cached_file, &symbols));
-        tokens.extend(Self::find_parameters_variables(uri, cached_file, &symbols));
-        tokens.extend(Self::find_enum(uri, cached_file, &symbols));
+        tokens.extend(self.find_macros(uri));
+        tokens.extend(self.find_parameters_variables(uri));
+        tokens.extend(self.find_enum(uri));
 
         // Sort by positions
         tokens.sort_by(|lhs, rhs| {

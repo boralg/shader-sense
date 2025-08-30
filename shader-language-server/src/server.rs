@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::num::NonZero;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -19,6 +20,7 @@ mod server_language_data;
 use crossbeam_channel::RecvTimeoutError;
 use debug::{DumpAstRequest, DumpDependencyRequest};
 use log::{debug, error, info, warn};
+use lru::LruCache;
 use lsp_types::notification::{
     Cancel, DidChangeConfiguration, DidChangeTextDocument, DidCloseTextDocument,
     DidOpenTextDocument, DidSaveTextDocument, Notification, Progress,
@@ -62,6 +64,7 @@ pub struct ServerLanguage {
     // Cache
     watched_files: ServerLanguageFileCache,
     language_data: HashMap<ShadingLanguage, ServerLanguageData>,
+    regex_cache: LruCache<String, regex::Regex>, // For semantic token provider who create regex on the fly
 }
 
 fn clean_url(url: &Url) -> Url {
@@ -125,6 +128,7 @@ impl ServerLanguage {
                 (ShadingLanguage::Hlsl, ServerLanguageData::hlsl()),
                 (ShadingLanguage::Wgsl, ServerLanguageData::wgsl()),
             ]),
+            regex_cache: LruCache::new(NonZero::new(100).unwrap()),
         }
     }
     pub fn initialize(&mut self) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
