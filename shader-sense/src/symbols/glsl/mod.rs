@@ -18,6 +18,6 @@ pub(super) fn create_glsl_symbol_provider(
         get_glsl_parsers(),
         get_glsl_preprocessor_parser(),
         Box::new(GlslRegionFinder::new()),
-        Box::new(GlslSymbolWordProvider {}),
+        Box::new(GlslSymbolWordProvider::new()),
     )
 }

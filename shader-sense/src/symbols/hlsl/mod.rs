@@ -8,6 +8,7 @@ use hlsl_preprocessor::get_hlsl_preprocessor_parser;
 
 // For glsl
 pub use hlsl_regions::HlslSymbolRegionFinder;
+pub use hlsl_word::HlslSymbolWordProvider;
 
 use super::symbol_provider::SymbolProvider;
 
