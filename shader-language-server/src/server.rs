@@ -128,7 +128,11 @@ impl ServerLanguage {
                 (ShadingLanguage::Hlsl, ServerLanguageData::hlsl()),
                 (ShadingLanguage::Wgsl, ServerLanguageData::wgsl()),
             ]),
-            regex_cache: LruCache::new(NonZero::new(100).unwrap()),
+            // Big file can have a LOOT of macro, so big cache
+            // Idea is to be able all macros for a single file in cache.
+            // Else when recomputing a file, we will recreate all regex and reinsert
+            // them instead of reading from cache.
+            regex_cache: LruCache::new(NonZero::new(1000).unwrap()),
         }
     }
     pub fn initialize(&mut self) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
