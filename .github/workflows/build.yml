@@ -62,7 +62,7 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }} # Make Rust compile to our target (defined in the matrix)
       - name: Build desktop executable
-        run: cargo build --release --verbose --target ${{ matrix.target }} # Specify target to build into target
+        run: cargo build --package shader_language_server --release --verbose --target ${{ matrix.target }} # Specify target to build into target
       - name: Copy desktop executable
         run: mkdir -p ./bin/ && cp ./target/${{ matrix.target }}/release/${{ matrix.executable }} ./bin/${{ matrix.executable }}
       # TODO: Add debug symbols for supported target to bin folder.
@@ -109,7 +109,7 @@ jobs:
           CC: clang-17
           CXX: clang++-17
       - name: Build WASI executable
-        run: cargo build --release --target wasm32-wasip1-threads --verbose
+        run: cargo build --package shader_language_server --release --target wasm32-wasip1-threads --verbose
         env: # Somehow this VM has clang14 by default, which is not supported...
           CC: clang-17
           CXX: clang++-17
