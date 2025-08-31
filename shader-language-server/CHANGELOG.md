@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
+## [1.1.0] - 2025-08-31
+
+## Added
+
+- Hlsl raytracing functions added to database
+- Hlsl enum support (syntax highlighting + hover + completion)
+- Glsl mesh shader extension added to database. Feel free to contribute to this database by adding other extensions !
+- LRU cache for semantic tokens regex which are created on the fly and were impacting performances.
+
+## Changed
+
+- Upgraded tree-sitter dependencies to use tree-sitter-language which allow using different languages easily such as slang. Wgsl does not support it yet, so waiting for [this PR](https://github.com/tree-sitter-grammars/tree-sitter-wgsl-bevy/pull/19) to upgrade.
+
+## Fixed
+- Validation was not retriggered when changing settings.
+- Stripped template from variable type to help finding in symbol list.
+
 ## [1.0.0] - 2025-08-25
 
 This new version features a lot of changes that should drastically improve performances on huge shader codebase, memory usage and behaviour of variant & updates. There was also some redesign with the architecture to handle this and make the API more friendly to use.
@@ -344,7 +361,8 @@ Initial release of this extension
 
 
 <!-- Below are link for above changelog titles-->
-[unreleased]: https://github.com/antaalt/shader-sense/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/antaalt/shader-sense/compare/v1.1.0...HEAD
+[1.0.0]: https://github.com/antaalt/shader-sense/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/antaalt/shader-sense/compare/v0.8.2...v1.0.0
 [0.8.2]: https://github.com/antaalt/shader-sense/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/antaalt/shader-sense/compare/v0.8.0...v0.8.1
