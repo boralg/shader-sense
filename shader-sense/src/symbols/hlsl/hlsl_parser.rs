@@ -5,7 +5,7 @@ use tree_sitter::StreamingIterator;
 use crate::position::ShaderRange;
 use crate::symbols::symbol_parser::ShaderSymbolListBuilder;
 use crate::symbols::symbols::{
-    ShaderEnumValue, ShaderMember, ShaderSymbolMode, ShaderSymbolRuntime,
+    ShaderEnumValue, ShaderMember, ShaderSymbolArray, ShaderSymbolMode, ShaderSymbolRuntime,
 };
 
 use crate::symbols::{
@@ -331,8 +331,8 @@ impl SymbolTreeParser for HlslVariableTreeParser {
             data: ShaderSymbolData::Variables {
                 ty: get_name(shader_content, type_node).into(),
                 count: size_node.map(|s| match get_name(shader_content, s).parse::<u32>() {
-                    Ok(value) => value,
-                    Err(_) => 0, // TODO: Need to resolve the parameter. Could use proxy tree same as for region conditions. For now, simply return zero.
+                    Ok(value) => ShaderSymbolArray::Fixed(value),
+                    Err(_) => ShaderSymbolArray::Unsized, // TODO: Need to resolve the parameter. Could use proxy tree same as for region conditions. For now, simply unsized array.
                 }),
             },
             mode: ShaderSymbolMode::Runtime(ShaderSymbolRuntime::new(

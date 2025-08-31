@@ -132,6 +132,7 @@ impl IntrinsicParser for GlslIntrinsicParser {
         self.add_methods(&mut symbols, cache_path);
         self.add_types(&mut symbols);
         self.add_keywords(&mut symbols);
+        self.get_extensions(&mut symbols);
 
         symbols
     }

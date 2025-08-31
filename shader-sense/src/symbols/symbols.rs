@@ -11,7 +11,7 @@ use crate::{
 pub struct ShaderParameter {
     pub ty: String,
     pub label: String,
-    pub count: Option<u32>,
+    pub count: Option<ShaderSymbolArray>,
     pub description: String,
     #[serde(skip)] // Runtime only
     pub range: Option<ShaderRange>,
@@ -161,6 +161,18 @@ impl ShaderEnumValue {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum ShaderSymbolArray {
+    Fixed(u32),
+    Unsized,
+}
+
+impl From<u32> for ShaderSymbolArray {
+    fn from(value: u32) -> Self {
+        Self::Fixed(value)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ShaderSymbolData {
     // A bit of duplicate from variables ? Should be struct (Which should be renamed something else)
     Types {
@@ -182,7 +194,7 @@ pub enum ShaderSymbolData {
     Parameter {
         context: String,
         ty: String,
-        count: Option<u32>,
+        count: Option<ShaderSymbolArray>,
     },
     Method {
         context: String,
@@ -192,7 +204,7 @@ pub enum ShaderSymbolData {
     // Mostly runtime, but GLSL has global variable in builtin that need serial.
     Variables {
         ty: String,
-        count: Option<u32>,
+        count: Option<ShaderSymbolArray>,
     },
     Enum {
         values: Vec<ShaderEnumValue>,
@@ -526,12 +538,29 @@ impl ShaderSymbol {
                 value,
             } => format!("{} {} {} = {};", qualifier, ty, self.label.clone(), value),
             ShaderSymbolData::Variables { ty, count } => match count {
-                Some(count) => format!("{} {}[{}]", ty, self.label, count),
+                Some(count) => format!(
+                    "{} {}[{}]",
+                    ty,
+                    self.label,
+                    match count {
+                        ShaderSymbolArray::Fixed(size) => size.to_string(),
+                        ShaderSymbolArray::Unsized => "".into(),
+                    }
+                ),
                 None => format!("{} {}", ty, self.label),
             },
             ShaderSymbolData::Enum { values: _ } => format!("enum {}", self.label),
             ShaderSymbolData::Parameter { context, ty, count } => match count {
-                Some(count) => format!("{} {}::{}[{}]", ty, context, self.label, count),
+                Some(count) => format!(
+                    "{} {}::{}[{}]",
+                    ty,
+                    context,
+                    self.label,
+                    match count {
+                        ShaderSymbolArray::Fixed(size) => size.to_string(),
+                        ShaderSymbolArray::Unsized => "".into(),
+                    }
+                ),
                 None => format!("{} {}::{}", ty, context, self.label),
             },
             ShaderSymbolData::Method {
