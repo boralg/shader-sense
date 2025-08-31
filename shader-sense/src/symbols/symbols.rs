@@ -134,6 +134,32 @@ pub struct ShaderEnumValue {
     pub range: Option<ShaderRange>,
 }
 
+impl ShaderEnumValue {
+    pub fn as_symbol(&self, file_path: Option<PathBuf>, context: &str) -> ShaderSymbol {
+        ShaderSymbol {
+            label: self.label.clone(),
+            requirement: None,
+            data: ShaderSymbolData::Parameter {
+                context: context.into(),
+                ty: context.into(),
+                count: None,
+            },
+            mode: match file_path {
+                // We assume it as range if it has path.
+                // TODO: This should not be a global. Should use symbol directly in fact...
+                Some(file_path) => ShaderSymbolMode::Runtime(ShaderSymbolRuntime::global(
+                    file_path,
+                    self.range.clone().unwrap(),
+                )),
+                None => ShaderSymbolMode::Intrinsic(ShaderSymbolIntrinsic::new(
+                    self.description.clone(),
+                    None,
+                )),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ShaderSymbolData {
     // A bit of duplicate from variables ? Should be struct (Which should be renamed something else)

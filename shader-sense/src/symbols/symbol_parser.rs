@@ -153,8 +153,8 @@ impl ShaderWordRange {
             let stack = self.get_word_stack();
             let mut rev_stack = stack.iter().rev();
             // TODO: SHould not require file path & filter here...
-            let symbol_list =
-                symbol_list.filter_scoped_symbol(&self.range.end.clone_into_file(file_path));
+            let symbol_list = symbol_list
+                .filter_scoped_symbol(&self.range.end.clone_into_file(file_path.clone()));
             // Look for root symbol (either a function or variable)
             let root_symbol = match rev_stack.next() {
                 Some(current_word) => match symbol_list.find_symbol(&current_word.word) {
@@ -180,6 +180,7 @@ impl ShaderWordRange {
                             }
                             ShaderSymbolData::Functions { signatures: _ } => symbol,
                             ShaderSymbolData::Variables { ty: _, count: _ } => symbol,
+                            ShaderSymbolData::Enum { values: _ } => symbol,
                             _ => return vec![], // Symbol found is not a variable nor a function.
                         }
                     }
@@ -212,6 +213,14 @@ impl ShaderWordRange {
                             None => return vec![], // No matching function found
                         }
                     }
+                    ShaderSymbolData::Enum { values } => match values
+                        .iter()
+                        .find(|v| v.label == next_item.get_word())
+                        .map(|v| v.as_symbol(Some(file_path.clone()), &current_symbols[0].label))
+                    {
+                        Some(symbol) => return vec![symbol],
+                        None => return vec![],
+                    },
                     ShaderSymbolData::Functions { signatures } => &signatures[0].returnType,
                     ShaderSymbolData::Variables { ty, count: _ } => &ty,
                     // Method & parameter will only be called after first iteration

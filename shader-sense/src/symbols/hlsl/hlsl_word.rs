@@ -18,23 +18,69 @@ impl SymbolWordProvider for HlslSymbolWordProvider {
         node: Node,
         position: &ShaderPosition,
     ) -> Result<ShaderWordRange, ShaderError> {
-        fn range_contain(including_range: tree_sitter::Range, position: ShaderPosition) -> bool {
+        fn range_contain(including_range: tree_sitter::Range, position: &ShaderPosition) -> bool {
             let including_range = ShaderRange::from(including_range);
-            including_range.contain(&position)
+            including_range.contain(position)
         }
-        if range_contain(node.range(), position.clone()) {
+        if range_contain(node.range(), &position) {
             match node.kind() {
                 // identifier = function name, variable...
                 // type_identifier = struct name, class name...
                 // primitive_type = float, uint...
                 // string_content = include, should check preproc_include as parent.
-                // namespace_identifier = enum, namespace
-                "identifier" | "type_identifier" | "primitive_type" | "namespace_identifier" => {
+                "identifier" | "type_identifier" | "primitive_type" => {
                     return Ok(ShaderWordRange::new(
                         get_name(&shader_module.content, node).into(),
                         ShaderRange::from(node.range()),
                         None,
                     ));
+                }
+                // Handle enum and its values
+                "qualified_identifier" => {
+                    let mut iterator = node.walk();
+                    let childrens = node.children(&mut iterator);
+                    let mut enum_node = None;
+                    for children in childrens {
+                        match children.kind() {
+                            "namespace_identifier" => {
+                                // Check if its an enum type or enum value
+                                enum_node = Some(children.clone());
+                                if range_contain(children.range(), &position) {
+                                    return Ok(ShaderWordRange::new(
+                                        get_name(&shader_module.content, children).into(),
+                                        ShaderRange::from(children.range()),
+                                        None,
+                                    ));
+                                }
+                            }
+                            "::" => continue,
+                            "identifier" => {
+                                if range_contain(children.range(), &position) {
+                                    match enum_node {
+                                        // Enum value
+                                        Some(enum_node) => {
+                                            return Ok(ShaderWordRange::new(
+                                                get_name(&shader_module.content, children).into(),
+                                                ShaderRange::from(children.range()),
+                                                Some(ShaderWordRange::new(
+                                                    get_name(&shader_module.content, enum_node)
+                                                        .into(),
+                                                    ShaderRange::from(enum_node.range()),
+                                                    None,
+                                                )),
+                                            ))
+                                        }
+                                        None => {
+                                            return Err(ShaderError::NoSymbol); // Weird...
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {
+                                return Err(ShaderError::NoSymbol); // Weird...
+                            }
+                        }
+                    }
                 }
                 // TODO: should use string_content instead
                 "string_literal" => {
