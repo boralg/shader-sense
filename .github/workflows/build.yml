@@ -36,8 +36,6 @@ jobs:
         run: cp ./dxc/bin/x64/dxcompiler.dll ./target/debug/dxcompiler.dll && cp ./dxc/bin/x64/dxil.dll ./target/debug/dxil.dll
       - name: Run tests
         run: cargo test --verbose # Test all package on windows.
-      - name: Run doc test
-        run: cargo test --doc -- --show-output
 
   build-desktop:
     runs-on: ${{ matrix.os }}
