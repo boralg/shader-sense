@@ -133,6 +133,24 @@ mod tests {
         )));
     }
     #[test]
+    fn create_glsl_module_ok() {
+        let mut parser = ShaderModuleParser::glsl();
+        let path = Path::new("./test/glsl/ok.frag.glsl");
+        let _module = parser.create_module(path, &std::fs::read_to_string(path).unwrap());
+    }
+    #[test]
+    fn create_hlsl_module_ok() {
+        let mut parser = ShaderModuleParser::hlsl();
+        let path = Path::new("./test/hlsl/ok.hlsl");
+        let _module = parser.create_module(path, &std::fs::read_to_string(path).unwrap());
+    }
+    #[test]
+    fn create_wgsl_module_ok() {
+        let mut parser = ShaderModuleParser::wgsl();
+        let path = Path::new("./test/wgsl/ok.wgsl");
+        let _module = parser.create_module(path, &std::fs::read_to_string(path).unwrap());
+    }
+    #[test]
     fn symbols_glsl_ok() {
         // Ensure parsing of symbols is OK
         let file_path = Path::new("./test/glsl/include-level.comp.glsl");

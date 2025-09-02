@@ -16,12 +16,12 @@ use super::shader_module::ShaderModule;
 /// let shader_content = std::fs::read_to_string(shader_path).unwrap();
 /// let mut shader_module_parser = ShaderModuleParser::hlsl();
 /// let mut shader_module = shader_module_parser.create_module(shader_path, &shader_content).unwrap();
-/// // Here we can simply insert a new text at the position 0, 12.
+/// // Here we can simply insert a new text at the position 3, 4.
 /// shader_module_parser.update_module_partial(
 ///     &mut shader_module,
 ///     &ShaderRange::new(
-///         ShaderPosition::new(0, 12),
-///         ShaderPosition::new(0, 12)
+///         ShaderPosition::new(3, 4),
+///         ShaderPosition::new(3, 4)
 ///     ),
 ///     &String::from("inserted text")
 /// ).unwrap();
