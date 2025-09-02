@@ -1,7 +1,9 @@
+//! Small and easy to use profiler
 use std::time::Instant;
 
 use log::info;
 
+/// macro to define a profiler in scope and keep it until its dropped.
 #[macro_export]
 macro_rules! profile_scope {
     ($($arg:tt)+) => {
@@ -11,11 +13,13 @@ macro_rules! profile_scope {
     };
 }
 
+/// Small basic profiler based on Instant.
 pub struct Profiler {
     start: Instant,
     message: String,
 }
 impl Profiler {
+    /// On creation, log the message.
     pub fn new(message: String) -> Self {
         info!("vv {} vv", message);
         Self {
@@ -25,6 +29,7 @@ impl Profiler {
     }
 }
 impl Drop for Profiler {
+    /// On drop, print the elapsed time.
     fn drop(&mut self) {
         info!(
             "^^ {} (duration {}ms) ^^",

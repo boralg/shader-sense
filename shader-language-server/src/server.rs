@@ -1,3 +1,4 @@
+//! Server implementation
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -58,6 +59,7 @@ use crate::server::async_message::{AsyncCacheRequest, AsyncMessage, AsyncRequest
 use crate::server::common::lsp_range_to_shader_range;
 use crate::server::server_file_cache::ServerFileCache;
 
+/// Server implementation
 pub struct ServerLanguage {
     connection: ServerConnection,
     config: ServerConfig,
@@ -100,6 +102,7 @@ fn shader_error_to_lsp_error(error: &ShaderError) -> ErrorCode {
     }
 }
 
+/// Server transport method
 #[derive(Debug, Default, PartialEq, Eq)]
 pub enum Transport {
     #[default]
@@ -1017,6 +1020,7 @@ impl ServerLanguage {
     }
 }
 
+/// Run the server with given config and transport.
 pub fn run(config: ServerConfig, transport: Transport) {
     let mut server = ServerLanguage::new(config, transport);
 
