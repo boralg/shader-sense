@@ -128,11 +128,10 @@ impl ServerLanguage {
                 (ShadingLanguage::Hlsl, ServerLanguageData::hlsl()),
                 (ShadingLanguage::Wgsl, ServerLanguageData::wgsl()),
             ]),
-            // Big file can have a LOOT of macro, so big cache
             // Idea is to be able all macros for a single file in cache.
             // Else when recomputing a file, we will recreate all regex and reinsert
-            // them instead of reading from cache.
-            regex_cache: LruCache::new(NonZero::new(1000).unwrap()),
+            // them instead of reading from cache. So we update it size at runtime.
+            regex_cache: LruCache::new(NonZero::new(50).unwrap()),
         }
     }
     pub fn initialize(&mut self) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
@@ -1001,12 +1000,17 @@ impl ServerLanguage {
                     Ok(AsyncMessage::None)
                 }
             }
+            Cancel::METHOD => {
+                // TODO: cancel request somehow.
+                Ok(AsyncMessage::None)
+            }
             _ => {
                 warn!(
                     "Received unhandled notification {}: {}",
                     notification.method,
                     self.debug(&notification)
                 );
+                // Should return method not supported.
                 Ok(AsyncMessage::None)
             }
         }

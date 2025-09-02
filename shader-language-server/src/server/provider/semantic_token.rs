@@ -1,5 +1,7 @@
 use std::cell::RefCell;
+use std::num::NonZero;
 
+use log::warn;
 use lru::LruCache;
 use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensResult, Url};
 use shader_sense::symbols::symbols::ShaderSymbolMode;
@@ -263,6 +265,36 @@ impl ServerLanguage {
         tokens.extend(self.find_macros(uri));
         tokens.extend(self.find_parameters_variables(uri));
         tokens.extend(self.find_enum(uri));
+
+        // Increase cache size if we couldnt fit all tokens.
+        if tokens.len() > self.regex_cache.cap().get() {
+            let scale_factor = 1.2; // Allocate a bit more than the max.
+            let max_size = 2000; // Avoid using too much memory.
+            if tokens.len() <= max_size {
+                let new_cap =
+                    std::cmp::min((tokens.len() as f32 * scale_factor) as usize, max_size);
+                warn!(
+                    "Too many tokens found for single file {} ({}). Extending regex cache size to {}.",
+                    uri,
+                    tokens.len(),
+                    new_cap
+                );
+                let old_cache = std::mem::replace(
+                    &mut self.regex_cache,
+                    LruCache::new(NonZero::new(new_cap).unwrap()),
+                );
+                for (old_key, old_regex) in old_cache {
+                    self.regex_cache.put(old_key, old_regex);
+                }
+            } else {
+                warn!(
+                    "Too many tokens found for single file {} ({}), maximum limit {} reached.",
+                    uri,
+                    tokens.len(),
+                    max_size
+                );
+            }
+        }
 
         // Sort by positions
         tokens.sort_by(|lhs, rhs| {
