@@ -1,3 +1,4 @@
+//! Entry point for tree-sitter parsing.
 use std::path::Path;
 
 use tree_sitter::InputEdit;
@@ -5,6 +6,21 @@ use tree_sitter::InputEdit;
 use crate::{position::ShaderRange, shader::ShadingLanguage, shader_error::ShaderError};
 
 use super::shader_module::ShaderModule;
+
+/// Handle the creation and update of internal tree_sitter AST stored into a [`ShaderModule`]
+/// ```
+/// let mut shader_module_parser = ShaderModuleParser::hlsl();
+/// let shader_module = shader_module_parser.create_module(file_path, shader_content).unwrap();
+/// // Here we can simply insert a new text at the position 0, 12.
+/// shader_module_parser.update_module_partial(
+///     shader_module,
+///     &ShaderRange::new(
+///         ShaderPosition::new(0, 12),
+///         ShaderPosition::new(0, 12)
+///     ),
+///     String::from("inserted text")
+/// ).unwrap();
+/// ```
 pub struct ShaderModuleParser {
     tree_sitter_parser: tree_sitter::Parser,
 }

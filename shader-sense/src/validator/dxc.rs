@@ -1,3 +1,5 @@
+//! Validation for hlsl with DXC
+
 use hassle_rs::*;
 use std::{
     collections::HashMap,

@@ -1,3 +1,5 @@
+//! Validation for glsl with glslang
+
 use super::validator::ValidatorImpl;
 use crate::{
     include::IncludeHandler,

@@ -1,9 +1,10 @@
-//! Error for this crate.
+//! Error handling for this crate.
 use core::fmt;
 use std::path::PathBuf;
 
 use crate::position::ShaderFileRange;
 
+/// Severity of a diagnostic
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShaderDiagnosticSeverity {
     Error,
@@ -35,6 +36,7 @@ impl From<&str> for ShaderDiagnosticSeverity {
 }
 
 impl ShaderDiagnosticSeverity {
+    /// Is this diagnostic required
     pub fn is_required(&self, required_severity: ShaderDiagnosticSeverity) -> bool {
         self.get_enum_index() <= required_severity.get_enum_index()
     }
@@ -48,17 +50,20 @@ impl ShaderDiagnosticSeverity {
     }
 }
 
+/// A diagnostic returned by validation
 #[derive(Debug, Clone)]
 pub struct ShaderDiagnostic {
     pub severity: ShaderDiagnosticSeverity,
     pub error: String,
     pub range: ShaderFileRange,
 }
+/// A list of diagnostic returned by validation
 #[derive(Debug, Default, Clone)]
 pub struct ShaderDiagnosticList {
     pub diagnostics: Vec<ShaderDiagnostic>,
 }
 
+/// A generic error enum for this crate.
 #[derive(Debug)]
 pub enum ShaderError {
     ValidationError(String),
@@ -73,6 +78,7 @@ pub enum ShaderError {
 }
 
 impl ShaderError {
+    /// Convert an error into a diagnostic if its supported
     pub fn into_diagnostic(&self, severity: ShaderDiagnosticSeverity) -> Option<ShaderDiagnostic> {
         match self {
             ShaderError::SymbolQueryError(message, range) => Some(ShaderDiagnostic {
@@ -140,17 +146,21 @@ impl From<ShaderDiagnostic> for ShaderDiagnosticList {
     }
 }
 impl ShaderDiagnosticList {
+    /// Generate an empty diagnostic list
     pub fn empty() -> Self {
         Self {
             diagnostics: Vec::new(),
         }
     }
+    /// Push a diagnostic in the list
     pub fn push(&mut self, error: ShaderDiagnostic) {
         self.diagnostics.push(error);
     }
+    /// Is the diagnostic empty
     pub fn is_empty(&self) -> bool {
         self.diagnostics.is_empty()
     }
+    /// Join two diagnostics.
     pub fn join(mut lhs: ShaderDiagnosticList, rhs: ShaderDiagnosticList) -> Self {
         lhs.diagnostics.extend(rhs.diagnostics);
         lhs

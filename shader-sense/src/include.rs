@@ -17,8 +17,8 @@ pub struct IncludeHandler {
 ///
 /// [`std::fs::canonicalize`] not supported on wasi target, so we emulate it.
 /// On Windows, [`std::fs::canonicalize`] return a /? prefix that break hashmap.
-/// https://stackoverflow.com/questions/50322817/how-do-i-remove-the-prefix-from-a-canonical-windows-path
 /// Instead use a custom canonicalize.
+// https://stackoverflow.com/questions/50322817/how-do-i-remove-the-prefix-from-a-canonical-windows-path
 pub fn canonicalize(p: &Path) -> std::io::Result<PathBuf> {
     // https://github.com/antmicro/wasi_ext_lib/blob/main/canonicalize.patch
     fn __canonicalize(path: &Path, buf: &mut PathBuf) {

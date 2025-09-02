@@ -1,3 +1,4 @@
+//! Main entry point to inspect symbols from a file
 use std::{cell::RefCell, rc::Rc};
 
 use tree_sitter::{Query, QueryCursor, StreamingIterator};
@@ -27,6 +28,8 @@ use super::{
     symbols::{ShaderScope, ShaderSymbol},
 };
 
+/// A symbol provider is responsible of querying a file using tree-sitter AST in order to find all [`ShaderSymbol`] and return them to user as a [`ShaderSymbolList`]
+/// It performs on a [`ShaderModule`] which need to be created by a [`ShaderModuleParser`]
 pub struct SymbolProvider {
     symbol_parsers: Vec<(Box<dyn SymbolTreeParser>, tree_sitter::Query)>,
     scope_query: Query,

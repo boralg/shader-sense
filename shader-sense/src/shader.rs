@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
+/// All shading language supported
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ShadingLanguage {
     Wgsl,
@@ -10,6 +11,7 @@ pub enum ShadingLanguage {
     Glsl,
 }
 
+/// All shader stage supported
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ShaderStage {
     Vertex,
@@ -29,6 +31,7 @@ pub enum ShaderStage {
 }
 
 impl ShaderStage {
+    /// Get a stage from its filename. Mostly follow glslang guideline
     pub fn from_file_name(file_name: &String) -> Option<ShaderStage> {
         // TODO: add control for these
         let paths = HashMap::from([
@@ -58,6 +61,7 @@ impl ShaderStage {
         // For header files & undefined, will output issue with missing version...
         None
     }
+    /// All graphics pipeline stages.
     pub fn graphics() -> Vec<ShaderStage> {
         vec![
             ShaderStage::Vertex,
@@ -69,9 +73,11 @@ impl ShaderStage {
             ShaderStage::Mesh,
         ]
     }
+    /// All compute pipeline stages.
     pub fn compute() -> Vec<ShaderStage> {
         vec![ShaderStage::Compute]
     }
+    /// All raytracing pipeline stages.
     pub fn raytracing() -> Vec<ShaderStage> {
         vec![
             ShaderStage::RayGeneration,
@@ -127,21 +133,27 @@ impl ToString for ShadingLanguage {
     }
 }
 
+/// Generic tag to define a language to be used in template situations
 pub trait ShadingLanguageTag {
+    /// Get the language of the tag.
     fn get_language() -> ShadingLanguage;
 }
+
+/// Hlsl tag
 pub struct HlslShadingLanguageTag {}
 impl ShadingLanguageTag for HlslShadingLanguageTag {
     fn get_language() -> ShadingLanguage {
         ShadingLanguage::Hlsl
     }
 }
+/// Glsl tag
 pub struct GlslShadingLanguageTag {}
 impl ShadingLanguageTag for GlslShadingLanguageTag {
     fn get_language() -> ShadingLanguage {
         ShadingLanguage::Glsl
     }
 }
+/// Wgsl tag
 pub struct WgslShadingLanguageTag {}
 impl ShadingLanguageTag for WgslShadingLanguageTag {
     fn get_language() -> ShadingLanguage {
@@ -149,7 +161,10 @@ impl ShadingLanguageTag for WgslShadingLanguageTag {
     }
 }
 
-// DXC only support shader model up to 6.0
+/// All HLSL shader model existing.
+///
+/// Note that DXC only support shader model up to 6.0, and FXC is not supported.
+/// So shader model below 6 are only present for documentation purpose.
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HlslShaderModel {
     ShaderModel1,
@@ -176,14 +191,17 @@ pub enum HlslShaderModel {
 }
 
 impl HlslShaderModel {
+    /// Get first shader model version
     pub fn earliest() -> HlslShaderModel {
         HlslShaderModel::ShaderModel1
     }
+    /// Get last shader model version
     pub fn latest() -> HlslShaderModel {
         HlslShaderModel::ShaderModel6_8
     }
 }
 
+/// All HLSL version supported
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HlslVersion {
     V2016,
@@ -193,6 +211,7 @@ pub enum HlslVersion {
     V2021,
 }
 
+/// Hlsl compilation parameters for DXC.
 #[derive(Default, Debug, Clone)]
 pub struct HlslCompilationParams {
     pub shader_model: HlslShaderModel,
@@ -201,6 +220,7 @@ pub struct HlslCompilationParams {
     pub spirv: bool,
 }
 
+/// Glsl target client
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum GlslTargetClient {
     Vulkan1_0,
@@ -212,6 +232,7 @@ pub enum GlslTargetClient {
 }
 
 impl GlslTargetClient {
+    /// Check if glsl is for OpenGL or Vulkan
     pub fn is_opengl(&self) -> bool {
         match *self {
             GlslTargetClient::OpenGL450 => true,
@@ -220,6 +241,7 @@ impl GlslTargetClient {
     }
 }
 
+/// All SPIRV version supported for glsl
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum GlslSpirvVersion {
     SPIRV1_0,
@@ -231,15 +253,18 @@ pub enum GlslSpirvVersion {
     #[default]
     SPIRV1_6,
 }
+/// Glsl compilation parameters for glslang.
 #[derive(Default, Debug, Clone)]
 pub struct GlslCompilationParams {
     pub client: GlslTargetClient,
     pub spirv: GlslSpirvVersion,
 }
 
+/// Wgsl compilation parameters for naga.
 #[derive(Default, Debug, Clone)]
 pub struct WgslCompilationParams {}
 
+/// Parameters for includes.
 #[derive(Default, Debug, Clone)]
 pub struct ShaderContextParams {
     pub defines: HashMap<String, String>,
@@ -247,6 +272,7 @@ pub struct ShaderContextParams {
     pub path_remapping: HashMap<PathBuf, PathBuf>,
 }
 
+/// Parameters for compilation
 #[derive(Default, Debug, Clone)]
 pub struct ShaderCompilationParams {
     pub entry_point: Option<String>,
@@ -256,6 +282,7 @@ pub struct ShaderCompilationParams {
     pub wgsl: WgslCompilationParams,
 }
 
+/// Generic parameters passed to validation and inspection.
 #[derive(Default, Debug, Clone)]
 pub struct ShaderParams {
     pub context: ShaderContextParams,

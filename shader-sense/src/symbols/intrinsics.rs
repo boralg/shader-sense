@@ -1,3 +1,5 @@
+//! Intrinsics loaded from json files
+
 use std::{collections::HashMap, sync::LazyLock};
 
 use crate::{

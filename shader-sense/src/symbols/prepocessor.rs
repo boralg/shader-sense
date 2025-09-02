@@ -1,3 +1,5 @@
+//! Preprocessor API
+
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},

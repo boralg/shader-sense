@@ -1,3 +1,4 @@
+//! Trait and helper to parse tree-sitter AST
 use std::path::{Path, PathBuf};
 
 use tree_sitter::{Node, QueryMatch};

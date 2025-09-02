@@ -1,8 +1,9 @@
-//! Position type for this crate
+//! Position type for handling text position in this crate.
 use std::{cmp::Ordering, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+/// Position in a single file with line and character
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderPosition {
     pub line: u32,
@@ -29,18 +30,24 @@ impl PartialEq for ShaderPosition {
 }
 
 impl ShaderPosition {
+    /// Create a new position
     pub fn new(line: u32, pos: u32) -> Self {
         Self { line, pos }
     }
+    /// Get the zero position
     pub fn zero() -> Self {
         Self { line: 0, pos: 0 }
     }
+    /// Convert a [`ShaderPosition`] into a [`ShaderFilePosition`]
     pub fn into_file(self, file_path: PathBuf) -> ShaderFilePosition {
         ShaderFilePosition::from(file_path, self)
     }
+    /// Clone a [`ShaderPosition`] to a [`ShaderFilePosition`]
     pub fn clone_into_file(&self, file_path: PathBuf) -> ShaderFilePosition {
         ShaderFilePosition::from(file_path, self.clone())
     }
+    /// Compute the line and pos in a given content from the given byte offset.
+    /// This is handling UTF8 string aswell and should safely return a correct position.
     pub fn from_byte_offset(content: &str, byte_offset: usize) -> std::io::Result<ShaderPosition> {
         // https://en.wikipedia.org/wiki/UTF-8
         if byte_offset == 0 {
@@ -80,6 +87,8 @@ impl ShaderPosition {
             }
         }
     }
+    /// Compute the byte offset in a given content from the given line and pos.
+    /// This is handling UTF8 string aswell and should safely return a byte offset at character boundary.
     pub fn to_byte_offset(&self, content: &str) -> std::io::Result<usize> {
         // https://en.wikipedia.org/wiki/UTF-8
         match content.lines().nth(self.line as usize) {
@@ -130,6 +139,7 @@ impl ShaderPosition {
     }
 }
 
+/// Wrapper for [`ShaderPosition`] with a [`PathBuf`] specified for context.
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ShaderFilePosition {
     pub file_path: PathBuf,
@@ -165,32 +175,38 @@ impl PartialEq for ShaderFilePosition {
 }
 
 impl ShaderFilePosition {
+    /// Create a [`ShaderFilePosition`] from a [`ShaderPosition`] and a [`PathBuf`]
     pub fn from(file_path: PathBuf, position: ShaderPosition) -> Self {
         Self {
             file_path,
             position,
         }
     }
+    /// Create a [`ShaderFilePosition`] from line and pos
     pub fn new(file_path: PathBuf, line: u32, pos: u32) -> Self {
         Self {
             file_path,
             position: ShaderPosition::new(line, pos),
         }
     }
+    /// Create the zero position for this file
     pub fn zero(file_path: PathBuf) -> Self {
         Self {
             file_path,
             position: ShaderPosition::zero(),
         }
     }
+    // Get the character position in line
     pub fn pos(&self) -> u32 {
         self.position.pos
     }
+    // Get the line
     pub fn line(&self) -> u32 {
         self.position.line
     }
 }
 
+/// Range in a single file from two [`ShaderPosition`]
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ShaderRange {
     pub start: ShaderPosition,
@@ -198,18 +214,23 @@ pub struct ShaderRange {
 }
 
 impl ShaderRange {
+    /// Create a new range from two [`ShaderPosition`]
     pub fn new(start: ShaderPosition, end: ShaderPosition) -> Self {
         Self { start, end }
     }
+    /// Create a zero range
     pub fn zero() -> Self {
         Self::new(ShaderPosition::zero(), ShaderPosition::zero())
     }
+    /// Convert a [`ShaderRange`] into a [`ShaderFileRange`]
     pub fn into_file(self, file_path: PathBuf) -> ShaderFileRange {
         ShaderFileRange::from(file_path, self)
     }
+    /// Clone a [`ShaderRange`] to a [`ShaderFileRange`]
     pub fn clone_into_file(&self, file_path: PathBuf) -> ShaderFileRange {
         ShaderFileRange::from(file_path, self.clone())
     }
+    /// Get the total range for a given content.
     pub fn whole(content: &str) -> Self {
         let line_count = content.lines().count() as u32;
         let char_count = match content.lines().last() {
@@ -221,6 +242,7 @@ impl ShaderRange {
             end: ShaderPosition::new(line_count, char_count),
         }
     }
+    /// Check if the range contain another range.
     pub fn contain_bounds(&self, range: &ShaderRange) -> bool {
         if range.start.line > self.start.line && range.end.line < self.end.line {
             true
@@ -234,6 +256,7 @@ impl ShaderRange {
             false
         }
     }
+    /// Check if the range contain a [`ShaderPosition`]
     pub fn contain(&self, position: &ShaderPosition) -> bool {
         // Check line & position bounds.
         if position.line > self.start.line && position.line < self.end.line {
@@ -248,6 +271,7 @@ impl ShaderRange {
             false
         }
     }
+    // Join two range to a mutual range
     pub fn join(mut lhs: ShaderRange, rhs: ShaderRange) -> ShaderRange {
         lhs.start.line = std::cmp::min(lhs.start.line, rhs.start.line);
         lhs.start.pos = std::cmp::min(lhs.start.pos, rhs.start.pos);
@@ -257,6 +281,7 @@ impl ShaderRange {
     }
 }
 
+/// Wrapper for [`ShaderRange`] with a [`PathBuf`] specified for context.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ShaderFileRange {
     pub file_path: PathBuf,
@@ -264,33 +289,42 @@ pub struct ShaderFileRange {
 }
 
 impl ShaderFileRange {
+    /// Create a new range from a [`ShaderRange`] and a [`PathBuf`]
     pub fn from(file_path: PathBuf, range: ShaderRange) -> Self {
         Self { file_path, range }
     }
+    /// Create a new range from two [`ShaderPosition`] and a [`PathBuf`]
     pub fn new(file_path: PathBuf, start: ShaderPosition, end: ShaderPosition) -> Self {
         Self {
             file_path,
             range: ShaderRange::new(start, end),
         }
     }
+    /// Create a zero range
     pub fn zero(file_path: PathBuf) -> Self {
         Self::new(file_path, ShaderPosition::zero(), ShaderPosition::zero())
     }
+    /// Get the total range for a given content.
     pub fn whole(file_path: PathBuf, content: &str) -> Self {
         Self::from(file_path, ShaderRange::whole(content))
     }
+    /// Get the start position of the range
     pub fn start(&self) -> &ShaderPosition {
         &self.range.start
     }
+    /// Get the end position of the range
     pub fn end(&self) -> &ShaderPosition {
         &self.range.end
     }
+    // Get the start position as [`ShaderFilePosition`]
     pub fn start_as_file_position(&self) -> ShaderFilePosition {
         ShaderFilePosition::from(self.file_path.clone(), self.range.start.clone())
     }
+    // Get the end position as [`ShaderFilePosition`]
     pub fn end_as_file_position(&self) -> ShaderFilePosition {
         ShaderFilePosition::from(self.file_path.clone(), self.range.end.clone())
     }
+    /// Check if the range contain another range.
     pub fn contain_bounds(&self, range: &ShaderFileRange) -> bool {
         if self.file_path.as_os_str() == range.file_path.as_os_str() {
             debug_assert!(
@@ -306,6 +340,7 @@ impl ShaderFileRange {
             false
         }
     }
+    /// Check if the range contain a [`ShaderFilePosition`]
     pub fn contain(&self, position: &ShaderFilePosition) -> bool {
         // Check same file. Comparing components is hitting perf, so just compare raw path, which should already be canonical.
         if position.file_path.as_os_str() == self.file_path.as_os_str() {
@@ -322,6 +357,7 @@ impl ShaderFileRange {
             false
         }
     }
+    // Join two range to a mutual range
     pub fn join(mut lhs: ShaderFileRange, rhs: ShaderFileRange) -> ShaderFileRange {
         lhs.range = ShaderRange::join(lhs.range, rhs.range);
         lhs

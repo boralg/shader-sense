@@ -1,3 +1,4 @@
+//! Symbol list containing all symbol and helper to navigate into them
 use serde::{Deserialize, Serialize};
 
 use crate::{
