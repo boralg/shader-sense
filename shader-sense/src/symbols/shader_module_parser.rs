@@ -9,16 +9,21 @@ use super::shader_module::ShaderModule;
 
 /// Handle the creation and update of internal tree_sitter AST stored into a [`ShaderModule`]
 /// ```
+/// use shader_sense::symbols::shader_module_parser::ShaderModuleParser;
+/// use shader_sense::position::{ShaderPosition, ShaderRange};
+/// use std::path::Path;
+/// let shader_path = Path::new("./test/hlsl/ok.hlsl");
+/// let shader_content = std::fs::read_to_string(shader_path).unwrap();
 /// let mut shader_module_parser = ShaderModuleParser::hlsl();
-/// let shader_module = shader_module_parser.create_module(file_path, shader_content).unwrap();
+/// let mut shader_module = shader_module_parser.create_module(shader_path, &shader_content).unwrap();
 /// // Here we can simply insert a new text at the position 0, 12.
 /// shader_module_parser.update_module_partial(
-///     shader_module,
+///     &mut shader_module,
 ///     &ShaderRange::new(
 ///         ShaderPosition::new(0, 12),
 ///         ShaderPosition::new(0, 12)
 ///     ),
-///     String::from("inserted text")
+///     &String::from("inserted text")
 /// ).unwrap();
 /// ```
 pub struct ShaderModuleParser {
@@ -70,7 +75,7 @@ impl ShaderModuleParser {
     pub fn update_module(
         &mut self,
         module: &mut ShaderModule,
-        new_text: &String,
+        new_text: &str,
     ) -> Result<(), ShaderError> {
         self.update_module_partial(module, &ShaderRange::whole(&module.content), new_text)
     }
@@ -79,12 +84,12 @@ impl ShaderModuleParser {
         &mut self,
         module: &mut ShaderModule,
         old_range: &ShaderRange,
-        new_text: &String,
+        new_text: &str,
     ) -> Result<(), ShaderError> {
         let mut new_shader_content = module.content.clone();
         let old_start_byte_offset = old_range.start.to_byte_offset(&module.content)?;
         let old_end_byte_offset = old_range.end.to_byte_offset(&module.content)?;
-        new_shader_content.replace_range(old_start_byte_offset..old_end_byte_offset, &new_text);
+        new_shader_content.replace_range(old_start_byte_offset..old_end_byte_offset, new_text);
 
         let line_count = new_text.lines().count();
         let tree_sitter_range = tree_sitter::Range {

@@ -10,9 +10,14 @@
 //! - **WGSL** uses [`naga`] as backend for linting.
 //!
 //! ```no_run
-//! let validator = Validator::from_shading_language(T::get_language());
+//! use shader_sense::validator::validator::Validator;
+//! use shader_sense::shader::ShaderParams;
+//! use std::path::Path;
+//! let shader_path = Path::new("/path/to/shader.hlsl");
+//! let shader_content = std::fs::read_to_string(shader_path).unwrap();
+//! let validator = Validator::hlsl();
 //! match validator.validate_shader(
-//!     shader_content,
+//!     &shader_content,
 //!     shader_path,
 //!     &ShaderParams::default(),
 //!     &mut |path: &Path| Some(std::fs::read_to_string(path).unwrap()),
@@ -30,15 +35,24 @@
 //! You can inspect shaders aswell to find symbols inside it, their position and informations. It is using the [`tree-sitter`] API (instead of standard API) for performances reason and also because most standard API do not expose easily their AST.
 //!
 //! ```no_run
-//! let mut shader_module_parser = ShaderModuleParser::from_shading_language(T::get_language());
-//! let symbol_provider = SymbolProvider::from_shading_language(T::get_language());
-//! match shader_module_parser.create_module(shader_path, shader_content) {
+//! use shader_sense::shader::{ShaderParams, HlslShadingLanguageTag};
+//! use shader_sense::symbols::{
+//!     shader_module_parser::ShaderModuleParser,
+//!     symbol_provider::SymbolProvider,
+//!     symbol_provider::default_include_callback
+//! };
+//! use std::path::Path;
+//! let shader_path = Path::new("/path/to/shader.hlsl");
+//! let shader_content = std::fs::read_to_string(shader_path).unwrap();
+//! let mut shader_module_parser = ShaderModuleParser::hlsl();
+//! let symbol_provider = SymbolProvider::hlsl();
+//! match shader_module_parser.create_module(shader_path, &shader_content) {
 //!     Ok(shader_module) => {
 //!         let symbols = symbol_provider
 //!             .query_symbols(
 //!                 &shader_module,
 //!                 ShaderParams::default(),
-//!                 &mut default_include_callback::<T>,
+//!                 &mut default_include_callback::<HlslShadingLanguageTag>,
 //!                 None,
 //!             )
 //!             .unwrap();

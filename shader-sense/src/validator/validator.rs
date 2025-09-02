@@ -35,12 +35,17 @@ pub trait ValidatorImpl {
 ///
 /// Run
 /// ```
+/// use shader_sense::validator::validator::Validator;
+/// use shader_sense::shader::ShaderParams;
+/// use std::path::Path;
+/// let shader_path = Path::new("./test/hlsl/ok.hlsl");
+/// let shader_content = std::fs::read_to_string(shader_path).unwrap();
 /// let validator = Validator::hlsl();
 /// validator.validate_shader(
-///     shader_content,
-///     file_path,
-///     params,
-///     |path| {
+///     &shader_content,
+///     shader_path,
+///     &ShaderParams::default(),
+///     &mut |path: &Path| {
 ///         Some(std::fs::read_to_string(path).unwrap())
 ///     }
 /// ).unwrap();
