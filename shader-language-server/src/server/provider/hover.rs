@@ -51,12 +51,9 @@ impl ServerLanguage {
                         ShaderSymbolMode::RuntimeContext(_) => match &symbol.data {
                             ShaderSymbolData::Macro { value } => {
                                 let description = if !value.is_empty() {
-                                    format!(
-                                        "Preprocessor macro. Expanding to \n```\n{}\n```",
-                                        value
-                                    )
+                                    format!("Config macro. Expanding to \n```\n{}\n```", value)
                                 } else {
-                                    format!("Preprocessor macro.")
+                                    format!("Config macro.")
                                 };
                                 (description, "".into())
                             }
@@ -69,9 +66,12 @@ impl ServerLanguage {
                             }
                             ShaderSymbolData::Macro { value } => {
                                 let description = if !value.is_empty() {
-                                    format!("Config macro. Expanding to \n```\n{}\n```", value)
+                                    format!(
+                                        "Preprocessor macro. Expanding to \n```\n{}\n```",
+                                        value
+                                    )
                                 } else {
-                                    format!("Config macro.")
+                                    format!("Preprocessor macro.")
                                 };
                                 (description, "".into())
                             }
