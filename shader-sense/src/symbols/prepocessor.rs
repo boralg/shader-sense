@@ -72,16 +72,6 @@ impl ShaderPreprocessorContext {
     pub fn push_directory_stack(&mut self, canonical_path: &Path) {
         self.include_handler.push_directory_stack(canonical_path);
     }
-    pub fn push_define(&mut self, name: &str, value: &str) {
-        self.defines.push(ShaderSymbol {
-            label: name.into(),
-            requirement: None,
-            data: ShaderSymbolData::Macro {
-                value: value.into(),
-            },
-            mode: ShaderSymbolMode::RuntimeContext(ShaderSymbolRuntimeContext::new()),
-        });
-    }
     pub fn append_defines(&mut self, defines: Vec<ShaderPreprocessorDefine>) {
         self.defines
             .extend(defines.iter().map(|define| define.symbol.clone()));
