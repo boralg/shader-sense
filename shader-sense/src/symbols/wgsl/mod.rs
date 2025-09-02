@@ -1,3 +1,4 @@
+//! Parser specific for WGSL
 mod wgsl_parser;
 mod wgsl_regions;
 use wgsl_parser::get_wgsl_parsers;

@@ -1,3 +1,5 @@
+//! Command line interface for generating intrinsic JSON database for shader-sense.
+
 use std::{collections::HashSet, path::Path};
 
 use common::get_intrinsic_parser;

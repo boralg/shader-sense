@@ -1,3 +1,30 @@
+//! Command line interface to validate and inspect shaders using [`shader-sense`].
+//!
+//! It can be launched using the following options:
+//! ```bash
+//! --hlsl                    Use HLSL shading language (default)
+//! --glsl                    Use GLSL shading language
+//! --wgsl                    Use WGSL shading language
+//! -D, --define <DEF>        Define a macro
+//! -I, --include <PATH>      Add an include directory
+//! -E, --entry-point <NAME>  Specify the shader entry point
+//! -S, --stage <STAGE>       Specify shader stage (vertex, fragment, compute, mesh, task, control, evaluation, geometry)
+//! --validate                Validate the shader
+//! --functions               List functions
+//! --includes                List includes
+//! --macros                  List macros
+//! --variables               List variables
+//! --constants               List constants
+//! --keywords                List keywords
+//! --types                   List types
+//! --version, -v             Print version information
+//! --help, -h                Print this message
+//! ```
+//!
+//! Example:
+//! ```cli
+//! shader-sense-cli --hlsl -E main -S vertex shader.hlsl
+//! ```
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},

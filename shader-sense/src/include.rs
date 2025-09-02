@@ -1,8 +1,10 @@
+//! Include handler for all languages
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
+/// Include handler for all languages
 #[derive(Debug, Default, Clone)]
 pub struct IncludeHandler {
     includes: HashSet<PathBuf>, // Dont store in stack to compute them before.
@@ -10,10 +12,13 @@ pub struct IncludeHandler {
     visited_dependencies: HashMap<PathBuf, usize>,
     path_remapping: HashMap<PathBuf, PathBuf>, // remapping of path / virtual path
 }
-// std::fs::canonicalize not supported on wasi target... Emulate it.
-// On Windows, std::fs::canonicalize return a /? prefix that break hashmap.
-// https://stackoverflow.com/questions/50322817/how-do-i-remove-the-prefix-from-a-canonical-windows-path
-// Instead use a custom canonicalize.
+
+/// Canonicalize a path, the custom way.
+///
+/// [`std::fs::canonicalize`] not supported on wasi target, so we emulate it.
+/// On Windows, [`std::fs::canonicalize`] return a /? prefix that break hashmap.
+/// https://stackoverflow.com/questions/50322817/how-do-i-remove-the-prefix-from-a-canonical-windows-path
+/// Instead use a custom canonicalize.
 pub fn canonicalize(p: &Path) -> std::io::Result<PathBuf> {
     // https://github.com/antmicro/wasi_ext_lib/blob/main/canonicalize.patch
     fn __canonicalize(path: &Path, buf: &mut PathBuf) {
@@ -45,11 +50,14 @@ pub fn canonicalize(p: &Path) -> std::io::Result<PathBuf> {
 }
 
 impl IncludeHandler {
+    /// Maximum limit for including to avoid recursion stack overflow
     pub const DEPTH_LIMIT: usize = 30;
 
+    /// Create handler with empty config
     pub fn main_without_config(file: &Path) -> Self {
         Self::main(file, Vec::new(), HashMap::new())
     }
+    /// Create handler with given config
     pub fn main(
         file_path: &Path,
         includes: Vec<String>,
@@ -71,12 +79,15 @@ impl IncludeHandler {
             path_remapping: path_remapping,
         }
     }
+    /// Get all includes of handler
     pub fn get_includes(&self) -> &HashSet<PathBuf> {
         &self.includes
     }
+    /// Get the number of time a file has been visited
     pub fn get_visited_count(&self, path: &Path) -> usize {
         self.visited_dependencies.get(path).cloned().unwrap_or(0)
     }
+    /// Search for a given relative path in all includes and call the callback on the resolved absolute path to handle loading of the file.
     pub fn search_in_includes(
         &mut self,
         relative_path: &Path,
@@ -87,6 +98,7 @@ impl IncludeHandler {
             None => None,
         }
     }
+    /// Push a file on directory stack for include context.
     pub fn push_directory_stack(&mut self, canonical_path: &Path) {
         match self.visited_dependencies.get_mut(canonical_path) {
             Some(visited_dependency_count) => *visited_dependency_count += 1,
@@ -103,10 +115,17 @@ impl IncludeHandler {
             }
         }
     }
+    /// Search a path in include. Return an absolute canonicalized path.
     pub fn search_path_in_includes(&mut self, relative_path: &Path) -> Option<PathBuf> {
         self.search_path_in_includes_relative(relative_path)
             .map(|e| canonicalize(&e).unwrap())
     }
+    /// Search for a path in includes.
+    ///
+    /// It will look:
+    /// 1. in the directory stack for context by looking at the last one before the first one.
+    /// 2. in the given include path if not found on stack.
+    /// 3. in the given virtual path if not found in includes.
     fn search_path_in_includes_relative(&self, relative_path: &Path) -> Option<PathBuf> {
         // Checking for file existence is a bit costly.
         // Some options are available and have been tested
@@ -143,6 +162,7 @@ impl IncludeHandler {
             return None;
         }
     }
+    /// Check for path if its found in virtual paths
     fn resolve_virtual_path(
         virtual_path: &Path,
         virtual_folders: &HashMap<PathBuf, PathBuf>,

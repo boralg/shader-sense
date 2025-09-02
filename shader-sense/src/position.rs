@@ -1,3 +1,4 @@
+//! Position type for this crate
 use std::{cmp::Ordering, path::PathBuf};
 
 use serde::{Deserialize, Serialize};

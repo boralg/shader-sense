@@ -1,3 +1,54 @@
+//! Shader sense is a library for runtime validation and symbol inspection that can handle multiple shader languages, primarily intended for use in a language server. This works through the use of standard API for validation and tree-sitter for symbol inspection. It can be built to desktop or [WASI](https://wasi.dev/). WASI will let the extension run even in browser, but it suffer from limitations. See below for more informations.
+//!
+//! For symbol inspection, the API is relying on abstract syntax tree. As we want to support different language, and to ease this process, we are using the [`tree-sitter`] API (instead of standard API), which generate AST with query support, and is already available in a lot of languages.
+//!
+//! # Validating shader
+//!
+//! Validating shader is using standard API behind the hood :
+//! - **GLSL** uses [`glslang`] as backend. It provide complete linting for GLSL trough glslang API bindings from C.
+//! - **HLSL** uses [`hassle-rs`] as backend. It provides bindings to directx shader compiler in rust.
+//! - **WGSL** uses [`naga`] as backend for linting.
+//!
+//! ```no_run
+//! let validator = Validator::from_shading_language(T::get_language());
+//! match validator.validate_shader(
+//!     shader_content,
+//!     shader_path,
+//!     &ShaderParams::default(),
+//!     &mut |path: &Path| Some(std::fs::read_to_string(path).unwrap()),
+//! ) {
+//!     Ok(diagnostic_list) => println!(
+//!         "Validated file and return following diagnostics: {:#?}",
+//!         diagnostic_list
+//!     ),
+//!     Err(err) => println!("Failed to validate file: {:#?}", err),
+//! }
+//! ```
+//!
+//! # Inspecting shader
+//!
+//! You can inspect shaders aswell to find symbols inside it, their position and informations. It is using the [`tree-sitter`] API (instead of standard API) for performances reason and also because most standard API do not expose easily their AST.
+//!
+//! ```no_run
+//! let mut shader_module_parser = ShaderModuleParser::from_shading_language(T::get_language());
+//! let symbol_provider = SymbolProvider::from_shading_language(T::get_language());
+//! match shader_module_parser.create_module(shader_path, shader_content) {
+//!     Ok(shader_module) => {
+//!         let symbols = symbol_provider
+//!             .query_symbols(
+//!                 &shader_module,
+//!                 ShaderParams::default(),
+//!                 &mut default_include_callback::<T>,
+//!                 None,
+//!             )
+//!             .unwrap();
+//!         let symbol_list = symbols.get_all_symbols();
+//!         println!("Found symbols: {:#?}", symbol_list);
+//!     }
+//!     Err(err) => println!("Failed to create ast: {:#?}", err),
+//! }
+//! ```
+
 pub mod include;
 pub mod position;
 pub mod shader;

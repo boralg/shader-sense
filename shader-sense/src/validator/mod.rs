@@ -1,3 +1,5 @@
+//! Handle shader validation with standard API
+
 #[cfg(not(target_os = "wasi"))]
 pub mod dxc;
 pub mod glslang;

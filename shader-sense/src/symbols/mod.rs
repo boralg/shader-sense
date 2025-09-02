@@ -1,3 +1,5 @@
+//! Handle symbol inspection with tree-sitter
+
 mod glsl;
 mod hlsl;
 pub mod intrinsics;

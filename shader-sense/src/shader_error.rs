@@ -1,3 +1,4 @@
+//! Error for this crate.
 use core::fmt;
 use std::path::PathBuf;
 

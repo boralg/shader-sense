@@ -1,3 +1,4 @@
+//! Shader stage and specific helpers
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use serde::{Deserialize, Serialize};

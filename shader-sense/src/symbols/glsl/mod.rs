@@ -1,3 +1,4 @@
+//! Parser specific for GLSL
 mod glsl_parser;
 mod glsl_preprocessor;
 mod glsl_regions;

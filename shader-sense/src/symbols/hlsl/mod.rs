@@ -1,3 +1,4 @@
+//! Parser specific for HLSL
 mod hlsl_parser;
 mod hlsl_preprocessor;
 mod hlsl_regions;
