@@ -1,7 +1,59 @@
-use std::path::Path;
+use std::{
+    fmt,
+    path::{Path, PathBuf},
+};
 
 use lsp_types::{Location, Url};
-use shader_sense::position::{ShaderFileRange, ShaderPosition, ShaderRange};
+use shader_sense::{
+    position::{ShaderFileRange, ShaderPosition, ShaderRange},
+    shader_error::ShaderError,
+};
+
+pub enum ServerLanguageError {
+    ShaderError(ShaderError),
+    InvalidParams(String),
+    FileNotWatched(PathBuf),
+    SerializationError(serde_json::Error),
+    MethodNotFound(String),
+    LastRequestCanceled,
+    InternalError(String),
+    IoErr(std::io::Error),
+}
+
+impl fmt::Display for ServerLanguageError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ServerLanguageError::ShaderError(err) => write!(f, "{}", err),
+            ServerLanguageError::SerializationError(err) => {
+                write!(f, "Error with serialization: {}", err)
+            }
+            ServerLanguageError::FileNotWatched(uri) => {
+                write!(f, "File not watched: {}", uri.display())
+            }
+            ServerLanguageError::InvalidParams(err) => write!(f, "Invalid params: {}", err),
+            ServerLanguageError::MethodNotFound(err) => write!(f, "Method not found: {}", err),
+            ServerLanguageError::InternalError(err) => write!(f, "Internal error: {}", err),
+            ServerLanguageError::LastRequestCanceled => write!(f, "LastRequestCanceled"),
+            ServerLanguageError::IoErr(err) => write!(f, "Io Err : {}", err),
+        }
+    }
+}
+
+impl From<ShaderError> for ServerLanguageError {
+    fn from(error: ShaderError) -> Self {
+        ServerLanguageError::ShaderError(error)
+    }
+}
+impl From<serde_json::Error> for ServerLanguageError {
+    fn from(error: serde_json::Error) -> Self {
+        ServerLanguageError::SerializationError(error)
+    }
+}
+impl From<std::io::Error> for ServerLanguageError {
+    fn from(err: std::io::Error) -> Self {
+        ServerLanguageError::IoErr(err)
+    }
+}
 
 pub fn shader_range_to_lsp_range(range: &ShaderRange) -> lsp_types::Range {
     lsp_types::Range {

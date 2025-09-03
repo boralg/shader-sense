@@ -8,7 +8,7 @@ use shader_sense::{
 
 use lsp_types::{GotoDefinitionResponse, Position, Url};
 
-use crate::server::common::shader_range_to_lsp_range;
+use crate::server::common::{shader_range_to_lsp_range, ServerLanguageError};
 use crate::server::ServerLanguage;
 
 impl ServerLanguage {
@@ -16,7 +16,7 @@ impl ServerLanguage {
         &mut self,
         uri: &Url,
         position: Position,
-    ) -> Result<Option<GotoDefinitionResponse>, ShaderError> {
+    ) -> Result<Option<GotoDefinitionResponse>, ServerLanguageError> {
         let cached_file = self.get_cachable_file(&uri)?;
         let language_data = self
             .language_data
@@ -85,7 +85,7 @@ impl ServerLanguage {
                 if let ShaderError::NoSymbol = err {
                     Ok(None)
                 } else {
-                    Err(err)
+                    Err(err.into())
                 }
             }
         }

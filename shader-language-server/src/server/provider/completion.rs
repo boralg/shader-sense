@@ -11,7 +11,7 @@ use shader_sense::{
     symbols::symbols::{ShaderSymbol, ShaderSymbolData, ShaderSymbolMode, ShaderSymbolType},
 };
 
-use crate::server::ServerLanguage;
+use crate::server::{common::ServerLanguageError, ServerLanguage};
 
 impl ServerLanguage {
     pub fn recolt_completion(
@@ -19,7 +19,7 @@ impl ServerLanguage {
         uri: &Url,
         position: Position,
         trigger_character: Option<String>,
-    ) -> Result<Vec<CompletionItem>, ShaderError> {
+    ) -> Result<Vec<CompletionItem>, ServerLanguageError> {
         let cached_file = self.get_cachable_file(&uri)?;
         let language_data = self
             .language_data
@@ -206,7 +206,7 @@ impl ServerLanguage {
                         if let ShaderError::NoSymbol = err {
                             Ok(vec![])
                         } else {
-                            Err(err)
+                            Err(err.into())
                         }
                     }
                 }

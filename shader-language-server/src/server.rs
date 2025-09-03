@@ -51,12 +51,11 @@ use server_config::ServerConfig;
 use server_connection::ServerConnection;
 use server_file_cache::ServerLanguageFileCache;
 use server_language_data::ServerLanguageData;
-use shader_sense::shader_error::ShaderError;
 use shader_variant::DidChangeShaderVariant;
 
 use crate::profile_scope;
 use crate::server::async_message::{AsyncCacheRequest, AsyncMessage, AsyncRequest};
-use crate::server::common::lsp_range_to_shader_range;
+use crate::server::common::{lsp_range_to_shader_range, ServerLanguageError};
 use crate::server::server_file_cache::ServerFileCache;
 
 /// Server implementation
@@ -86,19 +85,16 @@ fn clean_url(url: &Url) -> Url {
         url.clone()
     }
 }
-fn shader_error_to_lsp_error(error: &ShaderError) -> ErrorCode {
+fn shader_error_to_lsp_error(error: &ServerLanguageError) -> ErrorCode {
     match error {
-        ShaderError::ValidationError(_)
-        | ShaderError::ParseSymbolError(_)
-        | ShaderError::IoErr(_)
-        | ShaderError::InternalErr(_)
-        | ShaderError::FileNotWatched(_) => ErrorCode::InternalError,
-        ShaderError::InvalidParams(_) => ErrorCode::InvalidParams,
-        ShaderError::SerializationError(_) => ErrorCode::InvalidParams,
-        // Should have been caught before getting here.
-        ShaderError::SymbolQueryError(_, _) | ShaderError::NoSymbol => {
-            unreachable!()
-        }
+        ServerLanguageError::ShaderError(_) => ErrorCode::InternalError,
+        ServerLanguageError::FileNotWatched(_) => ErrorCode::InternalError,
+        ServerLanguageError::SerializationError(_) => ErrorCode::InternalError,
+        ServerLanguageError::InvalidParams(_) => ErrorCode::InvalidParams,
+        ServerLanguageError::MethodNotFound(_) => ErrorCode::MethodNotFound,
+        ServerLanguageError::LastRequestCanceled => ErrorCode::RequestCanceled,
+        ServerLanguageError::InternalError(_) => ErrorCode::InternalError,
+        ServerLanguageError::IoErr(_) => ErrorCode::InternalError,
     }
 }
 
@@ -208,17 +204,21 @@ impl ServerLanguage {
 
         return Ok(());
     }
-    fn resolve_async_request(&mut self, request: AsyncMessage) -> Result<(), ShaderError> {
+    fn resolve_async_request(&mut self, request: AsyncMessage) -> Result<(), ServerLanguageError> {
         // TODO: Discard all messages which version is too old.
         // Check file of request was not already removed.
         match request.get_uri() {
             Some(uri) => {
                 if let Some(cached_file) = self.watched_files.files.get(uri) {
                     if !cached_file.is_cachable_file() {
-                        return Err(ShaderError::FileNotWatched(uri.to_file_path().unwrap()));
+                        return Err(ServerLanguageError::FileNotWatched(
+                            uri.to_file_path().unwrap(),
+                        ));
                     }
                 } else {
-                    return Err(ShaderError::FileNotWatched(uri.to_file_path().unwrap()));
+                    return Err(ServerLanguageError::FileNotWatched(
+                        uri.to_file_path().unwrap(),
+                    ));
                 }
             }
             None => {} // workspace request or such.
@@ -636,7 +636,7 @@ impl ServerLanguage {
                                         Ok(_) => {}
                                         Err(err) => {
                                             match err {
-                                                ShaderError::FileNotWatched(_) => {
+                                                ServerLanguageError::FileNotWatched(_) => {
                                                     if let Some(req_id_i32) =
                                                         request_id_to_i32(&req_id)
                                                     {
@@ -678,11 +678,13 @@ impl ServerLanguage {
             "{}".into()
         }
     }
-    fn get_cachable_file(&self, uri: &Url) -> Result<&ServerFileCache, ShaderError> {
-        let main_file = self
-            .watched_files
-            .get_file(&uri)
-            .ok_or(ShaderError::FileNotWatched(uri.to_file_path().unwrap()))?;
+    fn get_cachable_file(&self, uri: &Url) -> Result<&ServerFileCache, ServerLanguageError> {
+        let main_file =
+            self.watched_files
+                .get_file(&uri)
+                .ok_or(ServerLanguageError::FileNotWatched(
+                    uri.to_file_path().unwrap(),
+                ))?;
         debug_assert!(
             main_file.is_cachable_file(),
             "File {} is not a cachable file.",
@@ -690,7 +692,10 @@ impl ServerLanguage {
         );
         Ok(main_file)
     }
-    fn on_request(&mut self, req: lsp_server::Request) -> Result<AsyncMessage, ShaderError> {
+    fn on_request(
+        &mut self,
+        req: lsp_server::Request,
+    ) -> Result<AsyncMessage, ServerLanguageError> {
         // Simply parse the request and delay them.
         let async_request =
             match req.method.as_str() {
@@ -756,14 +761,17 @@ impl ServerLanguage {
         }
         Ok(async_request)
     }
-    fn on_response(&mut self, response: lsp_server::Response) -> Result<AsyncMessage, ShaderError> {
+    fn on_response(
+        &mut self,
+        response: lsp_server::Response,
+    ) -> Result<AsyncMessage, ServerLanguageError> {
         // Here the callback return a delayed update
         match self.connection.remove_callback(&response.id) {
             Some(callback) => match response.result {
                 Some(result) => callback(self, result),
                 None => Ok(AsyncMessage::None), // Received message can be empty.
             },
-            None => Err(ShaderError::InternalErr(format!(
+            None => Err(ServerLanguageError::InternalError(format!(
                 "Received unhandled response: {:#?}",
                 response
             ))),
@@ -772,7 +780,7 @@ impl ServerLanguage {
     fn on_notification(
         &mut self,
         notification: lsp_server::Notification,
-    ) -> Result<AsyncMessage, ShaderError> {
+    ) -> Result<AsyncMessage, ServerLanguageError> {
         // Watch & remove file as expected and return a delayed update.
         // We still update text content & AST here as performances are OK to be done here.
         // But symbol parsing & validation is done asynchronously.
@@ -790,14 +798,14 @@ impl ServerLanguage {
                 // Skip non file uri.
                 if uri.scheme() != "file" {
                     // Invalid Params
-                    return Err(ShaderError::InvalidParams(format!(
+                    return Err(ServerLanguageError::InvalidParams(format!(
                         "Trying to watch file with unsupported scheme : {}",
                         uri.scheme()
                     )));
                 }
                 let shading_language = ShadingLanguage::from_str(&params.text_document.language_id)
                     .map_err(|_| {
-                        ShaderError::InvalidParams(format!(
+                        ServerLanguageError::InvalidParams(format!(
                             "Trying to watch file with unsupported langID : {}",
                             params.text_document.language_id
                         ))

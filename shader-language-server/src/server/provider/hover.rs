@@ -2,10 +2,11 @@ use std::cell::RefCell;
 
 use lsp_types::{Hover, HoverContents, MarkupContent, Position, Url};
 
+use shader_sense::position::ShaderFilePosition;
+use shader_sense::shader_error::ShaderError;
 use shader_sense::symbols::symbols::{ShaderSymbolData, ShaderSymbolMode};
-use shader_sense::{position::ShaderFilePosition, shader_error::ShaderError};
 
-use crate::server::common::shader_range_to_lsp_range;
+use crate::server::common::{shader_range_to_lsp_range, ServerLanguageError};
 use crate::server::ServerLanguage;
 
 impl ServerLanguage {
@@ -13,7 +14,7 @@ impl ServerLanguage {
         &mut self,
         uri: &Url,
         position: Position,
-    ) -> Result<Option<Hover>, ShaderError> {
+    ) -> Result<Option<Hover>, ServerLanguageError> {
         let cached_file = self.get_cachable_file(&uri)?;
         let file_path = uri.to_file_path().unwrap();
         let shader_position = ShaderFilePosition::new(
@@ -117,7 +118,7 @@ impl ServerLanguage {
                 if let ShaderError::NoSymbol = err {
                     Ok(None)
                 } else {
-                    Err(err)
+                    Err(err.into())
                 }
             }
         }

@@ -12,14 +12,14 @@ use shader_sense::{
     symbols::symbols::{ShaderSymbolData, ShaderSymbolMode},
 };
 
-use crate::server::ServerLanguage;
+use crate::server::{common::ServerLanguageError, ServerLanguage};
 
 impl ServerLanguage {
     pub fn recolt_signature(
         &mut self,
         uri: &Url,
         position: Position,
-    ) -> Result<Option<SignatureHelp>, ShaderError> {
+    ) -> Result<Option<SignatureHelp>, ServerLanguageError> {
         let cached_file = self.get_cachable_file(&uri)?;
         let file_path = uri.to_file_path().unwrap();
         let shader_position = ShaderFilePosition::new(
@@ -139,7 +139,7 @@ impl ServerLanguage {
                 if let ShaderError::NoSymbol = err {
                     Ok(None)
                 } else {
-                    Err(err)
+                    Err(err.into())
                 }
             }
         }

@@ -1,12 +1,14 @@
 use std::cell::RefCell;
 
 use lsp_types::{FoldingRange, FoldingRangeKind, Url};
-use shader_sense::shader_error::ShaderError;
 
-use crate::server::ServerLanguage;
+use crate::server::{common::ServerLanguageError, ServerLanguage};
 
 impl ServerLanguage {
-    pub fn recolt_folding_range(&mut self, uri: &Url) -> Result<Vec<FoldingRange>, ShaderError> {
+    pub fn recolt_folding_range(
+        &mut self,
+        uri: &Url,
+    ) -> Result<Vec<FoldingRange>, ServerLanguageError> {
         let cached_file = self.get_cachable_file(&uri)?;
         // Adding regions
         let mut folding_ranges: Vec<FoldingRange> = cached_file

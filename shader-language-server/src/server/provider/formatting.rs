@@ -9,7 +9,7 @@ use lsp_types::{TextEdit, Url};
 use shader_sense::position::ShaderRange;
 use shader_sense::{shader::ShadingLanguage, shader_error::ShaderError};
 
-use crate::server::common::shader_range_to_lsp_range;
+use crate::server::common::{shader_range_to_lsp_range, ServerLanguageError};
 use crate::server::ServerLanguage;
 
 impl ServerLanguage {
@@ -57,7 +57,7 @@ impl ServerLanguage {
         &self,
         uri: &Url,
         range: Option<ShaderRange>,
-    ) -> Result<Vec<TextEdit>, ShaderError> {
+    ) -> Result<Vec<TextEdit>, ServerLanguageError> {
         let cached_file = self.get_cachable_file(&uri)?;
         match &cached_file.shading_language {
             ShadingLanguage::Wgsl => {
@@ -118,7 +118,7 @@ impl ServerLanguage {
                         new_text: formatted_code,
                     }])
                 } else {
-                    Err(ShaderError::InternalErr(
+                    Err(ServerLanguageError::InternalError(
                         "Failed to parse file with clang-format".into(),
                     ))
                 }

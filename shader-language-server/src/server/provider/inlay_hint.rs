@@ -1,11 +1,10 @@
 use lsp_types::{InlayHint, InlayHintKind, InlayHintLabel, Range, Url};
 
-use shader_sense::{
-    shader_error::ShaderError,
-    symbols::symbols::{ShaderSymbolData, ShaderSymbolMode, ShaderSymbolType},
-};
+use shader_sense::symbols::symbols::{ShaderSymbolData, ShaderSymbolMode, ShaderSymbolType};
 
-use crate::server::common::{lsp_range_to_shader_range, shader_position_to_lsp_position};
+use crate::server::common::{
+    lsp_range_to_shader_range, shader_position_to_lsp_position, ServerLanguageError,
+};
 use crate::server::ServerLanguage;
 
 impl ServerLanguage {
@@ -13,7 +12,7 @@ impl ServerLanguage {
         &mut self,
         uri: &Url,
         lsp_range: &Range,
-    ) -> Result<Vec<InlayHint>, ShaderError> {
+    ) -> Result<Vec<InlayHint>, ServerLanguageError> {
         // Ensure main file.
         let _cached_file = self.get_cachable_file(&uri)?;
         // Get all symbols

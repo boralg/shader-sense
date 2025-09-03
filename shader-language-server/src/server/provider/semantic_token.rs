@@ -5,10 +5,9 @@ use log::warn;
 use lru::LruCache;
 use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensResult, Url};
 use shader_sense::symbols::symbols::ShaderSymbolMode;
-use shader_sense::{
-    position::ShaderPosition, shader_error::ShaderError, symbols::symbols::ShaderSymbolData,
-};
+use shader_sense::{position::ShaderPosition, symbols::symbols::ShaderSymbolData};
 
+use crate::server::common::ServerLanguageError;
 use crate::server::ServerLanguage;
 
 impl ServerLanguage {
@@ -257,7 +256,7 @@ impl ServerLanguage {
     pub fn recolt_semantic_tokens(
         &mut self,
         uri: &Url,
-    ) -> Result<SemanticTokensResult, ShaderError> {
+    ) -> Result<SemanticTokensResult, ServerLanguageError> {
         // Ensure valid file input.
         let _cached_file = self.get_cachable_file(&uri)?;
         // Find occurences of tokens to paint

@@ -7,9 +7,9 @@ use lsp_types::{
     PublishDiagnosticsParams, RelatedFullDocumentDiagnosticReport, Url,
 };
 
-use shader_sense::shader_error::{ShaderDiagnosticSeverity, ShaderError};
+use shader_sense::shader_error::ShaderDiagnosticSeverity;
 
-use crate::server::common::shader_range_to_lsp_range;
+use crate::server::common::{shader_range_to_lsp_range, ServerLanguageError};
 
 use crate::server::ServerLanguage;
 
@@ -44,7 +44,7 @@ impl ServerLanguage {
     pub fn recolt_document_diagnostic(
         &mut self,
         uri: &Url,
-    ) -> Result<DocumentDiagnosticReportResult, ShaderError> {
+    ) -> Result<DocumentDiagnosticReportResult, ServerLanguageError> {
         let mut diagnostics = self.recolt_diagnostic(&uri)?;
         let main_diagnostic = match diagnostics.remove(&uri) {
             Some(diag) => diag,
@@ -98,7 +98,7 @@ impl ServerLanguage {
     pub fn recolt_diagnostic(
         &mut self,
         uri: &Url,
-    ) -> Result<HashMap<Url, Vec<Diagnostic>>, ShaderError> {
+    ) -> Result<HashMap<Url, Vec<Diagnostic>>, ServerLanguageError> {
         let cached_file = self.get_cachable_file(&uri)?;
         let data = cached_file.get_data();
         // Diagnostic for included file stored in main cache.

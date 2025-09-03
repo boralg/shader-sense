@@ -1,17 +1,14 @@
 use lsp_types::{DocumentSymbol, SymbolKind, Url};
-use shader_sense::{
-    shader_error::ShaderError,
-    symbols::symbols::{ShaderScope, ShaderSymbolMode, ShaderSymbolType},
-};
+use shader_sense::symbols::symbols::{ShaderScope, ShaderSymbolMode, ShaderSymbolType};
 
-use crate::server::common::shader_range_to_location;
+use crate::server::common::{shader_range_to_location, ServerLanguageError};
 use crate::server::ServerLanguage;
 
 impl ServerLanguage {
     pub fn recolt_document_symbol(
         &mut self,
         uri: &Url,
-    ) -> Result<Vec<DocumentSymbol>, ShaderError> {
+    ) -> Result<Vec<DocumentSymbol>, ServerLanguageError> {
         let cached_file = self.get_cachable_file(&uri)?;
         let symbols = cached_file
             .get_data()
