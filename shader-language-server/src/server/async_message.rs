@@ -66,7 +66,11 @@ impl AsyncMessage {
     pub fn is_update(&self) -> bool {
         matches!(self, Self::None | Self::UpdateCache(_))
     }
+    pub fn is_request(&self) -> bool {
+        !self.is_update()
+    }
     pub fn get_request_id(&self) -> &RequestId {
+        assert!(self.is_request());
         match self {
             AsyncMessage::DocumentSymbolRequest(async_request) => &async_request.req_id,
             AsyncMessage::WorkspaceSymbolRequest(async_request) => &async_request.req_id,
@@ -83,6 +87,29 @@ impl AsyncMessage {
             AsyncMessage::DumpDependencyRequest(async_request) => &async_request.req_id,
             AsyncMessage::DumpAstRequest(async_request) => &async_request.req_id,
             // These variants do not have a RequestId
+            AsyncMessage::None | AsyncMessage::UpdateCache(_) => {
+                unreachable!("Should not be reached. Update AsyncMessage::is_update accordingly.");
+            }
+        }
+    }
+    pub fn get_request_method(&self) -> &'static str {
+        assert!(!self.is_update());
+        match self {
+            AsyncMessage::DocumentSymbolRequest(_) => DocumentSymbolRequest::METHOD,
+            AsyncMessage::WorkspaceSymbolRequest(_) => WorkspaceSymbolRequest::METHOD,
+            AsyncMessage::RangeFormatting(_) => RangeFormatting::METHOD,
+            AsyncMessage::Formatting(_) => Formatting::METHOD,
+            AsyncMessage::SemanticTokensFullRequest(_) => SemanticTokensFullRequest::METHOD,
+            AsyncMessage::FoldingRangeRequest(_) => FoldingRangeRequest::METHOD,
+            AsyncMessage::InlayHintRequest(_) => InlayHintRequest::METHOD,
+            AsyncMessage::HoverRequest(_) => HoverRequest::METHOD,
+            AsyncMessage::SignatureHelpRequest(_) => SignatureHelpRequest::METHOD,
+            AsyncMessage::Completion(_) => Completion::METHOD,
+            AsyncMessage::GotoDefinition(_) => GotoDefinition::METHOD,
+            AsyncMessage::DocumentDiagnosticRequest(_) => DocumentDiagnosticRequest::METHOD,
+            AsyncMessage::DumpDependencyRequest(_) => DumpDependencyRequest::METHOD,
+            AsyncMessage::DumpAstRequest(_) => DumpAstRequest::METHOD,
+            // These variants do not have a method
             AsyncMessage::None | AsyncMessage::UpdateCache(_) => {
                 unreachable!("Should not be reached. Update AsyncMessage::is_update accordingly.");
             }

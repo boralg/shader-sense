@@ -497,7 +497,40 @@ impl ServerLanguage {
                     },
                     Message::Notification(not) => match self.on_notification(not) {
                         Ok(async_message) => async_messages_queue.push(async_message),
-                        Err(err) => self.connection.send_notification_error(err.to_string()),
+                        Err(err) => match err {
+                            ServerLanguageError::LastRequestCanceled => {
+                                // Find last request and cancel it.
+                                match async_messages_queue
+                                    .iter()
+                                    .rev()
+                                    .position(|m| m.is_request())
+                                {
+                                    Some(last_request_index_from_end) => {
+                                        let last_request_index = async_messages_queue.len()
+                                            - last_request_index_from_end
+                                            - 1;
+                                        let canceled_request =
+                                            async_messages_queue.remove(last_request_index);
+                                        info!(
+                                            "Request #{} has been cancelled.",
+                                            canceled_request.get_request_id()
+                                        );
+                                        self.connection.send_response_error(
+                                            canceled_request.get_request_id().clone(),
+                                            ErrorCode::RequestCanceled,
+                                            format!(
+                                                "Request {} for file {} has been canceled",
+                                                canceled_request.get_request_method(),
+                                                canceled_request.get_uri().cloned().unwrap()
+                                            ),
+                                        );
+                                    }
+                                    // Couldn't cancel last request as its probably been flushed from queue. Ignore it.
+                                    None => {}
+                                }
+                            }
+                            _ => self.connection.send_notification_error(err.to_string()),
+                        },
                     },
                 },
                 Err(err) => match err {
@@ -751,7 +784,7 @@ impl ServerLanguage {
                 ),
                 _ => {
                     warn!("Received unhandled request: {:#?}", req);
-                    AsyncMessage::None
+                    return Err(ServerLanguageError::MethodNotFound(req.method));
                 }
             };
         if let Some(uri) = async_request.get_uri() {
@@ -1011,17 +1044,14 @@ impl ServerLanguage {
                     Ok(AsyncMessage::None)
                 }
             }
-            Cancel::METHOD => {
-                // TODO: cancel request somehow.
-                Ok(AsyncMessage::None)
-            }
+            Cancel::METHOD => Err(ServerLanguageError::LastRequestCanceled),
             _ => {
                 warn!(
                     "Received unhandled notification {}: {}",
                     notification.method,
                     self.debug(&notification)
                 );
-                // Should return method not supported.
+                // This is a notification. We can safely ignore it.
                 Ok(AsyncMessage::None)
             }
         }
