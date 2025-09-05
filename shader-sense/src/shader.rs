@@ -212,7 +212,7 @@ pub enum HlslVersion {
 }
 
 /// Hlsl compilation parameters for DXC.
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct HlslCompilationParams {
     pub shader_model: HlslShaderModel,
     pub version: HlslVersion,
@@ -254,21 +254,21 @@ pub enum GlslSpirvVersion {
     SPIRV1_6,
 }
 /// Glsl compilation parameters for glslang.
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct GlslCompilationParams {
     pub client: GlslTargetClient,
     pub spirv: GlslSpirvVersion,
 }
 
 /// Wgsl compilation parameters for naga.
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct WgslCompilationParams {}
 
 /// Parameters for includes.
 #[derive(Default, Debug, Clone)]
 pub struct ShaderContextParams {
     pub defines: HashMap<String, String>,
-    pub includes: Vec<String>,
+    pub includes: Vec<PathBuf>,
     pub path_remapping: HashMap<PathBuf, PathBuf>,
 }
 

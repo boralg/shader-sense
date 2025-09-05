@@ -1,11 +1,15 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
-use log::info;
+use log::{info, warn};
 use lsp_types::{request::WorkspaceConfiguration, ConfigurationParams};
 use serde::{Deserialize, Serialize};
 
 use serde_json::Value;
 use shader_sense::{
+    include::canonicalize,
     shader::{
         GlslCompilationParams, GlslSpirvVersion, GlslTargetClient, HlslCompilationParams,
         HlslShaderModel, HlslVersion, ShaderCompilationParams, ShaderContextParams, ShaderParams,
@@ -61,20 +65,179 @@ impl ServerTrace {
     }
 }
 
+/// Serialized configuration override that can be used for a specific engine for example (Unreal / Unity config).
 // Only use option to allow non defined values.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct ServerConfig {
+pub struct ServerSerializedConfigOverride {
     includes: Option<Vec<String>>,
     defines: Option<HashMap<String, String>>,
     path_remapping: Option<HashMap<String, String>>,
-    validate: Option<bool>,
-    symbols: Option<bool>,
-    symbol_diagnostics: Option<bool>,
-    trace: Option<ServerTrace>,
-    severity: Option<String>,
     hlsl: Option<ServerHlslConfig>,
     glsl: Option<ServerGlslConfig>,
+}
+
+/// Serialized configuration for the server to be sent through workspace/configuration lsp request or as input when starting the server.
+// Only use option to allow non defined values.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerSerializedConfig {
+    includes: Option<Vec<String>>,            // Includes folder to check
+    defines: Option<HashMap<String, String>>, // Defines to set
+    path_remapping: Option<HashMap<String, String>>, // Virtual path remapping
+    validate: Option<bool>,                   // Validation via standard API
+    symbols: Option<bool>,                    // Query symbols
+    symbol_diagnostics: Option<bool>,         // Debug option to visualise issues with tree-sitter
+    trace: Option<ServerTrace>,               // Level of error to display
+    severity: Option<String>,                 // Severity of diagnostic to display
+    config_override: Option<String>,          // Override configuration file
+    hlsl: Option<ServerHlslConfig>,           // Hlsl specific configuration
+    glsl: Option<ServerGlslConfig>,           // Glsl specific configuration
+}
+
+/// Configuration computed from both server configuration and engine configuration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerConfig {
+    includes: Vec<PathBuf>,
+    defines: HashMap<String, String>,
+    path_remapping: HashMap<PathBuf, PathBuf>,
+    validate: bool,
+    symbols: bool,
+    symbol_diagnostics: bool,
+    trace: ServerTrace,
+    severity: ShaderDiagnosticSeverity,
+    hlsl: HlslCompilationParams,
+    glsl: GlslCompilationParams,
+    wgsl: WgslCompilationParams,
+}
+
+impl ServerSerializedConfig {
+    pub fn compute_engine_config(self) -> ServerConfig {
+        fn verify_user_path(path: &str) -> PathBuf {
+            // Try to canonicalize path.
+            // If it fail, still return it to avoid crashing server with invalid config.
+            canonicalize(Path::new(&path)).unwrap_or_else(|err| {
+                warn!("Failed to canonicalize setting path {}", err);
+                PathBuf::from(path)
+            })
+        }
+        // Convert ServerConfig to ServerEngineConfig
+        let mut config = ServerConfig {
+            includes: self
+                .includes
+                .map(|i| i.into_iter().map(|i| verify_user_path(&i)).collect())
+                .unwrap_or_default(),
+            defines: self.defines.unwrap_or_default(),
+            path_remapping: self
+                .path_remapping
+                .map(|i| {
+                    i.into_iter()
+                        .map(|(v, i)| (verify_user_path(&v), verify_user_path(&i)))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            validate: self.validate.unwrap_or(ServerConfig::DEFAULT_VALIDATE),
+            symbols: self.symbols.unwrap_or(ServerConfig::DEFAULT_SYMBOLS),
+            symbol_diagnostics: self
+                .symbol_diagnostics
+                .unwrap_or(ServerConfig::DEFAULT_SYMBOL_DIAGNOSTIC),
+            trace: self.trace.unwrap_or(ServerConfig::DEFAULT_TRACE),
+            severity: self
+                .severity
+                .map(|s| ShaderDiagnosticSeverity::from(s.as_str()))
+                .unwrap_or(ServerConfig::DEFAULT_SEVERITY),
+            hlsl: self
+                .hlsl
+                .map(|hlsl| HlslCompilationParams {
+                    shader_model: hlsl.shader_model.unwrap_or_default(),
+                    version: hlsl.version.unwrap_or_default(),
+                    enable16bit_types: hlsl.enable16bit_types.unwrap_or_default(),
+                    spirv: hlsl.spirv.unwrap_or_default(),
+                })
+                .unwrap_or_default(),
+            glsl: self
+                .glsl
+                .map(|glsl| GlslCompilationParams {
+                    client: glsl.target_client.unwrap_or_default(),
+                    spirv: glsl.spirv_version.unwrap_or_default(),
+                })
+                .unwrap_or_default(),
+            wgsl: WgslCompilationParams {},
+        };
+        // Get engine config if set and override them.
+        if let Some(config_override) = self.config_override {
+            let settings = match std::fs::read_to_string(&config_override) {
+                Ok(setting) => setting,
+                Err(err) => {
+                    warn!(
+                        "Failed to read engine settings at {:?}: {}",
+                        config_override, err
+                    );
+                    return config;
+                }
+            };
+            let override_config =
+                match serde_json::from_str::<ServerSerializedConfigOverride>(&settings) {
+                    Ok(setting) => setting,
+                    Err(err) => {
+                        warn!(
+                            "Failed to parse engine settings at {:?}: {}",
+                            config_override, err
+                        );
+                        return config;
+                    }
+                };
+            // Merge config with settings.
+            config
+                .defines
+                .extend(override_config.defines.unwrap_or_default());
+            config.includes.extend(
+                override_config
+                    .includes
+                    .map(|i| {
+                        i.into_iter()
+                            .map(|i| verify_user_path(&i))
+                            .collect::<Vec<PathBuf>>()
+                    })
+                    .unwrap_or_default(),
+            );
+            config.path_remapping.extend(
+                override_config
+                    .path_remapping
+                    .map(|i| {
+                        i.into_iter()
+                            .map(|(v, i)| (verify_user_path(&v), verify_user_path(&i)))
+                            .collect::<HashMap<PathBuf, PathBuf>>()
+                    })
+                    .unwrap_or_default(),
+            );
+            if let Some(override_glsl) = override_config.glsl {
+                if let Some(spirv_version) = override_glsl.spirv_version {
+                    config.glsl.spirv = spirv_version;
+                }
+                if let Some(target_client) = override_glsl.target_client {
+                    config.glsl.client = target_client;
+                }
+            }
+            if let Some(override_hlsl) = override_config.hlsl {
+                if let Some(version) = override_hlsl.version {
+                    config.hlsl.version = version;
+                }
+                if let Some(shader_model) = override_hlsl.shader_model {
+                    config.hlsl.shader_model = shader_model;
+                }
+                if let Some(enable16bit_types) = override_hlsl.enable16bit_types {
+                    config.hlsl.enable16bit_types = enable16bit_types;
+                }
+                if let Some(spirv) = override_hlsl.spirv {
+                    config.hlsl.spirv = spirv;
+                }
+            }
+            config
+        } else {
+            config
+        }
+    }
 }
 
 impl ServerConfig {
@@ -90,94 +253,63 @@ impl ServerConfig {
         let (mut defines, mut includes, entry_point, shader_stage) = match variant {
             Some(variant) => (
                 variant.defines.clone(),
-                variant
-                    .includes
-                    .into_iter()
-                    .map(|e| e.into_os_string().into_string().unwrap())
-                    .collect::<Vec<String>>(),
+                variant.includes.clone(),
                 Some(variant.entry_point),
                 variant.stage,
             ),
             None => (HashMap::new(), Vec::new(), None, None),
         };
-        defines.extend(self.defines.clone().unwrap_or_default());
-        includes.extend(self.includes.clone().unwrap_or_default());
-        let hlsl = self.hlsl.clone().unwrap_or_default();
-        let glsl = self.glsl.clone().unwrap_or_default();
+        defines.extend(self.defines.clone());
+        includes.extend(self.includes.clone());
+        let hlsl = self.hlsl.clone();
+        let glsl = self.glsl.clone();
+        let wgsl = self.wgsl.clone();
         ShaderParams {
             context: ShaderContextParams {
                 defines,
                 includes,
-                path_remapping: self
-                    .path_remapping
-                    .clone()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|(vp, p)| (vp.into(), p.into()))
-                    .collect(),
+                path_remapping: self.path_remapping.clone(),
             },
             compilation: ShaderCompilationParams {
                 entry_point,
                 shader_stage,
-                hlsl: HlslCompilationParams {
-                    shader_model: hlsl.shader_model.unwrap_or_default(),
-                    version: hlsl.version.unwrap_or_default(),
-                    enable16bit_types: hlsl.enable16bit_types.unwrap_or_default(),
-                    spirv: hlsl.spirv.unwrap_or_default(),
-                },
-                glsl: GlslCompilationParams {
-                    client: glsl.target_client.unwrap_or_default(),
-                    spirv: glsl.spirv_version.unwrap_or_default(),
-                },
-                wgsl: WgslCompilationParams {},
+                hlsl: hlsl,
+                glsl: glsl,
+                wgsl: wgsl,
             },
         }
     }
-    pub fn get_symbols(&self) -> bool {
-        match &self.symbols {
-            Some(symbols) => *symbols,
-            None => Self::DEFAULT_SYMBOLS,
-        }
-    }
     pub fn get_validate(&self) -> bool {
-        match &self.validate {
-            Some(validate) => *validate,
-            None => Self::DEFAULT_VALIDATE,
-        }
+        self.validate
+    }
+    pub fn get_symbols(&self) -> bool {
+        self.symbols
     }
     pub fn get_symbol_diagnostics(&self) -> bool {
-        match &self.symbol_diagnostics {
-            Some(symbol_diagnostics) => *symbol_diagnostics,
-            None => Self::DEFAULT_SYMBOL_DIAGNOSTIC,
-        }
-    }
-    pub fn get_severity(&self) -> ShaderDiagnosticSeverity {
-        match &self.severity {
-            Some(severity) => ShaderDiagnosticSeverity::from(severity.as_str()),
-            None => Self::DEFAULT_SEVERITY,
-        }
+        self.symbol_diagnostics
     }
     pub fn is_verbose(&self) -> bool {
-        match &self.trace {
-            Some(trace) => trace.is_verbose(),
-            None => Self::DEFAULT_TRACE.is_verbose(),
-        }
+        self.trace.is_verbose()
+    }
+    pub fn get_severity(&self) -> ShaderDiagnosticSeverity {
+        self.severity.clone() // TODO: ref
     }
 }
 
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
-            includes: None,
-            defines: None,
-            path_remapping: None,
-            validate: None,
-            symbols: None,
-            symbol_diagnostics: None,
-            trace: None,
-            severity: None,
-            hlsl: None,
-            glsl: None,
+            includes: Vec::new(),
+            defines: HashMap::new(),
+            path_remapping: HashMap::new(),
+            validate: ServerConfig::DEFAULT_VALIDATE,
+            symbols: ServerConfig::DEFAULT_SYMBOLS,
+            symbol_diagnostics: ServerConfig::DEFAULT_SYMBOL_DIAGNOSTIC,
+            trace: ServerConfig::DEFAULT_TRACE,
+            severity: ServerConfig::DEFAULT_SEVERITY,
+            hlsl: HlslCompilationParams::default(),
+            glsl: GlslCompilationParams::default(),
+            wgsl: WgslCompilationParams::default(),
         }
     }
 }
@@ -194,8 +326,10 @@ impl ServerLanguage {
             config,
             |server: &mut ServerLanguage, value: Value| {
                 // Sent 1 item, received 1 in an array
-                let mut parsed_config: Vec<Option<ServerConfig>> = serde_json::from_value(value)?;
+                let mut parsed_config: Vec<Option<ServerSerializedConfig>> =
+                    serde_json::from_value(value)?;
                 let config = parsed_config.remove(0).unwrap_or_default();
+                let config = config.compute_engine_config();
                 if server.config != config {
                     profile_scope!("Updating server config: {:#?}", config);
                     server.config = config.clone();
@@ -217,5 +351,81 @@ impl ServerLanguage {
                 }
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use crate::server::server_config::{ServerConfig, ServerSerializedConfig};
+
+    #[test]
+    fn test_empty_config() {
+        let cfg: ServerSerializedConfig = serde_json::from_str("{}").unwrap();
+        let cfg = cfg.compute_engine_config();
+        assert!(cfg.get_validate() == ServerConfig::DEFAULT_VALIDATE);
+        let cfg_inverse: ServerSerializedConfig = serde_json::from_str(
+            format!(
+                "{{\"validate\": {}}}",
+                if ServerConfig::DEFAULT_VALIDATE {
+                    "false"
+                } else {
+                    "true"
+                }
+            )
+            .as_str(),
+        )
+        .unwrap();
+        let cfg_inverse = cfg_inverse.compute_engine_config();
+        assert!(cfg_inverse.get_validate() == !ServerConfig::DEFAULT_VALIDATE);
+    }
+
+    #[test]
+    fn test_default_config() {
+        let cfg = ServerSerializedConfig::default();
+        let cfg = cfg.compute_engine_config();
+        assert!(cfg.get_symbols() == ServerConfig::DEFAULT_SYMBOLS);
+        assert!(cfg.get_validate() == ServerConfig::DEFAULT_VALIDATE);
+        assert!(cfg.get_symbol_diagnostics() == ServerConfig::DEFAULT_SYMBOL_DIAGNOSTIC);
+        assert!(cfg.is_verbose() == ServerConfig::DEFAULT_TRACE.is_verbose());
+        assert!(cfg.get_severity() == ServerConfig::DEFAULT_SEVERITY);
+    }
+
+    #[test]
+    fn test_engine_config() {
+        // compute_engine_config does not return error and try to recover if invalid content.
+        // To check if it passed successfully, we need to check if no logs were outputed.
+        struct TestLogger;
+        impl log::Log for TestLogger {
+            fn enabled(&self, metadata: &log::Metadata) -> bool {
+                metadata.level() < log::Level::Info
+            }
+            fn log(&self, record: &log::Record) {
+                if self.enabled(record.metadata()) {
+                    assert!(
+                        false,
+                        "Did not expected any logs. but got : {} - {}",
+                        record.level(),
+                        record.args()
+                    );
+                }
+            }
+            fn flush(&self) {}
+        }
+        static LOGGER: TestLogger = TestLogger;
+        log::set_logger(&LOGGER)
+            .map(|_| log::set_max_level(log::LevelFilter::Warn))
+            .unwrap();
+        let cfg = ServerSerializedConfig {
+            includes: Some(vec!["D:/other/path/to/my/include".into()]),
+            config_override: Some("../shader-sense/test/config-override.json".into()),
+            ..Default::default()
+        };
+        let cfg = cfg.compute_engine_config();
+        assert!(cfg.includes.len() == 2);
+        assert!(cfg.includes[0] == PathBuf::from("D:/other/path/to/my/include"));
+        assert!(cfg.includes[1] == PathBuf::from("D:/path/to/my/include"));
+        assert!(*cfg.defines.get("MY_MACRO").unwrap() == String::from("1"));
     }
 }

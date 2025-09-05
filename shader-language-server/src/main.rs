@@ -1,5 +1,9 @@
 use log::{error, info, warn};
-use shader_language_server::server::{self, server_config::ServerConfig, Transport};
+use shader_language_server::server::{
+    self,
+    server_config::{ServerConfig, ServerSerializedConfig},
+    Transport,
+};
 
 fn get_version() -> &'static str {
     static VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -51,8 +55,11 @@ pub fn main() {
             "-h" => return usage(),
             "--config" => {
                 if let Some(config_str) = args.next() {
-                    match serde_json::from_str::<ServerConfig>(&config_str) {
-                        Ok(config_parsed) => config = config_parsed,
+                    match serde_json::from_str::<ServerSerializedConfig>(&config_str) {
+                        Ok(config_parsed) => {
+                            info!("Parsed config {:?}", config_parsed);
+                            config = config_parsed.compute_engine_config();
+                        }
                         Err(err) => {
                             error!("Failed to parse config {}: {}", config_str, err);
                             return usage();
@@ -66,16 +73,18 @@ pub fn main() {
             "--config-file" => {
                 if let Some(config_file) = args.next() {
                     match std::fs::read_to_string(&config_file) {
-                        Ok(config_str) => match serde_json::from_str::<ServerConfig>(&config_str) {
-                            Ok(config_parsed) => {
-                                info!("Parsed config {:?}", config_parsed);
-                                config = config_parsed;
+                        Ok(config_str) => {
+                            match serde_json::from_str::<ServerSerializedConfig>(&config_str) {
+                                Ok(config_parsed) => {
+                                    info!("Parsed config {:?}", config_parsed);
+                                    config = config_parsed.compute_engine_config();
+                                }
+                                Err(err) => {
+                                    error!("Failed to parse config file {}: {}", config_str, err);
+                                    return usage();
+                                }
                             }
-                            Err(err) => {
-                                error!("Failed to parse config file {}: {}", config_str, err);
-                                return usage();
-                            }
-                        },
+                        }
                         Err(err) => {
                             error!("Failed to open config file {}: {}", config_file, err);
                             return usage();

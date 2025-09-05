@@ -60,7 +60,7 @@ impl IncludeHandler {
     /// Create handler with given config
     pub fn main(
         file_path: &Path,
-        includes: Vec<String>,
+        includes: Vec<PathBuf>,
         path_remapping: HashMap<PathBuf, PathBuf>,
     ) -> Self {
         // Add local path to directory stack
@@ -70,10 +70,7 @@ impl IncludeHandler {
         let mut visited_dependencies = HashMap::new();
         visited_dependencies.insert(file_path.into(), 1);
         Self {
-            includes: includes
-                .into_iter()
-                .map(|s| canonicalize(Path::new(&s)).unwrap())
-                .collect(),
+            includes: includes.into_iter().collect(),
             directory_stack: directory_stack,
             visited_dependencies: visited_dependencies,
             path_remapping: path_remapping,

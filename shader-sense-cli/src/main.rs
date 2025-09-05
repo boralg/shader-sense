@@ -28,7 +28,7 @@
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
-    path::Path,
+    path::{Path, PathBuf},
     rc::Rc,
 };
 
@@ -190,7 +190,7 @@ pub fn main() {
         Some(file_name) => {
             let shader_params = ShaderParams {
                 context: ShaderContextParams {
-                    includes: includes,
+                    includes: includes.into_iter().map(|i| PathBuf::from(i)).collect(),
                     defines: defines.into_iter().map(|d| (d, "1".to_owned())).collect(),
                     path_remapping: HashMap::new(),
                 },

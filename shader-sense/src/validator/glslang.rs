@@ -77,7 +77,7 @@ struct GlslangIncludeHandler<'a> {
 impl<'a> GlslangIncludeHandler<'a> {
     pub fn new(
         file_path: &'a Path,
-        includes: Vec<String>,
+        includes: Vec<PathBuf>,
         path_remapping: HashMap<PathBuf, PathBuf>,
         include_callback: &'a mut dyn FnMut(&Path) -> Option<String>,
     ) -> Self {

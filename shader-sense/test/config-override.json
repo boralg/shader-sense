@@ -1,0 +1,8 @@
+{
+    "includes": [
+        "D:/path/to/my/include"
+    ],
+    "defines": {
+        "MY_MACRO": "1"
+    }
+}

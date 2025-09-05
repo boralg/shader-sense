@@ -38,7 +38,7 @@ struct DxcIncludeHandler<'a> {
 impl<'a> DxcIncludeHandler<'a> {
     pub fn new(
         file: &Path,
-        includes: Vec<String>,
+        includes: Vec<PathBuf>,
         path_remapping: HashMap<PathBuf, PathBuf>,
         include_callback: &'a mut dyn FnMut(&Path) -> Option<String>,
     ) -> Self {

@@ -9,6 +9,7 @@ use shader_sense::{
     shader_error::ShaderError,
 };
 
+#[derive(Debug)]
 pub enum ServerLanguageError {
     ShaderError(ShaderError),
     InvalidParams(String),
