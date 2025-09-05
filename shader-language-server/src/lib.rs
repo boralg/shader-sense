@@ -7,6 +7,7 @@
 //!     --stdio         Use the stdio transport. Default transport.
 //!     --tcp           Use tcp transport. Not implemented yet.
 //!     --memory        Use memory transport. Not implemented yet.
+//!     --cwd           Set current working directory of server. If not set, will be the server executable path.
 //!     --version | -v  Print server version.
 //!     --help | -h     Print this helper.
 //! ```

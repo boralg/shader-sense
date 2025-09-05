@@ -23,6 +23,12 @@ fn run_server(config: ServerConfig, transport: Transport) {
     if let Ok(current_exe) = std::env::current_exe() {
         info!("Server running from {}", current_exe.display());
     }
+    if let Ok(current_dir) = std::env::current_dir() {
+        info!(
+            "Server current working directory is {}",
+            current_dir.display()
+        );
+    }
     server::run(config, transport);
 }
 
@@ -37,6 +43,7 @@ fn usage() {
     println!("  --stdio                   Use the stdio transport. Default transport.");
     println!("  --tcp                     Use tcp transport. Not implemented yet.");
     println!("  --memory                  Use memory transport. Not implemented yet.");
+    println!("  --cwd                     Set current working directory of server. If not set, will be the server executable path.");
     println!("  --version | -v            Print server version.");
     println!("  --help | -h               Print this helper.");
 }
@@ -98,6 +105,17 @@ pub fn main() {
             "--stdio" => transport = Transport::Stdio,
             "--tcp" => transport = Transport::Tcp,
             "--memory" => transport = Transport::Memory,
+            "--cwd" => {
+                if let Some(cwd) = args.next() {
+                    match std::env::set_current_dir(cwd) {
+                        Ok(_) => {}
+                        Err(err) => error!("Failed to set cwd: {}", err),
+                    }
+                } else {
+                    error!("Missing directory for --cwd");
+                    return usage();
+                }
+            }
             arg => {
                 warn!("Argument {} unknown", arg);
             }
