@@ -24,7 +24,7 @@ use log::{debug, error, info, warn};
 use lru::LruCache;
 use lsp_types::notification::{
     Cancel, DidChangeConfiguration, DidChangeTextDocument, DidCloseTextDocument,
-    DidOpenTextDocument, DidSaveTextDocument, Notification, Progress,
+    DidOpenTextDocument, DidSaveTextDocument, LogTrace, Notification, Progress, SetTrace,
 };
 use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, FoldingRangeRequest, Formatting,
@@ -38,7 +38,7 @@ use lsp_types::{
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentSymbolOptions,
     DocumentSymbolResponse, FoldingRangeProviderCapability, HoverProviderCapability, OneOf,
     ProgressParams, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
+    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities, SetTraceParams,
     SignatureHelpOptions, TextDocumentSyncKind, Url, WorkDoneProgress, WorkDoneProgressBegin,
     WorkDoneProgressCreateParams, WorkDoneProgressEnd, WorkDoneProgressOptions,
     WorkDoneProgressReport, WorkspaceSymbolOptions, WorkspaceSymbolResponse,
@@ -56,6 +56,7 @@ use shader_variant::DidChangeShaderVariant;
 use crate::profile_scope;
 use crate::server::async_message::{AsyncCacheRequest, AsyncMessage, AsyncRequest};
 use crate::server::common::{lsp_range_to_shader_range, ServerLanguageError};
+use crate::server::server_config::{ServerTrace, ServerTraceLevel};
 use crate::server::server_file_cache::ServerFileCache;
 
 /// Server implementation
@@ -1043,6 +1044,21 @@ impl ServerLanguage {
                 } else {
                     Ok(AsyncMessage::None)
                 }
+            }
+            LogTrace::METHOD => {
+                warn!("Log trace should only be sent by server.");
+                Ok(AsyncMessage::None)
+            }
+            SetTrace::METHOD => {
+                let params: SetTraceParams = serde_json::from_value(notification.params)?;
+                profile_scope!("Received set trace notification: {}", self.debug(&params));
+                // Config will override this though...
+                self.config.set_trace(match params.value {
+                    lsp_types::TraceValue::Off => ServerTrace::new(ServerTraceLevel::Off),
+                    lsp_types::TraceValue::Messages => ServerTrace::new(ServerTraceLevel::Messages),
+                    lsp_types::TraceValue::Verbose => ServerTrace::new(ServerTraceLevel::Verbose),
+                });
+                Ok(AsyncMessage::None)
             }
             Cancel::METHOD => Err(ServerLanguageError::LastRequestCanceled),
             _ => {

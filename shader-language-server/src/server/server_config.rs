@@ -60,6 +60,9 @@ pub struct ServerTrace {
 }
 
 impl ServerTrace {
+    pub fn new(level: ServerTraceLevel) -> Self {
+        Self { server: level }
+    }
     pub fn is_verbose(&self) -> bool {
         self.server == ServerTraceLevel::Verbose
     }
@@ -293,6 +296,9 @@ impl ServerConfig {
     }
     pub fn get_severity(&self) -> ShaderDiagnosticSeverity {
         self.severity.clone() // TODO: ref
+    }
+    pub fn set_trace(&mut self, trace: ServerTrace) {
+        self.trace = trace
     }
 }
 
