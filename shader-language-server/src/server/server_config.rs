@@ -407,6 +407,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "wasi"))] // File not in right workspace.
     fn test_engine_config() {
         // compute_engine_config does not return error and try to recover if invalid content.
         // To check if it passed successfully, we need to check if no logs were outputed.
