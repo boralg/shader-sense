@@ -23,8 +23,9 @@ use debug::{DumpAstRequest, DumpDependencyRequest};
 use log::{debug, error, info, warn};
 use lru::LruCache;
 use lsp_types::notification::{
-    Cancel, DidChangeConfiguration, DidChangeTextDocument, DidCloseTextDocument,
-    DidOpenTextDocument, DidSaveTextDocument, LogTrace, Notification, Progress, SetTrace,
+    Cancel, DidChangeConfiguration, DidChangeTextDocument, DidChangeWorkspaceFolders,
+    DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, LogTrace, Notification,
+    Progress, SetTrace,
 };
 use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, FoldingRangeRequest, Formatting,
@@ -34,14 +35,15 @@ use lsp_types::request::{
 };
 use lsp_types::{
     CancelParams, CompletionOptionsCompletionItem, CompletionResponse,
-    DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentSymbolOptions,
-    DocumentSymbolResponse, FoldingRangeProviderCapability, HoverProviderCapability, OneOf,
-    ProgressParams, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities, SetTraceParams,
-    SignatureHelpOptions, TextDocumentSyncKind, Url, WorkDoneProgress, WorkDoneProgressBegin,
-    WorkDoneProgressCreateParams, WorkDoneProgressEnd, WorkDoneProgressOptions,
-    WorkDoneProgressReport, WorkspaceSymbolOptions, WorkspaceSymbolResponse,
+    DidChangeConfigurationParams, DidChangeTextDocumentParams, DidChangeWorkspaceFoldersParams,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    DocumentSymbolOptions, DocumentSymbolResponse, FoldingRangeProviderCapability,
+    HoverProviderCapability, OneOf, ProgressParams, SemanticTokenType, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+    ServerCapabilities, SetTraceParams, SignatureHelpOptions, TextDocumentSyncKind, Url,
+    WorkDoneProgress, WorkDoneProgressBegin, WorkDoneProgressCreateParams, WorkDoneProgressEnd,
+    WorkDoneProgressOptions, WorkDoneProgressReport, WorkspaceFoldersServerCapabilities,
+    WorkspaceServerCapabilities, WorkspaceSymbolOptions, WorkspaceSymbolResponse,
 };
 use shader_sense::shader::ShadingLanguage;
 
@@ -194,10 +196,26 @@ impl ServerLanguage {
             ),
             document_formatting_provider: Some(OneOf::Left(is_clang_format_available)),
             document_range_formatting_provider: Some(OneOf::Left(is_clang_format_available)),
+            workspace: Some(WorkspaceServerCapabilities {
+                workspace_folders: Some(WorkspaceFoldersServerCapabilities {
+                    supported: Some(true),
+                    change_notifications: Some(OneOf::Left(true)),
+                }),
+                ..Default::default()
+            }),
             ..Default::default()
         })?;
-        let _client_initialization_params =
-            self.connection.initialize(server_capabilities).unwrap();
+        let client_initialization_params = self.connection.initialize(server_capabilities).unwrap();
+        // Store workspace folder
+        if let Some(workspace_folders) = client_initialization_params.workspace_folders {
+            self.watched_files.workspace_folder = workspace_folders
+                .into_iter()
+                .map(|w| {
+                    info!("Watching workspace folder {} at {}", w.name, w.uri);
+                    w.uri
+                })
+                .collect()
+        }
         // TODO: Check features support from client params.
         debug!("Received client params");
         // Request configuration as its not sent automatically (at least with vscode)
@@ -1045,13 +1063,37 @@ impl ServerLanguage {
                     Ok(AsyncMessage::None)
                 }
             }
+            DidChangeWorkspaceFolders::METHOD => {
+                let params: DidChangeWorkspaceFoldersParams =
+                    serde_json::from_value(notification.params)?;
+                profile_scope!("Received {}: {}", notification.method, self.debug(&params));
+                for removed in params.event.removed {
+                    if let Some(position) = self
+                        .watched_files
+                        .workspace_folder
+                        .iter()
+                        .position(|f| *f == removed.uri)
+                    {
+                        self.watched_files.workspace_folder.remove(position);
+                        info!(
+                            "Removing workspace folder {} at {}",
+                            removed.name, removed.uri
+                        );
+                    }
+                }
+                for added in params.event.added {
+                    info!("Adding workspace folder {} at {}", added.name, added.uri);
+                    self.watched_files.workspace_folder.push(added.uri);
+                }
+                Ok(AsyncMessage::None)
+            }
             LogTrace::METHOD => {
                 warn!("Log trace should only be sent by server.");
                 Ok(AsyncMessage::None)
             }
             SetTrace::METHOD => {
                 let params: SetTraceParams = serde_json::from_value(notification.params)?;
-                profile_scope!("Received set trace notification: {}", self.debug(&params));
+                profile_scope!("Received {}: {}", notification.method, self.debug(&params));
                 // Config will override this though...
                 self.config.set_trace(match params.value {
                     lsp_types::TraceValue::Off => ServerTrace::new(ServerTraceLevel::Off),

@@ -4,7 +4,7 @@ use std::{
 };
 
 use log::{info, warn};
-use lsp_types::{request::WorkspaceConfiguration, ConfigurationParams};
+use lsp_types::{request::WorkspaceConfiguration, ConfigurationParams, Url};
 use serde::{Deserialize, Serialize};
 
 use serde_json::Value;
@@ -252,7 +252,11 @@ impl ServerConfig {
         server: ServerTraceLevel::Off,
     };
 
-    pub fn into_shader_params(&self, variant: Option<ShaderVariant>) -> ShaderParams {
+    pub fn into_shader_params(
+        &self,
+        workspace_folder: Option<&Url>,
+        variant: Option<ShaderVariant>,
+    ) -> ShaderParams {
         let (mut defines, mut includes, entry_point, shader_stage) = match variant {
             Some(variant) => (
                 variant.defines.clone(),
@@ -264,6 +268,10 @@ impl ServerConfig {
         };
         defines.extend(self.defines.clone());
         includes.extend(self.includes.clone());
+        // Insert workspace folder at start for cwd.
+        if let Some(workspace_folder) = workspace_folder {
+            includes.insert(0, workspace_folder.to_file_path().unwrap());
+        }
         let hlsl = self.hlsl.clone();
         let glsl = self.glsl.clone();
         let wgsl = self.wgsl.clone();

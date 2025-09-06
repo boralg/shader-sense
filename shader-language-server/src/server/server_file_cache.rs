@@ -73,6 +73,7 @@ impl ServerFileCache {
 pub struct ServerLanguageFileCache {
     pub files: HashMap<Url, ServerFileCache>,
     pub variant: Option<ShaderVariant>,
+    pub workspace_folder: Vec<Url>,
 }
 
 impl ServerLanguageFileCache {
@@ -80,7 +81,14 @@ impl ServerLanguageFileCache {
         Self {
             files: HashMap::new(),
             variant: None,
+            workspace_folder: Vec::new(),
         }
+    }
+    fn get_workspace_folder(&self, uri: &Url) -> Option<&Url> {
+        let file_path = uri.to_file_path().unwrap();
+        self.workspace_folder
+            .iter()
+            .find(|w| file_path.starts_with(&w.to_file_path().unwrap()))
     }
     // Get all main dependent files using the given file.
     pub fn get_dependent_main_files(&self, dependent_url: &Url) -> HashSet<Url> {
@@ -185,7 +193,8 @@ impl ServerLanguageFileCache {
         let variant = self.variant.clone().filter(|v| v.url == *uri);
 
         // Compute params
-        let shader_params = config.into_shader_params(variant.clone());
+        let shader_params =
+            config.into_shader_params(self.get_workspace_folder(uri), variant.clone());
         let mut context =
             ShaderPreprocessorContext::main(&file_path, shader_params.context.clone());
 
@@ -462,7 +471,10 @@ impl ServerLanguageFileCache {
                                     let intrinsics = ShaderIntrinsics::get(shading_language)
                                         .get_intrinsics_symbol(
                                             &config
-                                                .into_shader_params(Some(variant.clone()))
+                                                .into_shader_params(
+                                                    self.get_workspace_folder(uri),
+                                                    Some(variant.clone()),
+                                                )
                                                 .compilation,
                                         );
                                     file_to_cache.insert(
