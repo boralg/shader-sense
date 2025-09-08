@@ -279,13 +279,13 @@ impl SymbolTreeParser for HlslVariableTreeParser {
         format!(
             r#"({}declaration
             (qualifiers)?
-            [
-                type: (template_type
+            type: [
+                (template_type
                     name: (type_identifier) @variable.type
                 )
-                type: (identifier) @variable.type
-                type: (type_identifier) @variable.type
-                type: (primitive_type) @variable.type
+                (identifier) @variable.type
+                (type_identifier) @variable.type
+                (primitive_type) @variable.type
             ]
             declarator: [
                 (init_declarator
