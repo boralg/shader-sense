@@ -538,9 +538,9 @@ impl ServerLanguage {
                                             canceled_request.get_request_id().clone(),
                                             ErrorCode::RequestCanceled,
                                             format!(
-                                                "Request {} for file {} has been canceled",
+                                                "Request {} for file {:?} has been canceled",
                                                 canceled_request.get_request_method(),
-                                                canceled_request.get_uri().cloned().unwrap()
+                                                canceled_request.get_uri()
                                             ),
                                         );
                                     }
