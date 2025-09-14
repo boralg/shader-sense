@@ -1,5 +1,5 @@
 use shader_sense::{
-    shader::{HlslShaderModel, HlslVersion, ShaderStage},
+    shader::{HlslShaderModel, HlslVersion, ShaderStage, ShaderStageMask},
     symbols::{
         symbol_list::ShaderSymbolList,
         symbols::{
@@ -127,7 +127,7 @@ impl HlslIntrinsicParser {
             "__SHADER_TARGET_STAGE".into(),
             "__SHADER_STAGE_VERTEX",
             HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::Vertex]),
+                stages: Some(ShaderStageMask::VERTEX),
                 ..Default::default()
             },
         );
@@ -136,7 +136,7 @@ impl HlslIntrinsicParser {
             "__SHADER_TARGET_STAGE".into(),
             "__SHADER_STAGE_PIXEL",
             HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::Fragment]),
+                stages: Some(ShaderStageMask::FRAGMENT),
                 ..Default::default()
             },
         );
@@ -145,7 +145,7 @@ impl HlslIntrinsicParser {
             "__SHADER_TARGET_STAGE".into(),
             "__SHADER_STAGE_COMPUTE",
             HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::Compute]),
+                stages: Some(ShaderStageMask::COMPUTE),
                 ..Default::default()
             },
         );
@@ -154,7 +154,7 @@ impl HlslIntrinsicParser {
             "__SHADER_TARGET_STAGE".into(),
             "__SHADER_STAGE_HULL",
             HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             },
         );
@@ -163,7 +163,7 @@ impl HlslIntrinsicParser {
             "__SHADER_TARGET_STAGE".into(),
             "__SHADER_STAGE_DOMAIN",
             HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::TesselationEvaluation]),
+                stages: Some(ShaderStageMask::TESSELATION_EVALUATION),
                 ..Default::default()
             },
         );
@@ -172,7 +172,7 @@ impl HlslIntrinsicParser {
             "__SHADER_TARGET_STAGE".into(),
             "__SHADER_STAGE_MESH",
             HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::Mesh]),
+                stages: Some(ShaderStageMask::MESH),
                 ..Default::default()
             },
         );
@@ -181,7 +181,7 @@ impl HlslIntrinsicParser {
             "__SHADER_TARGET_STAGE".into(),
             "__SHADER_STAGE_AMPLIFICATION",
             HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::Task]),
+                stages: Some(ShaderStageMask::TASK),
                 ..Default::default()
             },
         );
@@ -190,7 +190,7 @@ impl HlslIntrinsicParser {
             "__SHADER_TARGET_STAGE".into(),
             "__SHADER_STAGE_GEOMETRY",
             HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::Geometry]),
+                stages: Some(ShaderStageMask::GEOMETRY),
                 ..Default::default()
             },
         );
@@ -199,14 +199,7 @@ impl HlslIntrinsicParser {
             "__SHADER_TARGET_STAGE".into(),
             "__SHADER_STAGE_LIBRARY",
             HlslRequirementParameter {
-                stages: Some(vec![
-                    ShaderStage::RayGeneration,
-                    ShaderStage::Intersect,
-                    ShaderStage::Miss,
-                    ShaderStage::AnyHit,
-                    ShaderStage::ClosestHit,
-                    ShaderStage::Callable,
-                ]),
+                stages: Some(ShaderStage::raytracing()),
                 ..Default::default()
             },
         );

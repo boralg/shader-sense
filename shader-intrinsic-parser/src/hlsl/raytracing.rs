@@ -1,5 +1,5 @@
 use shader_sense::{
-    shader::ShaderStage,
+    shader::{ShaderStage, ShaderStageMask},
     symbols::{
         symbol_list::ShaderSymbolList,
         symbols::{
@@ -26,7 +26,7 @@ impl HlslIntrinsicParser {
                 Some("https://learn.microsoft.com/en-us/windows/win32/direct3d12/raytracingaccelerationstructure".into())
             )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::AnyHit]),
+                stages: Some(ShaderStageMask::ANY_HIT),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Types { constructors: vec![] },
@@ -93,7 +93,7 @@ impl HlslIntrinsicParser {
                 Some("https://learn.microsoft.com/en-us/windows/win32/direct3d12/intersection-attributes".into())
             )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::AnyHit]),
+                stages: Some(ShaderStageMask::ANY_HIT),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Struct {
@@ -116,7 +116,7 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "AcceptHitAndEndSearch".into(),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::AnyHit]),
+                stages: Some(ShaderStageMask::ANY_HIT),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Functions { signatures: vec![
@@ -135,7 +135,7 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "CallShader".into(),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::AnyHit, ShaderStage::ClosestHit, ShaderStage::Miss, ShaderStage::RayGeneration]),
+                stages: Some(ShaderStageMask::ANY_HIT | ShaderStageMask::CLOSEST_HIT | ShaderStageMask::MISS | ShaderStageMask::RAY_GENERATION),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Functions { signatures: vec![
@@ -167,7 +167,7 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "IgnoreHit".into(),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::AnyHit]),
+                stages: Some(ShaderStageMask::ANY_HIT),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Functions { signatures: vec![
@@ -186,7 +186,7 @@ impl HlslIntrinsicParser {
         symbols.types.push(ShaderSymbol {
             label: "ReportHit".into(),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::Intersect]),
+                stages: Some(ShaderStageMask::INTERSECT),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Functions { signatures: vec![
@@ -229,7 +229,7 @@ impl HlslIntrinsicParser {
                 Some("https://learn.microsoft.com/en-us/windows/win32/direct3d12/traceray-function".into())
             )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
-                stages: Some(vec![ShaderStage::RayGeneration, ShaderStage::Miss, ShaderStage::ClosestHit]),
+                stages: Some(ShaderStageMask::CLOSEST_HIT | ShaderStageMask::MISS | ShaderStageMask::RAY_GENERATION),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Functions { signatures: vec![

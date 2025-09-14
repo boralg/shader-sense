@@ -1,5 +1,5 @@
 use shader_sense::{
-    shader::{HlslShaderModel, ShaderStage},
+    shader::{HlslShaderModel, ShaderStageMask},
     symbols::{
         symbol_list::ShaderSymbolList,
         symbols::{
@@ -369,7 +369,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
+                stages: Some(ShaderStageMask::FRAGMENT | ShaderStageMask::COMPUTE),
                 ..Default::default()
             })),
         });
@@ -428,7 +428,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel1),
-                stages: Some(vec![ShaderStage::Fragment]),
+                stages: Some(ShaderStageMask::FRAGMENT),
                 ..Default::default()
             })),
         });
@@ -569,7 +569,7 @@ impl HlslIntrinsicParser {
             }).collect()},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel2),
-                stages: Some(vec![ShaderStage::Fragment]),
+                stages: Some(ShaderStageMask::FRAGMENT),
                 ..Default::default()
             })),
         });
@@ -592,7 +592,7 @@ impl HlslIntrinsicParser {
             }).collect()},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::Fragment]),
+                stages: Some(ShaderStageMask::FRAGMENT),
                 ..Default::default()
             })),
         });
@@ -615,7 +615,7 @@ impl HlslIntrinsicParser {
             }).collect()},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::Fragment]),
+                stages: Some(ShaderStageMask::FRAGMENT),
                 ..Default::default()
             })),
         });
@@ -638,7 +638,7 @@ impl HlslIntrinsicParser {
             }).collect()},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel2),
-                stages: Some(vec![ShaderStage::Fragment]),
+                stages: Some(ShaderStageMask::FRAGMENT),
                 ..Default::default()
             })),
         });
@@ -661,7 +661,7 @@ impl HlslIntrinsicParser {
             }).collect()},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::Fragment]),
+                stages: Some(ShaderStageMask::FRAGMENT),
                 ..Default::default()
             })),
         });
@@ -684,7 +684,7 @@ impl HlslIntrinsicParser {
             }).collect()},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::Fragment]),
+                stages: Some(ShaderStageMask::FRAGMENT),
                 ..Default::default()
             })),
         });
@@ -921,7 +921,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::Fragment]),
+                stages: Some(ShaderStageMask::FRAGMENT),
                 ..Default::default()
             })),
         });
@@ -951,7 +951,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::Fragment]),
+                stages: Some(ShaderStageMask::FRAGMENT),
                 ..Default::default()
             })),
         });
@@ -981,7 +981,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::Fragment]),
+                stages: Some(ShaderStageMask::FRAGMENT),
                 ..Default::default()
             })),
         });
@@ -2409,7 +2409,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
         });
@@ -2460,7 +2460,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
         });
@@ -2511,7 +2511,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
         });
@@ -2555,7 +2555,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
         });
@@ -2606,7 +2606,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
         });
@@ -2657,7 +2657,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
         });
@@ -2708,7 +2708,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
         });
@@ -2759,7 +2759,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
         });
@@ -2810,7 +2810,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
         });
@@ -2861,7 +2861,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
         });
@@ -3357,7 +3357,7 @@ impl HlslIntrinsicParser {
                 }]},
                 requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                     min_shader_model: Some(HlslShaderModel::ShaderModel1),
-                    stages: Some(vec![ShaderStage::Fragment]),
+                    stages: Some(ShaderStageMask::FRAGMENT),
                     ..Default::default()
                 })),
             });
@@ -3401,7 +3401,7 @@ impl HlslIntrinsicParser {
                 }]},
                 requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                     min_shader_model: Some(HlslShaderModel::ShaderModel2),
-                    stages: Some(vec![ShaderStage::Fragment]),
+                    stages: Some(ShaderStageMask::FRAGMENT),
                     ..Default::default()
                 })),
             });
@@ -3431,7 +3431,7 @@ impl HlslIntrinsicParser {
                 }]},
                 requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                     min_shader_model: Some(HlslShaderModel::ShaderModel2),
-                    stages: Some(vec![ShaderStage::Fragment]),
+                    stages: Some(ShaderStageMask::FRAGMENT),
                     ..Default::default()
                 })),
             });
@@ -3475,7 +3475,7 @@ impl HlslIntrinsicParser {
                 }]},
                 requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                     min_shader_model: Some(HlslShaderModel::ShaderModel2),
-                    stages: Some(vec![ShaderStage::Fragment]),
+                    stages: Some(ShaderStageMask::FRAGMENT),
                     ..Default::default()
                 })),
             });
@@ -3505,7 +3505,7 @@ impl HlslIntrinsicParser {
                 }]},
                 requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                     min_shader_model: Some(HlslShaderModel::ShaderModel3),
-                    stages: Some(vec![ShaderStage::Fragment]),
+                    stages: Some(ShaderStageMask::FRAGMENT),
                     ..Default::default()
                 })),
             });
@@ -3535,7 +3535,7 @@ impl HlslIntrinsicParser {
                 }]},
                 requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                     min_shader_model: Some(HlslShaderModel::ShaderModel2),
-                    stages: Some(vec![ShaderStage::Fragment]),
+                    stages: Some(ShaderStageMask::FRAGMENT),
                     ..Default::default()
                 })),
             });
@@ -3604,7 +3604,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
-                stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
+                stages: Some(ShaderStageMask::FRAGMENT | ShaderStageMask::COMPUTE),
                 ..Default::default()
             })),
         });
@@ -3633,7 +3633,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
-                stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
+                stages: Some(ShaderStageMask::FRAGMENT | ShaderStageMask::COMPUTE),
                 ..Default::default()
             })),
         });
@@ -3656,7 +3656,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
-                stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
+                stages: Some(ShaderStageMask::FRAGMENT | ShaderStageMask::COMPUTE),
                 ..Default::default()
             })),
         });
@@ -3679,7 +3679,7 @@ impl HlslIntrinsicParser {
             }]},
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel6),
-                stages: Some(vec![ShaderStage::Fragment, ShaderStage::Compute]),
+                stages: Some(ShaderStageMask::FRAGMENT | ShaderStageMask::COMPUTE),
                 ..Default::default()
             })),
         });

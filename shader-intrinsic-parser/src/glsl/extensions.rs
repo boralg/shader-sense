@@ -1,5 +1,5 @@
 use shader_sense::{
-    shader::ShaderStage,
+    shader::ShaderStageMask,
     symbols::{
         symbol_list::ShaderSymbolList,
         symbols::{
@@ -28,7 +28,7 @@ impl GlslIntrinsicParser {
             ),
             requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                 extension: Some("GLSL_EXT_mesh_shader".into()),
-                stages: Some(vec![ShaderStage::Task]),
+                stages: Some(ShaderStageMask::TASK),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Functions { signatures: vec![
@@ -69,7 +69,7 @@ impl GlslIntrinsicParser {
             ),
             requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                 extension: Some("GLSL_EXT_mesh_shader".into()),
-                stages: Some(vec![ShaderStage::Mesh]),
+                stages: Some(ShaderStageMask::MESH),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Functions { signatures: vec![
@@ -105,7 +105,7 @@ impl GlslIntrinsicParser {
             ),
             requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                 extension: Some("GLSL_EXT_mesh_shader".into()),
-                stages: Some(vec![ShaderStage::Task, ShaderStage::Mesh]),
+                stages: Some(ShaderStageMask::TASK | ShaderStageMask::MESH),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Struct {
@@ -163,7 +163,7 @@ impl GlslIntrinsicParser {
             ),
             requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                 extension: Some("GLSL_EXT_mesh_shader".into()),
-                stages: Some(vec![ShaderStage::Task, ShaderStage::Mesh]),
+                stages: Some(ShaderStageMask::TASK | ShaderStageMask::MESH),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Variables  {
@@ -180,7 +180,7 @@ impl GlslIntrinsicParser {
             ),
             requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                 extension: Some("GLSL_EXT_mesh_shader".into()),
-                stages: Some(vec![ShaderStage::Task, ShaderStage::Mesh]),
+                stages: Some(ShaderStageMask::TASK | ShaderStageMask::MESH),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Struct {
@@ -248,7 +248,7 @@ impl GlslIntrinsicParser {
             ),
             requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                 extension: Some("GLSL_EXT_mesh_shader".into()),
-                stages: Some(vec![ShaderStage::Task, ShaderStage::Mesh]),
+                stages: Some(ShaderStageMask::TASK | ShaderStageMask::MESH),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Variables {
@@ -265,7 +265,7 @@ impl GlslIntrinsicParser {
             ),
             requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                 extension: Some("GLSL_EXT_mesh_shader".into()),
-                stages: Some(vec![ShaderStage::Task, ShaderStage::Mesh]),
+                stages: Some(ShaderStageMask::TASK | ShaderStageMask::MESH),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Variables {
@@ -281,7 +281,7 @@ impl GlslIntrinsicParser {
             ),
             requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                 extension: Some("GLSL_EXT_mesh_shader".into()),
-                stages: Some(vec![ShaderStage::Task, ShaderStage::Mesh]),
+                stages: Some(ShaderStageMask::TASK | ShaderStageMask::MESH),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Variables {
@@ -297,7 +297,7 @@ impl GlslIntrinsicParser {
             ),
             requirement: Some(RequirementParameter::Glsl(GlslRequirementParameter {
                 extension: Some("GLSL_EXT_mesh_shader".into()),
-                stages: Some(vec![ShaderStage::Task, ShaderStage::Mesh]),
+                stages: Some(ShaderStageMask::TASK | ShaderStageMask::MESH),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Variables {

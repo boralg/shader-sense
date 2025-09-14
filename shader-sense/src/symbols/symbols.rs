@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     position::ShaderRange,
-    shader::{HlslShaderModel, HlslVersion, ShaderCompilationParams, ShaderStage},
+    shader::{HlslShaderModel, HlslVersion, ShaderCompilationParams, ShaderStageMask},
 };
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
@@ -228,18 +228,18 @@ pub enum ShaderSymbolData {
 #[allow(non_snake_case)] // for JSON
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct HlslRequirementParameter {
-    pub stages: Option<Vec<ShaderStage>>, // Stage required by this symbol.
+    pub stages: Option<ShaderStageMask>, // Stages required by this symbol.
     pub min_version: Option<HlslVersion>, // Minimum HLSL version for this symbol.
-    pub version: Option<HlslVersion>,     // Exact HLSL version for this symbol.
+    pub version: Option<HlslVersion>,    // Exact HLSL version for this symbol.
     pub min_shader_model: Option<HlslShaderModel>, // Minimum shader model for this symbol.
     pub shader_model: Option<HlslShaderModel>, // Exact shader model for this symbol.
-    pub spirv: Option<bool>,              // Requires SPIRV
+    pub spirv: Option<bool>,             // Requires SPIRV
     pub enable_16bit_types: Option<bool>, // Requires 16bit types.
 }
 #[allow(non_snake_case)] // for JSON
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct GlslRequirementParameter {
-    pub stages: Option<Vec<ShaderStage>>,
+    pub stages: Option<ShaderStageMask>,
     pub min_version: Option<u32>,  // min glsl version
     pub extension: Option<String>, // Extension required for this symbol.
 }

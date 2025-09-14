@@ -1,5 +1,10 @@
 //! Shader stage and specific helpers
-use std::{collections::HashMap, path::PathBuf, str::FromStr};
+use std::{
+    collections::HashMap,
+    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not},
+    path::PathBuf,
+    str::FromStr,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +14,93 @@ pub enum ShadingLanguage {
     Wgsl,
     Hlsl,
     Glsl,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct ShaderStageMask(u32);
+
+impl ShaderStageMask {
+    pub const VERTEX: Self = Self(1 << 0);
+    pub const FRAGMENT: Self = Self(1 << 1);
+    pub const COMPUTE: Self = Self(1 << 2);
+    pub const TESSELATION_CONTROL: Self = Self(1 << 3);
+    pub const TESSELATION_EVALUATION: Self = Self(1 << 4);
+    pub const MESH: Self = Self(1 << 5);
+    pub const TASK: Self = Self(1 << 6);
+    pub const GEOMETRY: Self = Self(1 << 7);
+    pub const RAY_GENERATION: Self = Self(1 << 8);
+    pub const CLOSEST_HIT: Self = Self(1 << 9);
+    pub const ANY_HIT: Self = Self(1 << 10);
+    pub const CALLABLE: Self = Self(1 << 11);
+    pub const MISS: Self = Self(1 << 12);
+    pub const INTERSECT: Self = Self(1 << 13);
+}
+
+impl Default for ShaderStageMask {
+    fn default() -> Self {
+        Self(0)
+    }
+}
+impl ShaderStageMask {
+    pub const fn from_u32(x: u32) -> Self {
+        Self(x)
+    }
+    pub const fn as_u32(self) -> u32 {
+        self.0
+    }
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+    pub const fn contains(self, other: &ShaderStage) -> bool {
+        let mask = other.as_mask();
+        self.0 & mask.0 == mask.0
+    }
+}
+impl BitOr for ShaderStageMask {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self {
+        Self(self.0 | rhs.0)
+    }
+}
+impl BitOrAssign for ShaderStageMask {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = *self | rhs
+    }
+}
+impl BitAnd for ShaderStageMask {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, rhs: Self) -> Self {
+        Self(self.0 & rhs.0)
+    }
+}
+impl BitAndAssign for ShaderStageMask {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: Self) {
+        *self = *self & rhs
+    }
+}
+impl BitXor for ShaderStageMask {
+    type Output = Self;
+    #[inline]
+    fn bitxor(self, rhs: Self) -> Self {
+        Self(self.0 ^ rhs.0)
+    }
+}
+impl BitXorAssign for ShaderStageMask {
+    #[inline]
+    fn bitxor_assign(&mut self, rhs: Self) {
+        *self = *self ^ rhs
+    }
+}
+impl Not for ShaderStageMask {
+    type Output = Self;
+    #[inline]
+    fn not(self) -> Self {
+        Self(!self.0)
+    }
 }
 
 /// All shader stage supported
@@ -61,32 +153,46 @@ impl ShaderStage {
         // For header files & undefined, will output issue with missing version...
         None
     }
+    pub const fn as_mask(&self) -> ShaderStageMask {
+        match self {
+            ShaderStage::Vertex => ShaderStageMask::VERTEX,
+            ShaderStage::Fragment => ShaderStageMask::FRAGMENT,
+            ShaderStage::Compute => ShaderStageMask::COMPUTE,
+            ShaderStage::TesselationControl => ShaderStageMask::TESSELATION_CONTROL,
+            ShaderStage::TesselationEvaluation => ShaderStageMask::TESSELATION_EVALUATION,
+            ShaderStage::Mesh => ShaderStageMask::MESH,
+            ShaderStage::Task => ShaderStageMask::TASK,
+            ShaderStage::Geometry => ShaderStageMask::GEOMETRY,
+            ShaderStage::RayGeneration => ShaderStageMask::RAY_GENERATION,
+            ShaderStage::ClosestHit => ShaderStageMask::CLOSEST_HIT,
+            ShaderStage::AnyHit => ShaderStageMask::ANY_HIT,
+            ShaderStage::Callable => ShaderStageMask::CALLABLE,
+            ShaderStage::Miss => ShaderStageMask::MISS,
+            ShaderStage::Intersect => ShaderStageMask::INTERSECT,
+        }
+    }
     /// All graphics pipeline stages.
-    pub fn graphics() -> Vec<ShaderStage> {
-        vec![
-            ShaderStage::Vertex,
-            ShaderStage::Fragment,
-            ShaderStage::Geometry,
-            ShaderStage::TesselationControl,
-            ShaderStage::TesselationEvaluation,
-            ShaderStage::Task,
-            ShaderStage::Mesh,
-        ]
+    pub fn graphics() -> ShaderStageMask {
+        ShaderStageMask::VERTEX
+            | ShaderStageMask::FRAGMENT
+            | ShaderStageMask::GEOMETRY
+            | ShaderStageMask::TESSELATION_CONTROL
+            | ShaderStageMask::TESSELATION_EVALUATION
+            | ShaderStageMask::TASK
+            | ShaderStageMask::MESH
     }
     /// All compute pipeline stages.
-    pub fn compute() -> Vec<ShaderStage> {
-        vec![ShaderStage::Compute]
+    pub fn compute() -> ShaderStageMask {
+        ShaderStageMask::COMPUTE
     }
     /// All raytracing pipeline stages.
-    pub fn raytracing() -> Vec<ShaderStage> {
-        vec![
-            ShaderStage::RayGeneration,
-            ShaderStage::Intersect,
-            ShaderStage::ClosestHit,
-            ShaderStage::AnyHit,
-            ShaderStage::Miss,
-            ShaderStage::Callable,
-        ]
+    pub fn raytracing() -> ShaderStageMask {
+        ShaderStageMask::RAY_GENERATION
+            | ShaderStageMask::INTERSECT
+            | ShaderStageMask::CLOSEST_HIT
+            | ShaderStageMask::ANY_HIT
+            | ShaderStageMask::MISS
+            | ShaderStageMask::INTERSECT
     }
 }
 

@@ -1,5 +1,5 @@
 use shader_sense::{
-    shader::{HlslShaderModel, ShaderStage},
+    shader::{HlslShaderModel, ShaderStageMask},
     symbols::{
         symbol_list::ShaderSymbolList,
         symbols::{
@@ -831,7 +831,7 @@ impl HlslIntrinsicParser {
             )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Struct {
@@ -848,7 +848,7 @@ impl HlslIntrinsicParser {
             )),
             requirement: Some(RequirementParameter::Hlsl(HlslRequirementParameter {
                 min_shader_model: Some(HlslShaderModel::ShaderModel5),
-                stages: Some(vec![ShaderStage::TesselationControl]),
+                stages: Some(ShaderStageMask::TESSELATION_CONTROL),
                 ..Default::default()
             })),
             data: ShaderSymbolData::Struct {
