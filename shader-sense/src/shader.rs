@@ -196,6 +196,31 @@ impl ShaderStage {
     }
 }
 
+impl FromStr for ShaderStage {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<ShaderStage, Self::Err> {
+        // Be case insensitive for parsing.
+        let lower_input = input.to_lowercase();
+        match lower_input.as_str() {
+            "vertex" => Ok(ShaderStage::Vertex),
+            "fragment" | "pixel" => Ok(ShaderStage::Fragment),
+            "compute" => Ok(ShaderStage::Compute),
+            "tesselationcontrol" | "hull" => Ok(ShaderStage::TesselationControl),
+            "tesselationevaluation" | "domain" => Ok(ShaderStage::TesselationEvaluation),
+            "mesh" => Ok(ShaderStage::Mesh),
+            "task" | "amplification" => Ok(ShaderStage::Task),
+            "geometry" => Ok(ShaderStage::Geometry),
+            "raygeneration" => Ok(ShaderStage::RayGeneration),
+            "closesthit" => Ok(ShaderStage::ClosestHit),
+            "anyhit" => Ok(ShaderStage::AnyHit),
+            "callable" => Ok(ShaderStage::Callable),
+            "miss" => Ok(ShaderStage::Miss),
+            "intersect" => Ok(ShaderStage::Intersect),
+            _ => Err(()),
+        }
+    }
+}
 impl ToString for ShaderStage {
     fn to_string(&self) -> String {
         match self {
