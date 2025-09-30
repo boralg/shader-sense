@@ -172,6 +172,9 @@ impl ServerSerializedConfig {
         };
         // Get engine config if set and override them.
         if let Some(config_override) = self.config_override {
+            if config_override.is_empty() {
+                return config;
+            }
             let settings = match std::fs::read_to_string(&config_override) {
                 Ok(setting) => setting,
                 Err(err) => {
