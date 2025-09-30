@@ -8,7 +8,6 @@ pub mod validator;
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use std::{collections::HashMap, path::Path};
 
     use crate::shader::{
@@ -19,7 +18,8 @@ mod tests {
     use super::*;
 
     #[cfg(not(target_os = "wasi"))]
-    fn find_test_dxc() -> Option<PathBuf> {
+    fn find_test_dxc() -> Option<std::path::PathBuf> {
+        use std::path::PathBuf;
         // Dxc copied here by build system for convenience.
         // Manifest dir is not in workspace, but command executed from workspace, so hardcode the path here.
         // Should be handled cleanly, maybe by copying dll with a build.rs file.

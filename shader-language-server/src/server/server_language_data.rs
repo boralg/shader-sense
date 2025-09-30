@@ -29,19 +29,6 @@ impl ServerLanguageData {
     pub fn hlsl() -> Self {
         let shader_module_parser = ShaderModuleParser::from_shading_language(ShadingLanguage::Hlsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Hlsl);
-        let dxc_path = Dxc::find_dxc_library();
-        if dxc_path.is_some() {
-            log::info!(
-                "Found dxc library for HLSL validation at {}",
-                dxc_path
-                    .clone()
-                    .map(|f| f)
-                    .unwrap_or(PathBuf::from("./"))
-                    .display()
-            );
-        } else {
-            log::info!("Did not found dxc library for HLSL validation, will try to use globally available ones.");
-        }
         Self {
             #[cfg(target_os = "wasi")]
             validator: {
@@ -49,7 +36,16 @@ impl ServerLanguageData {
                 Box::new(Glslang::hlsl())
             },
             #[cfg(not(target_os = "wasi"))]
-            validator: match Dxc::new(dxc_path) {
+            validator: match Dxc::new(if let Some(dxc_path) = Dxc::find_dxc_library() {
+                log::info!(
+                    "Found dxc library for HLSL validation at {}",
+                    dxc_path.display()
+                );
+                Some(dxc_path)
+            } else {
+                log::info!("Did not found dxc library for HLSL validation, will try to use globally available ones.");
+                None
+            }) {
                 Ok(dxc) => {
                     log::info!(
                         "Using Dxc for HLSL. DXIL validation {}",
