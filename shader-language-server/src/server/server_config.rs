@@ -13,7 +13,7 @@ use shader_sense::{
     shader::{
         GlslCompilationParams, GlslSpirvVersion, GlslTargetClient, HlslCompilationParams,
         HlslShaderModel, HlslVersion, ShaderCompilationParams, ShaderContextParams, ShaderParams,
-        WgslCompilationParams,
+        ShaderStage, WgslCompilationParams,
     },
     shader_error::ShaderDiagnosticSeverity,
 };
@@ -104,6 +104,8 @@ pub struct ServerConfig {
     includes: Vec<PathBuf>,
     defines: HashMap<String, String>,
     path_remapping: HashMap<PathBuf, PathBuf>,
+    // Hashmap of hashmap complicated to implement in vscode.
+    stage_define: HashMap<ShaderStage, String>, // Support a single macro per stage ? or separate them with ; or something (what about value)
     validate: bool,
     symbols: bool,
     symbol_diagnostics: bool,
@@ -145,6 +147,7 @@ impl ServerSerializedConfig {
                 .symbol_diagnostics
                 .unwrap_or(ServerConfig::DEFAULT_SYMBOL_DIAGNOSTIC),
             trace: self.trace.unwrap_or(ServerConfig::DEFAULT_TRACE),
+            stage_define: HashMap::new(),
             severity: self
                 .severity
                 .map(|s| ShaderDiagnosticSeverity::from(s.as_str()))
@@ -318,6 +321,7 @@ impl Default for ServerConfig {
             path_remapping: HashMap::new(),
             validate: ServerConfig::DEFAULT_VALIDATE,
             symbols: ServerConfig::DEFAULT_SYMBOLS,
+            stage_define: HashMap::new(),
             symbol_diagnostics: ServerConfig::DEFAULT_SYMBOL_DIAGNOSTIC,
             trace: ServerConfig::DEFAULT_TRACE,
             severity: ServerConfig::DEFAULT_SEVERITY,
