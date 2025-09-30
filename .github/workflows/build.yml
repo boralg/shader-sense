@@ -19,6 +19,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+          components: rustfmt
       - name: Check formatting
         run: cargo fmt --check
       # Download dxc dll for tests.
