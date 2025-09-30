@@ -84,35 +84,43 @@ impl Dxc {
     pub const DXC_SPIRV_VERSION_MAJOR: u32 = 1;
     pub const DXC_SPIRV_VERSION_MINOR: u32 = 6;
 
-    pub fn new() -> Result<Self, hassle_rs::HassleError> {
-        // Pick the bundled dxc dll if available.
-        // Else it will ignore it and pick the globally available one.
+    // Look for dxc library near the executable
+    pub fn find_dxc_library() -> Option<PathBuf> {
+        // Assume dxil at same folder to avoid version mismatch.
+        let dxc_compiler_lib_name = libloading::library_filename("dxcompiler");
+        // Pick the dxc dll next to executable if available.
+        // Rely on current_exe as current_dir might be changed by process.
+        // Else return dll path and hope that they are accessible in path.
+        match std::env::current_exe() {
+            Ok(executable_path) => {
+                if let Some(parent_path) = executable_path.parent() {
+                    let dll_path = parent_path.join(&dxc_compiler_lib_name);
+                    if dll_path.is_file() {
+                        dll_path.parent().map(|p| p.into())
+                    } else {
+                        None // Not found at executable path
+                    }
+                } else {
+                    None // Executable path does not have parent
+                }
+            }
+            Err(_) => None, // No executable path
+        }
+    }
+
+    pub fn new(library_path: Option<PathBuf>) -> Result<Self, hassle_rs::HassleError> {
         let dxc_compiler_lib_name = libloading::library_filename("dxcompiler");
         let dxil_lib_name = libloading::library_filename("dxil");
-        fn find_dll_path(dll: &Path) -> Option<PathBuf> {
-            // Rely on current_exe as current_dir might be changed by process.
-            // Else return dll and hope that they are accessible in path.
-            match std::env::current_exe() {
-                Ok(executable_path) => {
-                    if let Some(parent_path) = executable_path.parent() {
-                        let dll_path = parent_path.join(dll);
-                        if dll_path.is_file() {
-                            Some(dll_path)
-                        } else {
-                            Some(dll.into())
-                        }
-                    } else {
-                        Some(dll.into())
-                    }
-                }
-                Err(_) => Some(dll.into()),
-            }
-        }
-        let dxc = hassle_rs::Dxc::new(find_dll_path(Path::new(&dxc_compiler_lib_name)))?;
+        let dxc = hassle_rs::Dxc::new(
+            library_path
+                .clone()
+                .map(|path| path.join(dxc_compiler_lib_name)),
+        )?;
         let library = dxc.create_library()?;
         let compiler = dxc.create_compiler()?;
         // For some reason, there is a sneaky LoadLibrary call to dxil.dll from dxcompiler.dll that forces it to be in global path on Linux.
-        let (dxil, validator) = match Dxil::new(find_dll_path(Path::new(&dxil_lib_name))) {
+        // This might get mismatch version between dxc compiler and dxil validation.
+        let (dxil, validator) = match Dxil::new(library_path.map(|path| path.join(dxil_lib_name))) {
             Ok(dxil) => {
                 let validator_option = match dxil.create_validator() {
                     Ok(validator) => Some(validator),

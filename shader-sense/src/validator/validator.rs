@@ -67,7 +67,7 @@ impl Validator {
     pub fn hlsl() -> Self {
         Self {
             #[cfg(not(target_os = "wasi"))]
-            imp: match Dxc::new() {
+            imp: match Dxc::new(Dxc::find_dxc_library()) {
                 Ok(dxc) => Box::new(dxc),
                 Err(_) => Box::new(Glslang::hlsl()), // Failed to instantiate dxc. Fallback to glslang.
             },

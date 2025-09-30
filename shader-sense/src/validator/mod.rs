@@ -8,6 +8,7 @@ pub mod validator;
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
     use std::{collections::HashMap, path::Path};
 
     use crate::shader::{
@@ -17,12 +18,19 @@ mod tests {
     use super::validator::*;
     use super::*;
 
+    #[cfg(not(target_os = "wasi"))]
+    fn find_test_dxc() -> Option<PathBuf> {
+        // Dxc copied here by build system for convenience.
+        // Manifest dir is not in workspace, but command executed from workspace, so hardcode the path here.
+        // Should be handled cleanly, maybe by copying dll with a build.rs file.
+        Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..\\target\\debug"))
+    }
     fn create_test_validator(shading_language: ShadingLanguage) -> Box<dyn ValidatorImpl> {
         // Do not use Validator::from_shading_language to enforce dxc on PC.
         match shading_language {
             ShadingLanguage::Wgsl => Box::new(naga::Naga::new()),
             #[cfg(not(target_os = "wasi"))]
-            ShadingLanguage::Hlsl => Box::new(dxc::Dxc::new().unwrap()),
+            ShadingLanguage::Hlsl => Box::new(dxc::Dxc::new(find_test_dxc()).unwrap()),
             #[cfg(target_os = "wasi")]
             ShadingLanguage::Hlsl => Box::new(glslang::Glslang::hlsl()),
             ShadingLanguage::Glsl => Box::new(glslang::Glslang::glsl()),
