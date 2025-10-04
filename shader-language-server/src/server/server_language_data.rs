@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use shader_sense::{
     shader::ShadingLanguage,
     symbols::{shader_module_parser::ShaderModuleParser, symbol_provider::SymbolProvider},
@@ -16,6 +14,13 @@ pub struct ServerLanguageData {
 }
 
 impl ServerLanguageData {
+    pub fn from_shading_language(shading_language: ShadingLanguage) -> Self {
+        match shading_language {
+            ShadingLanguage::Hlsl => Self::hlsl(),
+            ShadingLanguage::Glsl => Self::glsl(),
+            ShadingLanguage::Wgsl => Self::wgsl(),
+        }
+    }
     pub fn glsl() -> Self {
         let shader_module_parser = ShaderModuleParser::from_shading_language(ShadingLanguage::Glsl);
         let symbol_provider = SymbolProvider::from_shading_language(ShadingLanguage::Glsl);

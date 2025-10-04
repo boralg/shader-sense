@@ -1,6 +1,6 @@
 //! Server implementation
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::num::NonZero;
 use std::str::FromStr;
@@ -111,7 +111,11 @@ pub enum Transport {
 }
 
 impl ServerLanguage {
-    pub fn new(config: ServerConfig, transport: Transport) -> Self {
+    pub fn new(
+        config: ServerConfig,
+        transport: Transport,
+        supported_shading_languages: HashSet<ShadingLanguage>,
+    ) -> Self {
         assert!(
             transport == Transport::Stdio,
             "Only stdio transport implemented for now"
@@ -125,11 +129,16 @@ impl ServerLanguage {
             connection: ServerConnection::new(),
             watched_files: ServerLanguageFileCache::new(),
             config: config,
-            language_data: HashMap::from([
-                (ShadingLanguage::Glsl, ServerLanguageData::glsl()),
-                (ShadingLanguage::Hlsl, ServerLanguageData::hlsl()),
-                (ShadingLanguage::Wgsl, ServerLanguageData::wgsl()),
-            ]),
+            language_data: supported_shading_languages
+                .into_iter()
+                .map(|shading_language| {
+                    info!("Enabling support for {:?}", shading_language);
+                    (
+                        shading_language,
+                        ServerLanguageData::from_shading_language(shading_language),
+                    )
+                })
+                .collect(),
             // Idea is to be able all macros for a single file in cache.
             // Else when recomputing a file, we will recreate all regex and reinsert
             // them instead of reading from cache. So we update it size at runtime.
@@ -862,6 +871,7 @@ impl ServerLanguage {
                             params.text_document.language_id
                         ))
                     })?;
+                // Return error instead
                 let language_data = self.language_data.get_mut(&shading_language).unwrap();
                 let _ = self.watched_files.watch_main_file(
                     &uri,
@@ -1117,8 +1127,8 @@ impl ServerLanguage {
 }
 
 /// Run the server with given config and transport.
-pub fn run(config: ServerConfig, transport: Transport) {
-    let mut server = ServerLanguage::new(config, transport);
+pub fn run(config: ServerConfig, transport: Transport, shading_language: HashSet<ShadingLanguage>) {
+    let mut server = ServerLanguage::new(config, transport, shading_language);
 
     match server.initialize() {
         Ok(_) => info!("Server initialization successfull"),

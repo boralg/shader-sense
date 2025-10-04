@@ -1,9 +1,12 @@
+use std::collections::HashSet;
+
 use log::{error, info, warn};
 use shader_language_server::server::{
     self,
     server_config::{ServerConfig, ServerSerializedConfig},
     Transport,
 };
+use shader_sense::shader::ShadingLanguage;
 
 fn get_version() -> &'static str {
     static VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -14,7 +17,11 @@ fn print_version() {
     println!("shader-language-server v{}", get_version());
 }
 
-fn run_server(config: ServerConfig, transport: Transport) {
+fn run_server(
+    config: ServerConfig,
+    transport: Transport,
+    shading_language: HashSet<ShadingLanguage>,
+) {
     info!(
         "shader-language-server v{} ({})",
         get_version(),
@@ -29,7 +36,7 @@ fn run_server(config: ServerConfig, transport: Transport) {
             current_dir.display()
         );
     }
-    server::run(config, transport);
+    server::run(config, transport, shading_language);
 }
 
 fn usage() {
@@ -40,12 +47,18 @@ fn usage() {
     println!("Options:");
     println!("  --config                  Pass a custom config as a JSON string for server.");
     println!("  --config-file             Pass a custom config as a file for server.");
-    println!("  --stdio                   Use the stdio transport. Default transport.");
-    println!("  --tcp                     Use tcp transport. Not implemented yet.");
-    println!("  --memory                  Use memory transport. Not implemented yet.");
     println!("  --cwd                     Set current working directory of server. If not set, will be the server executable path.");
     println!("  --version | -v            Print server version.");
     println!("  --help | -h               Print this helper.");
+    println!("Language:");
+    println!("  By default, all of them are enabled. If you specify a single one, you will need to pick every language you need.");
+    println!("  --hlsl                    Add support for hlsl language id.");
+    println!("  --glsl                    Add support for glsl language id.");
+    println!("  --wgsl                    Add support for wgsl language id.");
+    println!("Transport:");
+    println!("  --stdio                   Use the stdio transport. Default transport.");
+    println!("  --tcp                     Use tcp transport. Not implemented yet.");
+    println!("  --memory                  Use memory transport. Not implemented yet.");
 }
 
 pub fn main() {
@@ -54,6 +67,7 @@ pub fn main() {
     let _exe = args.next().unwrap();
     let mut transport = Transport::default();
     let mut config = ServerConfig::default();
+    let mut shading_language = HashSet::new();
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--version" => return print_version(),
@@ -102,6 +116,15 @@ pub fn main() {
                     return usage();
                 }
             }
+            "--wgsl" => {
+                shading_language.insert(ShadingLanguage::Wgsl);
+            }
+            "--hlsl" => {
+                shading_language.insert(ShadingLanguage::Hlsl);
+            }
+            "--glsl" => {
+                shading_language.insert(ShadingLanguage::Glsl);
+            }
             "--stdio" => transport = Transport::Stdio,
             "--tcp" => transport = Transport::Tcp,
             "--memory" => transport = Transport::Memory,
@@ -121,5 +144,11 @@ pub fn main() {
             }
         }
     }
-    run_server(config, transport);
+    // If no langugages specified, add them all for backward compatibilty
+    if shading_language.is_empty() {
+        shading_language.insert(ShadingLanguage::Glsl);
+        shading_language.insert(ShadingLanguage::Hlsl);
+        shading_language.insert(ShadingLanguage::Wgsl);
+    }
+    run_server(config, transport, shading_language);
 }
