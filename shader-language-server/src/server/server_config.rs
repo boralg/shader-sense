@@ -91,8 +91,8 @@ pub struct ServerSerializedConfig {
     validate: Option<bool>,                   // Validation via standard API
     symbols: Option<bool>,                    // Query symbols
     symbol_diagnostics: Option<bool>,         // Debug option to visualise issues with tree-sitter
-    stage_define: HashMap<ShaderStage, HashMap<String, String>>, // Specific macro defined per shader stage
-    trace: Option<ServerTrace>,                                  // Level of error to display
+    stage_define: Option<HashMap<ShaderStage, HashMap<String, String>>>, // Specific macro defined per shader stage
+    trace: Option<ServerTrace>,      // Level of error to display
     severity: Option<String>,        // Severity of diagnostic to display
     config_override: Option<String>, // Override configuration file
     hlsl: Option<ServerHlslConfig>,  // Hlsl specific configuration
@@ -147,7 +147,7 @@ impl ServerSerializedConfig {
                 .symbol_diagnostics
                 .unwrap_or(ServerConfig::DEFAULT_SYMBOL_DIAGNOSTIC),
             trace: self.trace.unwrap_or(ServerConfig::DEFAULT_TRACE),
-            stage_define: self.stage_define,
+            stage_define: self.stage_define.unwrap_or_default(),
             severity: self
                 .severity
                 .map(|s| ShaderDiagnosticSeverity::from(s.as_str()))
