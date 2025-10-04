@@ -16,9 +16,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.90
         with:
-          toolchain: stable
           components: rustfmt
       - name: Check formatting
         run: cargo fmt --check
