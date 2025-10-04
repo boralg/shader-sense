@@ -387,9 +387,15 @@ impl ServerLanguage {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{collections::HashMap, path::PathBuf};
 
-    use crate::server::server_config::{ServerConfig, ServerSerializedConfig};
+    use lsp_types::Url;
+    use shader_sense::shader::{ShaderStage, ShadingLanguage};
+
+    use crate::server::{
+        server_config::{ServerConfig, ServerSerializedConfig},
+        shader_variant::ShaderVariant,
+    };
 
     #[test]
     fn test_empty_config() {
@@ -414,6 +420,57 @@ mod tests {
 
     #[test]
     fn test_default_config() {
+        let cfg: ServerSerializedConfig = serde_json::from_str(
+            r#"{
+            "stageDefine": {
+                "vertex": { "MY_MACRO_VERTEX":"1"}
+            }
+        }"#,
+        )
+        .unwrap();
+        let cfg = cfg.compute_engine_config();
+        let vertex_shader_params = cfg.into_shader_params(
+            None,
+            Some(ShaderVariant {
+                url: Url::parse("file://test").unwrap(),
+                stage: Some(ShaderStage::Vertex),
+                shading_language: ShadingLanguage::Hlsl,
+                entry_point: "".into(),
+                defines: HashMap::new(),
+                includes: Vec::new(),
+            }),
+        );
+        let compute_shader_params = cfg.into_shader_params(
+            None,
+            Some(ShaderVariant {
+                url: Url::parse("file://test").unwrap(),
+                stage: Some(ShaderStage::Compute),
+                shading_language: ShadingLanguage::Hlsl,
+                entry_point: "".into(),
+                defines: HashMap::new(),
+                includes: Vec::new(),
+            }),
+        );
+        assert!(vertex_shader_params
+            .context
+            .defines
+            .contains_key("MY_MACRO_VERTEX"));
+        assert!(
+            vertex_shader_params
+                .context
+                .defines
+                .get("MY_MACRO_VERTEX")
+                .unwrap()
+                == "1"
+        );
+        assert!(!compute_shader_params
+            .context
+            .defines
+            .contains_key("MY_MACRO_VERTEX"));
+    }
+
+    #[test]
+    fn test_stage_define() {
         let cfg = ServerSerializedConfig::default();
         let cfg = cfg.compute_engine_config();
         assert!(cfg.get_symbols() == ServerConfig::DEFAULT_SYMBOLS);
