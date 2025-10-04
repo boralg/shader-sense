@@ -105,6 +105,7 @@ impl Not for ShaderStageMask {
 
 /// All shader stage supported
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
 pub enum ShaderStage {
     Vertex,
     Fragment, // aka pixel shader

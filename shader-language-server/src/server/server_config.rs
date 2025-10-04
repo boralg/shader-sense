@@ -91,11 +91,12 @@ pub struct ServerSerializedConfig {
     validate: Option<bool>,                   // Validation via standard API
     symbols: Option<bool>,                    // Query symbols
     symbol_diagnostics: Option<bool>,         // Debug option to visualise issues with tree-sitter
-    trace: Option<ServerTrace>,               // Level of error to display
-    severity: Option<String>,                 // Severity of diagnostic to display
-    config_override: Option<String>,          // Override configuration file
-    hlsl: Option<ServerHlslConfig>,           // Hlsl specific configuration
-    glsl: Option<ServerGlslConfig>,           // Glsl specific configuration
+    stage_define: HashMap<ShaderStage, HashMap<String, String>>, // Specific macro defined per shader stage
+    trace: Option<ServerTrace>,                                  // Level of error to display
+    severity: Option<String>,        // Severity of diagnostic to display
+    config_override: Option<String>, // Override configuration file
+    hlsl: Option<ServerHlslConfig>,  // Hlsl specific configuration
+    glsl: Option<ServerGlslConfig>,  // Glsl specific configuration
 }
 
 /// Configuration computed from both server configuration and engine configuration.
@@ -104,8 +105,7 @@ pub struct ServerConfig {
     includes: Vec<PathBuf>,
     defines: HashMap<String, String>,
     path_remapping: HashMap<PathBuf, PathBuf>,
-    // Hashmap of hashmap complicated to implement in vscode.
-    stage_define: HashMap<ShaderStage, String>, // Support a single macro per stage ? or separate them with ; or something (what about value)
+    stage_define: HashMap<ShaderStage, HashMap<String, String>>,
     validate: bool,
     symbols: bool,
     symbol_diagnostics: bool,
@@ -147,7 +147,7 @@ impl ServerSerializedConfig {
                 .symbol_diagnostics
                 .unwrap_or(ServerConfig::DEFAULT_SYMBOL_DIAGNOSTIC),
             trace: self.trace.unwrap_or(ServerConfig::DEFAULT_TRACE),
-            stage_define: HashMap::new(),
+            stage_define: self.stage_define,
             severity: self
                 .severity
                 .map(|s| ShaderDiagnosticSeverity::from(s.as_str()))
@@ -281,6 +281,16 @@ impl ServerConfig {
         let hlsl = self.hlsl.clone();
         let glsl = self.glsl.clone();
         let wgsl = self.wgsl.clone();
+        // Add stage defines
+        let stage_defines = if let Some(shader_stage) = &shader_stage {
+            match self.stage_define.get(shader_stage) {
+                Some(stage_defines) => stage_defines.clone(),
+                None => HashMap::new(),
+            }
+        } else {
+            HashMap::new()
+        };
+        defines.extend(stage_defines);
         ShaderParams {
             context: ShaderContextParams {
                 defines,
