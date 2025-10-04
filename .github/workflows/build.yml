@@ -13,7 +13,11 @@ env:
 jobs:
   
   test:
-    runs-on: windows-latest
+    # windows-latest uses Windows server 2025 which seems to be missing some library 
+    # maybe because hassle-rs uses com crate which is deprecated in favor of windows-rs
+    # Check https://github.com/actions/runner-images/issues/12677
+    # So uses 2022 instead
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.90
